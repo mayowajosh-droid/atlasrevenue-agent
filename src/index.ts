@@ -10,6 +10,8 @@ import cors from "cors";
 import { Pool } from "pg";
 import OpenAI from "openai";
 import { z } from "zod";
+import { Queue, Worker } from "bullmq";
+import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
@@ -69,6 +71,7 @@ app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
+const REDIS_URL = process.env.REDIS_URL || null;
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -76,6 +79,18 @@ const pool = process.env.DATABASE_URL
 
 const memoryStore = new Map<string, ScanRecord>();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const redisConnection = REDIS_URL
+  ? new Redis(REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false
+    })
+  : null;
+
+const scanQueue = redisConnection
+  ? new Queue("govrevenue-scans", { connection: redisConnection as any })
+  : null;
+
 
 const intakeSchema = z.object({
   companyName: z.string().min(2),
@@ -1441,6 +1456,68 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
     });
   }
 }
+
+async function enqueueScan(id: string, input: z.infer<typeof intakeSchema>) {
+  if (!scanQueue) {
+    console.log("[queue] REDIS_URL not set. Running scan in-process.");
+    runScan(id, input).catch(console.error);
+    return;
+  }
+
+  await scanQueue.add(
+    "run-scan",
+    { id, input },
+    {
+      attempts: 2,
+      backoff: {
+        type: "exponential",
+        delay: 5000
+      },
+      removeOnComplete: {
+        age: 60 * 60 * 24 * 7,
+        count: 1000
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 14,
+        count: 1000
+      }
+    }
+  );
+
+  console.log(`[queue] queued scan ${id}`);
+}
+
+function startScanWorker() {
+  if (!redisConnection) {
+    console.log("[queue] Redis not configured. Worker disabled.");
+    return;
+  }
+
+  const worker = new Worker(
+    "govrevenue-scans",
+    async job => {
+      const { id, input } = job.data || {};
+      if (!id || !input) throw new Error("Invalid scan job payload.");
+      console.log(`[worker] processing scan ${id}`);
+      await runScan(id, input);
+    },
+    {
+      connection: redisConnection as any,
+      concurrency: Number(process.env.SCAN_WORKER_CONCURRENCY || 1)
+    }
+  );
+
+  worker.on("completed", job => {
+    console.log(`[worker] completed job ${job.id}`);
+  });
+
+  worker.on("failed", (job, error) => {
+    console.error(`[worker] failed job ${job?.id}`, error);
+  });
+
+  console.log("[queue] worker started");
+}
+
 
 
 type ScoreItem = {
@@ -3198,6 +3275,7 @@ app.get("/health", (_req, res) => {
     ok: true,
     app: "govrevenue-agent",
     database: pool ? "postgres" : "memory",
+    queue: scanQueue ? "redis" : "in-process",
     model: OPENAI_MODEL
   });
 });
@@ -3298,7 +3376,7 @@ app.post("/form-submit", async (req, res) => {
   }
 
   const scan = await createScan(parsed.data);
-  runScan(scan.id, parsed.data).catch(console.error);
+  await enqueueScan(scan.id, parsed.data);
 
   res.type("html").send(`
     <body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:32px">
@@ -3321,7 +3399,7 @@ app.post("/api/scans", async (req, res) => {
   }
 
   const scan = await createScan(parsed.data);
-  runScan(scan.id, parsed.data).catch(console.error);
+  await enqueueScan(scan.id, parsed.data);
 
   res.status(202).json({
     id: scan.id,
@@ -3598,6 +3676,8 @@ ${scans
 
 initDb()
   .then(() => {
+    startScanWorker();
+
     app.listen(PORT, () => {
       console.log(`[server] GovRevenue Agent running on port ${PORT}`);
     });

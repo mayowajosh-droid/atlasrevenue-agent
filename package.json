@@ -12,10 +12,13 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1069.0",
+    "bullmq": "^5.78.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "echarts": "^6.1.0",
     "express": "^4.21.2",
+    "ioredis": "^5.11.1",
     "openai": "^6.25.0",
     "pg": "^8.13.1",
     "puppeteer": "^25.1.0",
