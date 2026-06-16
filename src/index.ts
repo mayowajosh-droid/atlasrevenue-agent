@@ -2296,7 +2296,7 @@ function calcPremiumScores(scan: ScanRecord) {
         : "Partner/subcontract first";
 
   const sector =
-    construction ? "${escapeHtml(sectorLens)}" :
+    construction ? escapeHtml(inferSectorLens(scan)) :
     creative ? "Creative, media and visual services" :
     "Professional services";
 
@@ -2489,7 +2489,18 @@ function inferSectorLens(scan: ScanRecord) {
     text.includes("building surveying") ||
     text.includes("estate")
   ) {
-    return "${escapeHtml(sectorLens)}";
+   const scanData = scan as Record<string, any>;
+const explicitSectorLens = String(scanData.sector_lens ?? scanData.sectorLens ?? "").trim();
+
+if (explicitSectorLens) return explicitSectorLens;
+
+const sector = inferGovRevenueSector(scan).toLowerCase();
+
+if (sector.includes("clean")) {
+  return "Specialist cleaning, healthcare deep cleaning, education facilities cleaning, local authority estate cleaning and reactive hygiene support";
+}
+
+return inferGovRevenueSector(scan);
   }
 
   if (
