@@ -3282,87 +3282,249 @@ app.get("/health", (_req, res) => {
 
 app.get("/", (_req, res) => {
   res.type("html").send(`<!doctype html>
-<html>
+<html lang="en">
 <head>
-  <title>GovRevenue Agent</title>
+  <title>GovRevenue | Public-sector revenue intelligence</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family:Arial,sans-serif; background:#f3eadc; color:#24140f; margin:0; padding:32px; }
-    .wrap { max-width:980px; margin:0 auto; background:#fffaf3; border:1px solid #d2b88f; padding:30px; box-shadow:0 22px 70px rgba(36,20,15,.10); }
-    h1 { font-family:Georgia,serif; font-size:46px; margin:0 0 8px; }
-    p { line-height:1.55; color:#6f5b50; }
-    label { display:block; font-weight:800; margin-top:18px; }
-    input, textarea { width:100%; padding:13px; border:1px solid #d2b88f; background:#fff; font-size:15px; box-sizing:border-box; }
-    textarea { min-height:88px; }
-    button { margin-top:22px; padding:15px 22px; background:#24140f; color:#fff; border:0; font-weight:800; cursor:pointer; }
-    .small { font-size:13px; }
+    :root {
+      --ink: #21130d;
+      --muted: #6e594d;
+      --ivory: #fff9ef;
+      --warm: #f5e7d0;
+      --card: rgba(255, 252, 246, .92);
+      --line: rgba(74, 45, 28, .16);
+      --bronze: #b77a25;
+      --gold: #ddb46a;
+      --shadow: 0 22px 70px rgba(45, 25, 15, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(221, 180, 106, .34), transparent 34rem),
+        radial-gradient(circle at 90% 8%, rgba(33, 19, 13, .10), transparent 28rem),
+        linear-gradient(180deg, var(--ivory), var(--warm));
+    }
+
+    .page { width: min(1120px, calc(100% - 28px)); margin: 0 auto; padding: 18px 0 42px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: -.03em; }
+    .brand-badge { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #21130d, #7b4d18); box-shadow: 0 12px 26px rgba(33, 19, 13, .24); }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; color: #76521f; background: rgba(255, 249, 239, .72); font-size: 12px; font-weight: 900; }
+
+    .hero { display: grid; gap: 16px; }
+    .hero-card, .preview-card, .intake-card { border: 1px solid var(--line); border-radius: 28px; background: var(--card); box-shadow: var(--shadow); }
+    .hero-card { padding: 28px; overflow: hidden; position: relative; }
+    .hero-card:after { content: ""; position: absolute; right: -76px; top: -76px; width: 190px; height: 190px; border-radius: 999px; border: 36px solid rgba(183, 122, 37, .13); }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(183, 122, 37, .32); border-radius: 999px; padding: 7px 11px; color: #7b4d18; background: rgba(255, 246, 230, .84); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .1em; }
+    h1 { margin: 18px 0 12px; max-width: 760px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 10vw, 76px); line-height: .95; letter-spacing: -.06em; }
+    .lede { max-width: 700px; margin: 0; color: var(--muted); font-size: 17px; line-height: 1.55; }
+    .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
+    .cta, button { border: 0; border-radius: 999px; padding: 15px 22px; color: #fff; background: #21130d; font-weight: 900; text-decoration: none; box-shadow: 0 14px 32px rgba(33, 19, 13, .24); cursor: pointer; }
+    .text-link { color: #21130d; font-weight: 900; text-decoration-color: rgba(183, 122, 37, .5); text-underline-offset: 4px; }
+
+    .value-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 18px; }
+    .value-card { border: 1px solid var(--line); border-radius: 20px; padding: 16px; background: rgba(255, 255, 255, .58); }
+    .value-card b { display: block; margin-bottom: 4px; }
+    .value-card span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+    .preview-card { padding: 22px; }
+    .section-label { margin: 0 0 6px; color: #7b4d18; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; }
+    h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 30px; letter-spacing: -.04em; }
+    .dashboard { display: grid; gap: 12px; margin-top: 18px; }
+    .stat-row { display: grid; grid-template-columns: 128px 1fr 44px; align-items: center; gap: 10px; color: #4e382c; font-size: 13px; font-weight: 900; }
+    .track { height: 12px; overflow: hidden; border-radius: 999px; background: #ead9bd; }
+    .fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #21130d, var(--bronze), var(--gold)); }
+    .preview-notes { display: grid; gap: 10px; margin-top: 16px; }
+    .note { border-left: 4px solid var(--bronze); border-radius: 16px; padding: 13px 14px; background: #fff; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .note b { color: var(--ink); }
+
+    .intake-card { padding: 22px; }
+    .form-intro { margin: 7px 0 18px; color: var(--muted); line-height: 1.5; }
+    form { display: grid; gap: 18px; }
+    fieldset { border: 1px solid var(--line); border-radius: 22px; padding: 16px; background: rgba(255, 255, 255, .42); }
+    legend { padding: 0 8px; color: #7b4d18; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .1em; }
+    .fields { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    label { display: block; margin-bottom: 7px; color: #352117; font-size: 13px; font-weight: 900; }
+    input, textarea { width: 100%; border: 1px solid rgba(74, 45, 28, .20); border-radius: 18px; padding: 15px 16px; color: var(--ink); background: rgba(255, 255, 255, .9); font: inherit; outline: none; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+    textarea { min-height: 96px; resize: vertical; }
+    input:focus, textarea:focus { border-color: rgba(183, 122, 37, .86); box-shadow: 0 0 0 4px rgba(183, 122, 37, .14); background: #fff; }
+    .form-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .small { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    code { border-radius: 7px; padding: 2px 5px; background: rgba(33, 19, 13, .08); }
+
+    @media (min-width: 720px) {
+      .page { padding-top: 28px; }
+      .hero-card, .preview-card, .intake-card { border-radius: 34px; }
+      .hero-card { padding: 40px; }
+      .hero { grid-template-columns: 1.05fr .95fr; align-items: start; }
+      .hero-card { grid-column: 1 / -1; }
+      .value-grid { grid-template-columns: repeat(4, 1fr); }
+      .preview-notes { grid-template-columns: repeat(2, 1fr); }
+      .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .full { grid-column: 1 / -1; }
+    }
+
+    @media (min-width: 980px) {
+      .hero-card { min-height: 390px; }
+      .preview-card { position: sticky; top: 18px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>GovRevenue Agent.</h1>
-    <p>Public-sector revenue intelligence. Pulls Contracts Finder data, checks public signals, and turns the result into a commercial scan.</p>
+  <!-- GOVREVENUE_PREMIUM_HOME_V3 -->
+  <main class="page">
+    <header class="topbar">
+      <div class="brand"><span class="brand-badge">GR</span><span>GovRevenue Agent</span></div>
+      <span class="pill">Contracts Finder signals · Source-backed evidence</span>
+    </header>
 
-    <form method="POST" action="/form-submit">
-      <label>Company name</label>
-      <input name="companyName" required placeholder="The First Studios" />
+    <section class="hero" aria-label="GovRevenue homepage">
+      <div class="hero-card">
+        <span class="eyebrow">Public-sector revenue intelligence</span>
+        <h1>Find where your business can win public-sector work.</h1>
+        <p class="lede">GovRevenue turns public procurement data into a focused buyer route, evidence checklist and PDF action report so teams can stop chasing noise and start targeting credible opportunities.</p>
+        <div class="hero-actions">
+          <a class="cta" href="#scan-intake">Start scan</a>
+          <a class="text-link" href="/health">Check system health</a>
+        </div>
+        <div class="value-grid" aria-label="GovRevenue value cards">
+          <div class="value-card"><b>Contracts Finder signals</b><span>Pulls public opportunity and award records into one practical scan.</span></div>
+          <div class="value-card"><b>Buyer route mapping</b><span>Highlights the public bodies and entry routes worth prioritising.</span></div>
+          <div class="value-card"><b>Source-backed evidence</b><span>Separates supported signals from weak or noisy procurement matches.</span></div>
+          <div class="value-card"><b>PDF action report</b><span>Packages recommendations into a commercial report your team can use.</span></div>
+        </div>
+      </div>
 
-      <label>Website</label>
-      <input name="website" placeholder="https://..." />
+      <aside class="preview-card" aria-label="Dashboard preview">
+        <p class="section-label">Dashboard preview</p>
+        <h2>From raw notices to a credible pursuit plan.</h2>
+        <div class="dashboard">
+          <div class="stat-row"><span>Signals found</span><div class="track"><span class="fill" style="width:100%"></span></div><strong>100%</strong></div>
+          <div class="stat-row"><span>Relevant buyers</span><div class="track"><span class="fill" style="width:62%"></span></div><strong>62%</strong></div>
+          <div class="stat-row"><span>Action-ready</span><div class="track"><span class="fill" style="width:38%"></span></div><strong>38%</strong></div>
+        </div>
+        <div class="preview-notes">
+          <div class="note"><b>Trust gate:</b> records are filtered before they reach the recommendation layer.</div>
+          <div class="note"><b>Commercial lens:</b> every output points back to buyer fit, proof gaps and next actions.</div>
+        </div>
+      </aside>
 
-      <label>Location / base</label>
-      <input name="location" placeholder="Birmingham, West Midlands, UK" />
+      <section class="intake-card" id="scan-intake" aria-label="Scan intake">
+        <p class="section-label">Scan intake</p>
+        <h2>Tell GovRevenue what to scan.</h2>
+        <p class="form-intro">Keep the brief concise. The scan uses these details to narrow buyer fit, contract value, geography and readiness.</p>
 
-      <label>Areas served</label>
-      <textarea name="areasServed" placeholder="Birmingham, West Midlands, London and wider UK"></textarea>
+        <form method="POST" action="/form-submit">
+          <fieldset>
+            <legend>Company profile</legend>
+            <div class="fields">
+              <div>
+                <label>Company name</label>
+                <input name="companyName" required placeholder="The First Studios" />
+              </div>
+              <div>
+                <label>Website</label>
+                <input name="website" placeholder="https://..." />
+              </div>
+              <div>
+                <label>Location / base</label>
+                <input name="location" placeholder="Birmingham, West Midlands, UK" />
+              </div>
+              <div>
+                <label>Team size</label>
+                <input name="teamSize" />
+              </div>
+              <div class="full">
+                <label>Areas served</label>
+                <textarea name="areasServed" placeholder="Birmingham, West Midlands, London and wider UK"></textarea>
+              </div>
+            </div>
+          </fieldset>
 
-      <label>Main services</label>
-      <textarea name="mainServices" required placeholder="Wedding photography, portraits, graduation photography, event photography, property photography"></textarea>
+          <fieldset>
+            <legend>Services and fit</legend>
+            <div class="fields">
+              <div class="full">
+                <label>Main services</label>
+                <textarea name="mainServices" required placeholder="Wedding photography, portraits, graduation photography, event photography, property photography"></textarea>
+              </div>
+              <div class="full">
+                <label>Secondary services</label>
+                <textarea name="secondaryServices"></textarea>
+              </div>
+              <div class="full">
+                <label>Ideal public-sector buyers</label>
+                <textarea name="idealBuyers" placeholder="Councils, NHS trusts, universities, housing associations"></textarea>
+              </div>
+              <div class="full">
+                <label>Services they do NOT want</label>
+                <textarea name="excludedServices"></textarea>
+              </div>
+            </div>
+          </fieldset>
 
-      <label>Secondary services</label>
-      <textarea name="secondaryServices"></textarea>
+          <fieldset>
+            <legend>Commercial boundaries</legend>
+            <div class="fields">
+              <div>
+                <label>Ideal contract size</label>
+                <input name="idealContractSize" placeholder="£500-£5,000 first projects; £5,000-£25,000 repeat work" />
+              </div>
+              <div>
+                <label>Maximum contract size</label>
+                <input name="maximumContractSize" />
+              </div>
+              <div class="full">
+                <label>Regions to scan first</label>
+                <textarea name="regionsToScan" placeholder="West Midlands first, then London"></textarea>
+              </div>
+            </div>
+          </fieldset>
 
-      <label>Ideal public-sector buyers</label>
-      <textarea name="idealBuyers" placeholder="Councils, NHS trusts, universities, housing associations"></textarea>
+          <fieldset>
+            <legend>Proof and report goals</legend>
+            <div class="fields">
+              <div>
+                <label>Public-sector experience</label>
+                <input name="publicSectorExperience" placeholder="None / early-stage / some / strong" />
+              </div>
+              <div class="full">
+                <label>Case studies or proof</label>
+                <textarea name="caseStudies"></textarea>
+              </div>
+              <div class="full">
+                <label>Certifications / policies / accreditations</label>
+                <textarea name="certifications"></textarea>
+              </div>
+              <div class="full">
+                <label>Main business goal</label>
+                <textarea name="mainGoal"></textarea>
+              </div>
+              <div class="full">
+                <label>Biggest concern</label>
+                <textarea name="biggestConcern"></textarea>
+              </div>
+              <div class="full">
+                <label>Preferred output</label>
+                <textarea name="preferredOutput"></textarea>
+              </div>
+            </div>
+          </fieldset>
 
-      <label>Ideal contract size</label>
-      <input name="idealContractSize" placeholder="£500-£5,000 first projects; £5,000-£25,000 repeat work" />
-
-      <label>Maximum contract size</label>
-      <input name="maximumContractSize" />
-
-      <label>Team size</label>
-      <input name="teamSize" />
-
-      <label>Public-sector experience</label>
-      <input name="publicSectorExperience" placeholder="None / early-stage / some / strong" />
-
-      <label>Case studies or proof</label>
-      <textarea name="caseStudies"></textarea>
-
-      <label>Certifications / policies / accreditations</label>
-      <textarea name="certifications"></textarea>
-
-      <label>Services they do NOT want</label>
-      <textarea name="excludedServices"></textarea>
-
-      <label>Regions to scan first</label>
-      <textarea name="regionsToScan" placeholder="West Midlands first, then London"></textarea>
-
-      <label>Main business goal</label>
-      <textarea name="mainGoal"></textarea>
-
-      <label>Biggest concern</label>
-      <textarea name="biggestConcern"></textarea>
-
-      <label>Preferred output</label>
-      <textarea name="preferredOutput"></textarea>
-
-      <button type="submit">Run GovRevenue Scan</button>
-    </form>
-
-    <p class="small">Admin page: <code>/admin/scans?token=YOUR_ADMIN_TOKEN</code></p>
-  </div>
+          <div class="form-footer">
+            <button type="submit">Start scan</button>
+            <p class="small">Admin page: <code>/admin/scans?token=YOUR_ADMIN_TOKEN</code></p>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
 </body>
 </html>`);
 });
