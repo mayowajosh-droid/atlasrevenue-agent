@@ -3789,28 +3789,28 @@ app.get("/", (_req, res) => {
 
         <form method="POST" action="/form-submit">
           <label>Company name</label>
-          <input name="companyName" required placeholder="The First Studios" />
+          <input name="companyName" required />
 
           <label>Website</label>
-          <input name="website" placeholder="https://..." />
+          <input name="website" />
 
           <label>Location / base</label>
-          <input name="location" placeholder="Birmingham, West Midlands, UK" />
+          <input name="location" />
 
           <label>Areas served</label>
-          <textarea name="areasServed" placeholder="Birmingham, West Midlands, London and wider UK"></textarea>
+          <textarea name="areasServed"></textarea>
 
           <label>Main services</label>
-          <textarea name="mainServices" required placeholder="Commercial solar, retrofit, roofing, EV charging, property services"></textarea>
+          <textarea name="mainServices" required></textarea>
 
           <label>Secondary services</label>
           <textarea name="secondaryServices"></textarea>
 
           <label>Ideal public-sector buyers</label>
-          <textarea name="idealBuyers" placeholder="Councils, NHS trusts, universities, schools, housing associations"></textarea>
+          <textarea name="idealBuyers"></textarea>
 
           <label>Ideal contract size</label>
-          <input name="idealContractSize" placeholder="£25k-£150k, £100k-£500k, £500k+" />
+          <input name="idealContractSize" />
 
           <label>Maximum contract size</label>
           <input name="maximumContractSize" />
@@ -3819,7 +3819,7 @@ app.get("/", (_req, res) => {
           <input name="teamSize" />
 
           <label>Public-sector experience</label>
-          <input name="publicSectorExperience" placeholder="None / early-stage / some / strong" />
+          <input name="publicSectorExperience" />
 
           <label>Case studies or proof</label>
           <textarea name="caseStudies"></textarea>
@@ -3831,16 +3831,16 @@ app.get("/", (_req, res) => {
           <textarea name="excludedServices"></textarea>
 
           <label>Regions to scan first</label>
-          <textarea name="regionsToScan" placeholder="West Midlands first, then London"></textarea>
+          <textarea name="regionsToScan"></textarea>
 
           <label>Main business goal</label>
-          <textarea name="mainGoal" placeholder="Win direct tenders, find frameworks, find subcontracting routes, understand buyers"></textarea>
+          <textarea name="mainGoal"></textarea>
 
           <label>Biggest concern</label>
           <textarea name="biggestConcern"></textarea>
 
           <label>Preferred output</label>
-          <textarea name="preferredOutput" placeholder="Short commercial report, detailed board report, opportunity shortlist"></textarea>
+          <textarea name="preferredOutput"></textarea>
 
           <button type="submit">Run GovRevenue Scan</button>
         </form>
