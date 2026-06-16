@@ -3598,6 +3598,14 @@ function reportPage(scan: ScanRecord) {
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
   </main>
+  <script>
+    window.addEventListener("pageshow", () => {
+      document.querySelectorAll("#scan-intake input, #scan-intake textarea").forEach((field) => {
+        field.value = "";
+        field.setAttribute("autocomplete", "off");
+      });
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -3787,7 +3795,7 @@ app.get("/", (_req, res) => {
         <h2 class="form-title">Scan intake</h2>
         <p class="form-sub">Give the agent enough context to judge fit, route and commercial priority.</p>
 
-        <form method="POST" action="/form-submit">
+        <form method="POST" action="/form-submit" autocomplete="off">
           <label>Company name</label>
           <input name="companyName" required />
 
@@ -3858,6 +3866,14 @@ app.get("/", (_req, res) => {
       </div>
     </section>
   </main>
+  <script>
+    window.addEventListener("pageshow", () => {
+      document.querySelectorAll("#scan-intake input, #scan-intake textarea").forEach((field) => {
+        field.value = "";
+        field.setAttribute("autocomplete", "off");
+      });
+    });
+  </script>
 </body>
 </html>`);
 });
