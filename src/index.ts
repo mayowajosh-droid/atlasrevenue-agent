@@ -322,6 +322,25 @@ function buildKeywords(input: z.infer<typeof intakeSchema>) {
 
   const catalog = [
     {
+      triggers: [
+        "social housing", "housing repairs", "void maintenance", "void property",
+        "responsive repairs", "planned maintenance", "housing maintenance",
+        "repairs and maintenance", "voids and planned", "housing refurbishment",
+        "registered social landlord", "almo", "housing association",
+        "housing management", "resident-facing", "resident facing"
+      ],
+      keywords: [
+        "housing repairs and maintenance",
+        "responsive repairs",
+        "void property maintenance",
+        "planned maintenance",
+        "social housing maintenance",
+        "housing refurbishment",
+        "housing retrofit",
+        "social housing retrofit"
+      ]
+    },
+    {
       triggers: ["quantity surveying", "quantity surveyor", "cost management", "cost consultancy", "cost consultant", "qs"],
       keywords: ["quantity surveying", "cost management", "cost consultancy", "construction consultancy"]
     },
@@ -330,15 +349,19 @@ function buildKeywords(input: z.infer<typeof intakeSchema>) {
       keywords: ["construction project management", "project management", "programme management", "employer's agent", "contract administration", "project controls"]
     },
     {
-      triggers: ["building surveying", "building survey", "condition survey", "six facet", "estate", "estates", "asset management", "property consultancy", "strategic estate", "built asset"],
+      triggers: ["building surveying", "building survey", "condition survey", "six facet", "estate consultancy", "estate management", "strategic estate", "asset management consultancy", "property consultancy", "built asset consultancy"],
       keywords: ["building surveying", "condition survey", "estate consultancy", "asset management", "property consultancy", "built asset consultancy"]
     },
     {
-      triggers: ["retrofit", "decarbonisation", "decarbonization", "net zero", "energy efficiency", "sustainability"],
+      triggers: ["retrofit consultancy", "decarbonisation consultancy", "net zero consultancy", "energy efficiency consultancy", "sustainability consultancy", "retrofit assessment", "whole house retrofit"],
       keywords: ["retrofit consultancy", "decarbonisation", "net zero consultancy", "energy efficiency", "sustainability consultancy"]
     },
     {
-      triggers: ["facilities management", "fm", "maintenance", "hard fm", "soft fm"],
+      triggers: ["retrofit", "decarbonisation", "decarbonization", "net zero", "energy efficiency", "sustainability", "shdf", "social housing decarbonisation"],
+      keywords: ["housing retrofit", "social housing decarbonisation", "SHDF retrofit", "energy efficiency works", "net zero housing"]
+    },
+    {
+      triggers: ["facilities management", "hard fm", "soft fm", "fm services"],
       keywords: ["facilities management", "estate maintenance", "hard FM"]
     },
     {
