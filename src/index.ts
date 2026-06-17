@@ -2807,7 +2807,7 @@ const DESK_PROFILES: DeskProfile[] = [
   {
     slug: "construction",
     label: "Construction & Estates",
-    standfirst: "Capital works, building refurbishment, and estate management across local authorities and housing associations — the largest-value category on Contracts Finder.",
+    standfirst: "Capital works, refurbishment and estates services across the public sector.",
     live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
@@ -2816,15 +2816,15 @@ const DESK_PROFILES: DeskProfile[] = [
       mainGoal: "find construction and estate management contracts"
     }),
     categories: [
-      { label: "Repairs, Maintenance & Voids",         keywords: ["repair", "maintenance", "void", "responsive", "reactive", "handyman"],                                          subcategories: ["Reactive repairs","Planned maintenance","Void property works","Minor works","Handyman services","Multi-trade repairs","Damp & mould works"] },
-      { label: "Refurbishment & Fit-out",               keywords: ["refurb", "fit-out", "fitout", "renovation", "internal works", "conversion"],                                    subcategories: ["Refurbishment","Internal fit-out","Extensions","Classroom refurbishment","Toilet refurbishment","Kitchen refurbishment","Office fit-out"] },
-      { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                 subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating"] },
-      { label: "Mechanical, Electrical & Plumbing",    keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],          subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance"] },
-      { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "compliance", "remediation", "access control", "cctv"],                 subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Access control & CCTV"] },
-      { label: "Decarbonisation & Retrofit",            keywords: ["retrofit", "decarb", "energy efficiency", "solar", "heat pump", "led upgrade", "net zero", "insulation"],       subcategories: ["Energy efficiency","Retrofit works","Heat pumps","Solar PV","LED upgrades","Insulation","Net zero works"] },
-      { label: "Grounds, Civils & External Works",      keywords: ["grounds", "civil", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath"],    subcategories: ["Drainage","Surfacing","Landscaping","Fencing","Car parks","Playgrounds","Footpaths"] },
-      { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],        subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins"] },
-      { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "project management", "architectural", "quantity", "structural", "clerk of works"],  subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy"] },
+      { label: "Repairs, Maintenance & Voids",         keywords: ["repair", "maintenance", "void", "responsive", "reactive", "handyman"],                                          subcategories: ["Reactive repairs","Planned maintenance","Void property works","Minor works","Handyman services","Multi-trade repairs","Damp & mould works","Emergency repairs","Cyclical maintenance","Pre-void inspections","Void turnaround","Graffiti removal","Patch repairs","Drain unblocking","Gutter clearing","Pest control","Lock & key","Sash window repairs","Minor electrical","Minor plumbing"] },
+      { label: "Refurbishment & Fit-out",               keywords: ["refurb", "fit-out", "fitout", "renovation", "internal works", "conversion"],                                    subcategories: ["Refurbishment","Internal fit-out","Extensions","Classroom refurbishment","Toilet refurbishment","Kitchen refurbishment","Office fit-out","Strip-out & demolition","Major refurbishment","Window replacement","Door replacement","Flooring renewal","Bathroom pods","Accessible adaptations","Cosmetic upgrades","Loft conversion","Outbuilding conversion"] },
+      { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                 subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating","Flat roof replacement","Pitched roof repair","Fascias & soffits","UPVC replacement","Sash restoration","Curtain walling","Stonework","Pointing & repointing","External rendering","Leadwork","Roof inspection"] },
+      { label: "M&E, Plumbing & Electrical",            keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],          subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance","Hot water systems","Underfloor heating","Air conditioning","Switchgear","EV charging points","Solar panels","Mechanical ventilation","Data cabling","Emergency lighting","Sprinkler systems","Consumer units"] },
+      { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "compliance", "remediation", "access control", "cctv"],                 subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Access control & CCTV","Fire risk assessment","ACM cladding removal","EWS1 surveys","Waking watch","Compartmentalisation","Cavity barriers","Fire stopping","Smoke detectors","AOV systems","Fire suppression"] },
+      { label: "Decarbonisation & Retrofit",            keywords: ["retrofit", "decarb", "energy efficiency", "solar", "heat pump", "led upgrade", "net zero", "insulation"],       subcategories: ["Energy efficiency","Retrofit works","Heat pumps","Solar PV","LED upgrades","Insulation","Net zero works","Air source heat pumps","Ground source heat pumps","Cavity wall insulation","Solid wall insulation","Loft insulation","PAS 2035 retrofit","EPC improvements","Triple glazing","Demand response"] },
+      { label: "Grounds, Civils & External Works",      keywords: ["grounds", "civil", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath"],    subcategories: ["Drainage","Surfacing","Landscaping","Fencing","Car parks","Playgrounds","Footpaths","Tarmac resurfacing","Block paving","Boundary walls","Security fencing","Cycle shelters","Bin stores","Street furniture","Retaining walls","Kerbing","SUDS drainage","Attenuation tanks"] },
+      { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],        subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins","Timber & joinery","Ironmongery","Fixings & fasteners","Paint & coatings","Insulation materials","Roof materials","Floor coverings","Aggregates","Ready-mixed concrete","Skip hire","Temporary electrics"] },
+      { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "project management", "architectural", "quantity", "structural", "clerk of works"],  subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy","CDM coordination","Principal designer","Planning consultancy","Fire engineering","Mechanical design","Electrical design","Party wall surveying","Condition surveys","Asset management","Energy consultancy","Due diligence"] },
     ]
   },
   {
@@ -2844,6 +2844,25 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Managed Services",    keywords: ["managed service", "total fm", "integrated", "outsourced", "facilities management"],            subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
       { label: "Energy Management",   keywords: ["energy", "utilities", "metering", "sustainability", "carbon"],                                 subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
       { label: "Compliance & Safety", keywords: ["compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing"],      subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
+    ]
+  },
+  {
+    slug: "education",
+    label: "Education & Skills",
+    standfirst: "Schools, further education, skills and training procurement across local authorities, academy trusts, DfE and colleges.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "school refurbishment education technology learning management training skills courses further education academy",
+      idealBuyers: "local authorities academy trusts Department for Education further education colleges",
+      mainGoal: "find education and skills contracts"
+    }),
+    categories: [
+      { label: "School Buildings & Estates", keywords: ["school", "academy", "classroom", "education premises", "school refurb"],            subcategories: ["School refurbishment","RAAC remediation","Classroom fit-out","School expansion","Academy conversion","Caretaking","DDA works","Site security","Playground equipment","School gates"] },
+      { label: "Education Technology",       keywords: ["edtech", "education technology", "learning platform", "mis system", "school software", "vle", "lms"], subcategories: ["MIS systems","Learning platforms","VLE","Interactive displays","Broadband in schools","IT hardware","Digital literacy","Tablets & devices","Filtering software","Staff training tech"] },
+      { label: "Training & Skills",          keywords: ["training", "apprenticeship", "upskilling", "skills", "workforce development", "nvq", "cpd"],          subcategories: ["Apprenticeships","NVQ delivery","Leadership training","Digital skills","Workforce development","CPD programmes","Bootcamps","Functional skills","Sector-based work academies"] },
+      { label: "SEND & Alternative Provision", keywords: ["send", "special educational needs", "alternative provision", "pupil referral", "exclusion"],        subcategories: ["SEND support","Alternative provision","Pupil referral units","Educational psychology","Specialist tutoring","EHCP provision","Short breaks","Post-16 SEND"] },
+      { label: "Further & Higher Education", keywords: ["further education", "fe college", "higher education", "university", "adult education"],               subcategories: ["FE college services","HE procurement","Adult education budget","T-levels","Higher Technical Qualifications","Skills bootcamps","Multiply numeracy","ESOL provision"] },
     ]
   },
   {
@@ -2900,25 +2919,6 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "ict", "g-cloud", "digital outcomes"], subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
       { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "purchase order"],          subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
       { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market"],                                   subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
-    ]
-  },
-  {
-    slug: "procurement-act",
-    label: "Procurement Act",
-    standfirst: "The 24 February 2025 reform: new notice types, SME provisions, transparency pipeline notices, and what changes for bidders under the Procurement Act 2023.",
-    live: false,
-    pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
-      mainServices: "framework agreement dynamic purchasing system transparency notice pipeline notice competitive flexible procedure",
-      idealBuyers: "Cabinet Office Crown Commercial Service contracting authorities",
-      mainGoal: "track Procurement Act 2023 implementation notices and new procurement routes"
-    }),
-    categories: [
-      { label: "Pipeline Notices",           keywords: ["pipeline", "planned procurement notice", "pn"],                                   subcategories: ["12-month pipeline","Category planning","Forward workload"] },
-      { label: "Dynamic Markets",            keywords: ["dynamic market", "dynamic purchasing", "dps"],                                    subcategories: ["Open dynamic markets","DPS continuation","New dynamic markets"] },
-      { label: "Competitive Flexible",       keywords: ["competitive flexible", "competitive negotiated", "innovation partnership"],       subcategories: ["Competitive flexible procedure","Negotiated procedure","Innovation partnership"] },
-      { label: "Transparency Notices",       keywords: ["transparency", "contract award notice", "can"],                                   subcategories: ["Contract award notices","Modifications","Voluntary transparency"] },
-      { label: "Below-Threshold Routes",     keywords: ["below threshold", "sub-threshold", "low value", "direct award"],                  subcategories: ["Below threshold procedure","Direct award","Quote-based award"] },
     ]
   }
 ];
@@ -5030,6 +5030,61 @@ app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
 
 type InferredCategory = { label: string; count: number; value: number; subcategories: string[] };
 
+function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const ms = Date.now() - new Date(dateStr).getTime();
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return "< 1h ago";
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function buyerOrgType(buyer: string): string {
+  const b = buyer.toLowerCase();
+  if (b.includes("nhs") || b.includes("hospital") || b.includes("clinical commissioning") || b.includes("integrated care")) return "HEALTH";
+  if (b.includes("city council") || b.includes("borough council") || b.includes("district council") || b.includes("county council") || b.includes("metropolitan borough") || b.includes("london borough") || b.includes("unitary authority")) return "LOCAL AUTHORITY";
+  if (b.includes("ministry of") || b.includes("department for") || b.includes("department of") || b.includes("cabinet office") || b.includes("home office") || b.includes("treasury") || b.includes("hmrc") || b.includes("dvla") || b.includes("highways england")) return "CENTRAL GOV";
+  if (b.includes("housing association") || b.includes("homes england") || b.includes("housing trust") || b.includes("registered provider")) return "HOUSING";
+  if (b.includes("university") || b.includes("college") || b.includes(" school") || b.includes("academy trust")) return "EDUCATION";
+  return "";
+}
+
+function buyerInitials(buyer: string): string {
+  if (/^nhs /i.test(buyer)) return "NHS";
+  const stop = new Set(["the","a","of","and","for","&","in","on","at","to"]);
+  const words = buyer.split(/[\s,]+/).filter(w => w.length > 1 && !stop.has(w.toLowerCase()));
+  return words.slice(0, 3).map(w => w[0].toUpperCase()).join("") || buyer.slice(0, 2).toUpperCase();
+}
+
+function fmtMoney(v: number): string {
+  if (v >= 1_000_000_000) return `£${(v / 1_000_000_000).toFixed(2)}bn`;
+  if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`;
+  if (v >= 1_000) return `£${Math.round(v / 1_000)}k`;
+  return `£${Math.round(v)}`;
+}
+
+function getCategoryIcon(label: string): string {
+  const l = label.toLowerCase();
+  const s = (d: string) => `<svg class="dm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+  if (l.includes("repair") || l.includes("maintenance") || l.includes("void")) return s("M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z");
+  if (l.includes("refurb") || l.includes("fit-out") || l.includes("fitout")) return s("M4 20h16M8 20V8m8 12V8m-4 12V4");
+  if (l.includes("roof") || l.includes("window") || l.includes("fabric")) return s("M3 21V12l9-9 9 9v9H3zm6 0v-7h6v7");
+  if (l.includes("m&e") || l.includes("mechanical") || l.includes("electrical") || l.includes("plumbing")) return s("M13 2L3 14h9l-1 8 10-12h-9z");
+  if (l.includes("fire") || l.includes("compliance") || l.includes("remediation")) return s("M12 2l9 4.9V12c0 5.5-3.8 10.7-9 12-5.2-1.3-9-6.5-9-12V6.9zM9 12l2 2 4-4");
+  if (l.includes("decarb") || l.includes("retrofit") || l.includes("energy efficiency") || l.includes("net zero")) return s("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z");
+  if (l.includes("ground") || l.includes("civil") || l.includes("external")) return s("M12 22V12M12 12l-4-4M12 12l4-4M3 20h18M5 20V10l7-7 7 7v10");
+  if (l.includes("suppl") || l.includes("material") || l.includes("hire")) return s("M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12l8.73-5.04M12 22.08V12");
+  if (l.includes("school") || l.includes("building") || l.includes("estate")) return s("M3 21V12l9-9 9 9v9H3zm6 0v-5h6v5");
+  if (l.includes("technology") || l.includes("digital")) return s("M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18");
+  if (l.includes("training") || l.includes("skill")) return s("M12 2l9 4.9V12c0 5.5-3.8 10.7-9 12-5.2-1.3-9-6.5-9-12V6.9z");
+  if (l.includes("send") || l.includes("alternative")) return s("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2m22-2v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0");
+  if (l.includes("further") || l.includes("higher")) return s("M22 10v6m0 0-3-3m3 3 3-3M2 9l10-5 10 5-10 5zM6 12.5v5");
+  if (l.includes("hard fm") || l.includes("soft fm") || l.includes("managed")) return s("M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2");
+  if (l.includes("construction framework") || l.includes("framework")) return s("M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5");
+  return s("M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2");
+}
+
 function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCategory[]): InferredCategory[] {
   const result: InferredCategory[] = categories.map(c => ({ label: c.label, count: 0, value: 0, subcategories: c.subcategories }));
   for (const notice of notices) {
@@ -5045,125 +5100,177 @@ function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCateg
   return result;
 }
 
-function renderNoticeRow(n: ProcurementNotice): string {
-  const dateStr = (n.publishedDate || n.awardedDate)
-    ? new Date((n.publishedDate || n.awardedDate)!).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    : "—";
-  const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
-  const val = rawVal != null
-    ? (rawVal >= 1_000_000 ? `£${(rawVal / 1_000_000).toFixed(1)}m` : `£${Math.round(rawVal / 1000)}k`)
-    : "—";
-  return `<tr>
-    <td><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
-    <td class="nt-buyer">${escapeHtml(n.buyer.slice(0, 55))}</td>
-    <td class="nt-val">${escapeHtml(val)}</td>
-    <td class="nt-date">${escapeHtml(dateStr)}</td>
-    <td><span class="src-badge">${n.source === "Find a Tender" ? "FTS" : "CF"}</span></td>
-  </tr>`;
-}
-
-function renderDeskBuyerWatchlist(data: ProcurementData): string {
-  type BuyerEntry = { count: number; totalValue: number; latestDate: string | null };
-  const map = new Map<string, BuyerEntry>();
-  for (const n of data.contractsFinder.awarded) {
-    if (!n.buyer || n.buyer === "Not stated") continue;
-    const e = map.get(n.buyer) || { count: 0, totalValue: 0, latestDate: null };
-    e.count++;
-    if (n.awardedValue) e.totalValue += n.awardedValue;
-    if (n.awardedDate && (!e.latestDate || n.awardedDate > e.latestDate)) e.latestDate = n.awardedDate;
-    map.set(n.buyer, e);
-  }
-  const sorted = [...map.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
-  if (sorted.length === 0) return "";
-
-  const rows = sorted.map(([buyer, info]) => {
-    const tv = info.totalValue > 0
-      ? (info.totalValue >= 1_000_000 ? `£${(info.totalValue / 1_000_000).toFixed(1)}m` : `£${Math.round(info.totalValue / 1000)}k`)
-      : "—";
-    const ld = info.latestDate
-      ? new Date(info.latestDate).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
-      : "—";
-    return `<tr>
-      <td>${escapeHtml(buyer.slice(0, 60))}</td>
-      <td class="nt-val">${escapeHtml(String(info.count))}</td>
-      <td class="nt-val">${escapeHtml(tv)}</td>
-      <td class="nt-date">${escapeHtml(ld)}</td>
-    </tr>`;
-  }).join("");
-
-  return `<section class="desk-section">
-  <div class="wrap">
-    <div class="section-head"><h2>Active buyers</h2><span class="eyebrow">Derived from awarded contract records</span></div>
-    <table class="notice-table">
-      <thead><tr><th>Buyer</th><th>Awards found</th><th>Total awarded value</th><th>Latest award</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p class="nt-caveat">Source: Contracts Finder public award records &middot; not exhaustive &middot; covers notices matched by desk keywords only.</p>
-  </div>
-</section>`;
-}
-
 function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null): string {
   const isCompiling = cached === null;
   const data = cached?.data;
 
-  const openNotices = (data?.contractsFinder.open || [])
-    .concat(data?.findTender?.notices || [])
-    .slice(0, 30);
+  const allOpen = (data?.contractsFinder.open || []).concat(data?.findTender?.notices || []);
+  const openNotices = allOpen.slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
   const totalAwarded = awardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
-  const awardedCount = awardedNotices.filter(n => n.awardedValue).length;
-  const totalAwardedM = (totalAwarded / 1_000_000).toFixed(1);
-
-  const cacheAge = cached
-    ? (() => {
-        const ms = Date.now() - new Date(cached.cached_at).getTime();
-        const h = Math.floor(ms / 3_600_000);
-        return h < 1 ? "< 1h ago" : `${h}h ago`;
-      })()
-    : null;
-
+  const awardedCount = awardedNotices.length;
   const uniqueBuyerCount = new Set(awardedNotices.map(n => n.buyer).filter(b => b && b !== "Not stated")).size;
 
   const demandCategories = profile.live && !isCompiling
     ? inferDeskCategories(awardedNotices, profile.categories)
     : [];
 
+  // Buyer map: aggregate awarded value + open notice count per buyer
+  const buyerMap = new Map<string, { awardedValue: number; awardedCount: number; openCount: number }>();
+  for (const n of awardedNotices) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, awardedCount: 0, openCount: 0 };
+    e.awardedCount++;
+    e.awardedValue += n.awardedValue ?? 0;
+    buyerMap.set(n.buyer, e);
+  }
+  for (const n of allOpen) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, awardedCount: 0, openCount: 0 };
+    e.openCount++;
+    buyerMap.set(n.buyer, e);
+  }
+  const topBuyers = [...buyerMap.entries()]
+    .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
+    .slice(0, 5);
+
   const navLinks = DESK_PROFILES.map(d =>
-    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' style="color:var(--ink);border-bottom:1.5px solid var(--ink)"' : ''}>${escapeHtml(d.label)}</a>`
+    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ''}>${escapeHtml(d.label)}</a>`
   ).join("");
 
-  const feedHtml = !profile.live || isCompiling ? `` : `
-<section class="desk-section">
-  <div class="wrap">
-    <div class="section-head"><h2>Open opportunities</h2><span class="eyebrow">CF &middot; FTS &middot; public record &middot; ${escapeHtml(String(openNotices.length))} notices</span></div>
-    ${openNotices.length ? `<table class="notice-table">
-      <thead><tr><th>Notice</th><th>Buyer</th><th>Value</th><th>Published</th><th>Source</th></tr></thead>
-      <tbody>${openNotices.map(renderNoticeRow).join("")}</tbody>
-    </table>` : `<p class="nt-caveat">No open notices matched desk keywords at last refresh. Check back after the next compile.</p>`}
-  </div>
-</section>
-${renderDeskBuyerWatchlist(data!)}`;
+  const fmtBig = (v: number) => v >= 1_000_000_000
+    ? `£${(v / 1_000_000_000).toFixed(2)}bn`
+    : `£${(v / 1_000_000).toFixed(2)}m`;
 
-  const interstitialHtml = !profile.live || isCompiling ? `
-<section class="desk-section">
-  <div class="wrap">
-    <div class="interstitial-card">
-      <div class="eyebrow">${isCompiling ? "Compiling the record" : "Desk opening"}</div>
-      <h2>${isCompiling ? "Pulling the public record&hellip;" : "This desk opens soon."}</h2>
-      <p>${isCompiling
-        ? "The first pull takes 60–90 seconds. This page will have live data within the hour — refresh then, or run a targeted scan now."
-        : "This sector desk is being compiled. In the meantime, run a targeted scan for your firm to see your specific fit."
-      }</p>
-      <a class="btn-primary" href="/scan">Run a scan for this sector &rarr;</a>
+  const topCats = profile.live && !isCompiling
+    ? [...demandCategories].sort((a, b) => b.value - a.value).slice(0, 5).filter(c => c.value > 0)
+    : [];
+  const maxCatVal = topCats[0]?.value || 1;
+
+  // Demand signal panel
+  const demandHtml = profile.live && !isCompiling
+    ? `<div class="dp-head-row">
+        <span class="dp-eyebrow">AWARDED DEMAND SIGNAL</span>
+        <span class="dp-info" title="Based on awarded notices in the public record">ⓘ</span>
+       </div>
+       <p class="dp-caveat-sm">Based on awarded notices found in the public record<br>for this desk profile (last 12 months).</p>
+       <div class="dp-stats">
+         <div class="dp-stat">
+           <span class="dp-val">${escapeHtml(fmtBig(totalAwarded))}</span>
+           <span class="dp-stat-label">Total awarded value</span>
+         </div>
+         <div class="dp-stat">
+           <span class="dp-val">${escapeHtml(awardedCount.toLocaleString("en-GB"))}</span>
+           <span class="dp-stat-label">Awarded notices</span>
+         </div>
+         <div class="dp-stat">
+           <span class="dp-val">${escapeHtml(uniqueBuyerCount.toLocaleString("en-GB"))}</span>
+           <span class="dp-stat-label">Public buyers</span>
+         </div>
+       </div>
+       ${topCats.length ? `<div class="dp-bars-head">Top recurring demand areas <span class="dp-bars-sub">(by awarded value)</span></div>
+       ${topCats.map(c => {
+         const pct = Math.round((c.value / maxCatVal) * 100);
+         return `<div class="dp-bar-row">
+           <span class="dp-bar-label">${escapeHtml(c.label)}</span>
+           <div class="dp-bar-track"><div class="dp-bar-fill" style="width:${pct}%"></div></div>
+           <span class="dp-bar-val">${escapeHtml(fmtMoney(c.value))}</span>
+         </div>`;
+       }).join("")}
+       <a class="dp-map-link" href="#demand-map">Open the demand map &darr;</a>` : ""}
+       <p class="dp-caveat-foot">Caveat: Not a whole-market estimate. See sources below.</p>`
+    : `<div class="dp-head-row">
+        <span class="dp-eyebrow">AWARDED DEMAND SIGNAL</span>
+       </div>
+       <p style="color:var(--slate);margin-top:16px;font-size:14px;line-height:1.7">${isCompiling ? "Demand data compiles on first request.<br>Refresh after ~90 seconds." : "This desk is coming soon."}</p>
+       ${isCompiling ? `<span class="chip chip-amber" style="margin-top:16px;display:inline-block">Compiling &mdash; data within the hour</span>` : ""}`;
+
+  // Live signal panel
+  const liveHtml = `<div class="dp-head-row" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="live-dot"></span>
+      <span class="dp-eyebrow">LIVE SIGNAL &ndash; CF + FIND A TENDER</span>
     </div>
+    <a href="#demand-map" class="dp-link-sm">View all notices &rarr;</a>
   </div>
-</section>` : ``;
+  ${!profile.live || isCompiling
+    ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
+    : openNotices.length
+      ? `<table class="ls-table">
+          <thead><tr>
+            <th>NOTICE</th><th>BUYER</th><th class="ls-th-r">VALUE</th><th class="ls-th-r">PUBLISHED</th>
+          </tr></thead>
+          <tbody>${openNotices.map(n => {
+            const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
+            const val = rawVal != null ? fmtMoney(rawVal) : "—";
+            const ago = timeAgo(n.publishedDate || n.awardedDate);
+            return `<tr>
+              <td><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 72))}</a></td>
+              <td class="ls-buyer">${escapeHtml((n.buyer || "—").slice(0, 38))}</td>
+              <td class="ls-val">${escapeHtml(val)}</td>
+              <td class="ls-date">${escapeHtml(ago)}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>`
+      : `<p class="dp-caveat-sm">No open notices at last refresh. Check back after next compile.</p>`
+  }
+  <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Updates every 15 minutes</p>`;
 
-  const compilingBadge = isCompiling
-    ? `<span class="chip chip-amber">Compiling &mdash; data within the hour</span>`
-    : `<span class="chip chip-green">Updated ${escapeHtml(cacheAge!)}</span>`;
+  // Buyer watchlist panel
+  const watchlistHtml = `<div class="dp-head-row">
+    <div>
+      <span class="dp-eyebrow">BUYER WATCHLIST <span class="bw-sample">(SAMPLE)</span></span>
+    </div>
+    <span class="dp-info" title="Top buyers by estimated 12-month spend on this desk">ⓘ</span>
+  </div>
+  <a href="#demand-map" class="dp-link-sm" style="display:block;margin-bottom:16px">View full watchlist &rarr;</a>
+  ${!profile.live || isCompiling || topBuyers.length === 0
+    ? `<p class="dp-caveat-sm">Buyer data compiles with the demand signal.<br>Refresh after ~90 seconds.</p>`
+    : topBuyers.map(([buyer, info]) => {
+        const orgType = buyerOrgType(buyer);
+        const initials = buyerInitials(buyer);
+        const spend = info.awardedValue > 0 ? fmtMoney(info.awardedValue) : "—";
+        const activeCount = info.openCount || info.awardedCount;
+        const tagClass = orgType === "HEALTH" ? "bw-tag-health"
+          : orgType === "LOCAL AUTHORITY" ? "bw-tag-la"
+          : orgType === "CENTRAL GOV" ? "bw-tag-gov"
+          : orgType === "HOUSING" ? "bw-tag-housing"
+          : orgType === "EDUCATION" ? "bw-tag-edu"
+          : "bw-tag-other";
+        return `<div class="bw-row">
+          <div class="bw-avatar">${escapeHtml(initials)}</div>
+          <div class="bw-info">
+            <div class="bw-name">${escapeHtml(buyer.slice(0, 44))}</div>
+            ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
+            <div class="bw-meta">
+              <span class="bw-spend">${escapeHtml(spend)}</span>
+              <span class="bw-meta-label"> Est. spend (12m)</span>
+            </div>
+            <div class="bw-meta"><span class="bw-meta-label">Active notices: ${activeCount}</span></div>
+          </div>
+        </div>`;
+      }).join("")
+  }
+  <p class="dp-caveat-foot">Watchlist rotates daily. Figures are indicative.</p>`;
+
+  // Demand map grid
+  const dmGridHtml = profile.categories.map(cat => {
+    const inferred = demandCategories.find(c => c.label === cat.label);
+    const count = inferred?.count ?? 0;
+    const shown = cat.subcategories.slice(0, 7);
+    const more = cat.subcategories.length - shown.length;
+    return `<div class="dm-card">
+      <div class="dm-card-head">
+        <div class="dm-icon-wrap">${getCategoryIcon(cat.label)}</div>
+        <span class="dm-name">${escapeHtml(cat.label)}${count > 0 ? ` <span class="dm-count">(${count})</span>` : ""}</span>
+      </div>
+      <ul class="dm-subs">
+        ${shown.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
+        ${more > 0 ? `<li class="dm-more">+ ${more} more</li>` : ""}
+      </ul>
+    </div>`;
+  }).join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -5173,242 +5280,215 @@ ${renderDeskBuyerWatchlist(data!)}`;
 <title>${escapeHtml(profile.label)} &mdash; GovRevenue Desk</title>
 <style>
 :root{
-  --ink:#0B0F14; --paper:#FAF8F3; --paper-2:#F3EFE6;
-  --accent:#9B2C2C; --accent-2:#C2553F; --slate:#5A6B7B;
-  --line:#1f262e1a; --line-strong:#0F141926;
-  --serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
+  --accent:#9B2C2C;--slate:#5A6B7B;
+  --line:#1f262e1a;--line-strong:#0F141926;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
   --sans:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
-.topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
-.topstrip .wrap{display:flex;justify-content:space-between;align-items:center;height:34px}
-header.mast{border-bottom:1px solid var(--line-strong)}
-.mast .wrap{display:flex;align-items:baseline;justify-content:space-between;padding-top:26px;padding-bottom:18px}
-.logo{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em}
-.logo b{color:var(--accent)}
-nav.primary{display:flex;gap:30px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
-nav.primary a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
-nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
-.mast-cta{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--ink);padding:9px 16px;transition:.18s}
-.mast-cta:hover{background:var(--ink);color:var(--paper)}
-.verticals{border-bottom:1px solid var(--line-strong);background:var(--paper-2)}
-.verticals .wrap{display:flex;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;overflow-x:auto}
-.verticals a{padding:13px 22px 13px 0;color:var(--slate);white-space:nowrap;position:relative;transition:.18s}
-.verticals a:not(:last-child){margin-right:22px}
-.verticals a:not(:last-child):after{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:1px;height:13px;background:var(--line-strong)}
-.verticals a:hover{color:var(--accent)}
-.desk-masthead{padding:60px 0 48px;border-bottom:1px solid var(--line-strong)}
-.desk-masthead h1{font-family:var(--serif);font-size:48px;line-height:1.05;letter-spacing:-.02em;margin:12px 0 16px}
-.desk-masthead .lede{font-size:18px;color:var(--slate);max-width:660px;line-height:1.6}
-.desk-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
 .chip{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:6px 12px;border:1px solid var(--line-strong);background:var(--paper-2)}
 .chip-green{border-color:#1d6b4f44;color:#1d6b4f}
 .chip-amber{border-color:#a9793244;color:#a97932}
-.ds-card{border:1px solid var(--line-strong);padding:36px 40px;background:var(--paper-2)}
-.ds-card--cold{padding:28px 32px}
-.ds-card-head{margin-bottom:24px}
-.ds-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--line-strong);padding-bottom:28px;margin-bottom:28px}
-.ds-stat{padding-right:32px}
-.ds-stat:not(:last-child){border-right:1px solid var(--line-strong);margin-right:32px}
-.ds-val{display:block;font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1}
-.ds-label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-top:7px}
-.ds-bars-head{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-bottom:16px}
-.ds-muted{color:var(--slate);text-transform:none;letter-spacing:0;font-size:11px}
-.ds-bar-row{display:grid;grid-template-columns:220px 1fr 90px;gap:14px;align-items:center;margin-bottom:12px}
-.ds-bar-label{font-size:13px;font-family:var(--sans);color:var(--ink)}
-.ds-bar-track{height:5px;background:var(--line-strong);border-radius:2px}
-.ds-bar-fill{height:5px;background:var(--accent);border-radius:2px;transition:width .4s ease}
-.ds-bar-val{font-family:var(--mono);font-size:12px;color:var(--slate);text-align:right}
-.ds-caveat{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:24px;padding-top:18px;border-top:1px solid var(--line-strong);line-height:1.6}
-.ds-map-link{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-top:12px;text-decoration:underline;text-decoration-color:var(--accent)44}
-.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.dm-card{border:1px solid var(--line-strong);padding:20px 22px;background:var(--paper-2)}
-.dm-name{font-size:14px;font-weight:600;margin-bottom:12px;line-height:1.3}
-.dm-count{font-family:var(--mono);font-size:12px;color:var(--slate);font-weight:400}
-.dm-subs{list-style:none;font-size:12px;color:var(--slate);line-height:1.85;font-family:var(--sans)}
-.desk-section{padding:52px 0;border-bottom:1px solid var(--line-strong)}
-.section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
-.section-head h2{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em}
-.notice-table{width:100%;border-collapse:collapse;font-size:14px}
-.notice-table th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line-strong)}
-.notice-table td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.notice-table a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
-.notice-table a:hover{text-decoration-color:var(--accent)}
-.nt-buyer{color:var(--slate);font-size:13px}
-.nt-val{font-family:var(--mono);font-size:13px;white-space:nowrap}
-.nt-date{font-family:var(--mono);font-size:12px;color:var(--slate);white-space:nowrap}
-.src-badge{font-family:var(--mono);font-size:11px;letter-spacing:.06em;padding:3px 7px;background:var(--paper-2);border:1px solid var(--line-strong);white-space:nowrap}
-.nt-caveat{font-family:var(--mono);font-size:12px;color:var(--slate);margin-top:14px}
-.interstitial-card{border:1px solid var(--line-strong);padding:52px 48px;background:var(--paper-2);max-width:640px}
-.interstitial-card h2{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.01em;margin:12px 0 16px}
-.interstitial-card p{color:var(--slate);margin-bottom:28px}
-.btn-primary{display:inline-block;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:14px 22px;transition:.18s}
-.btn-primary:hover{background:var(--accent)}
-.desk-cta{padding:72px 0 96px}
-.desk-cta h2{font-family:var(--serif);font-size:36px;font-weight:600;letter-spacing:-.02em;margin-bottom:12px}
-.desk-cta p{color:var(--slate);max-width:560px;margin-bottom:28px}
-footer{background:var(--ink);color:var(--paper);padding:52px 0 36px}
-footer .wrap{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px}
-footer .logo{font-family:var(--serif);font-size:22px;margin-bottom:10px}
-footer .logo b{color:var(--accent)}
-footer p{font-size:13px;color:#9aabb7;line-height:1.65}
-footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aabb7;margin-bottom:14px}
-footer ul{list-style:none}
-footer li{margin-bottom:8px;font-size:14px}
-footer a:hover{color:var(--accent)}
-.foot-copy{text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#4a5a68;margin-top:36px;padding-top:20px;border-top:1px solid #ffffff14}
-@media(max-width:768px){
-  .ds-stats{grid-template-columns:1fr;gap:16px}
-  .ds-stat:not(:last-child){border-right:none;margin-right:0;border-bottom:1px solid var(--line-strong);padding-bottom:16px;margin-bottom:0}
-  .ds-bar-row{grid-template-columns:1fr 1fr;gap:8px}
-  .ds-bar-track{display:none}
-  .dm-grid{grid-template-columns:1fr 1fr}
-  .desk-masthead h1{font-size:34px}
-  footer .wrap{grid-template-columns:1fr}
-  .nt-buyer,.nt-date{display:none}
-  nav.primary,.mast-cta{display:none}
+/* Global header */
+.gh{background:var(--ink);color:var(--paper)}
+.gh-inner{max-width:1220px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
+.gh-logo b{color:#d97070}
+.gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav::-webkit-scrollbar{display:none}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:hover{color:var(--paper)}
+.gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
+.gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
+.gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+/* Masthead */
+.dm-mast{padding:48px 0 44px;border-bottom:1px solid var(--line-strong)}
+.dm-mast-inner{max-width:1220px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:1fr 320px;gap:56px;align-items:start}
+.dm-mast-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.dm-mast h1{font-family:var(--serif);font-size:42px;line-height:1.05;letter-spacing:-.02em;margin-bottom:14px}
+.dm-mast-lede{font-size:16px;color:var(--slate);line-height:1.65;margin-bottom:16px}
+.dm-source-badge{font-size:13px;color:var(--slate);display:flex;align-items:center;gap:6px}
+.dm-mast-cta{border:1px solid var(--line-strong);padding:24px 24px 24px}
+.dm-mast-cta p{font-family:var(--serif);font-size:17px;line-height:1.5;margin-bottom:18px}
+.btn-cta{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:13px 18px;transition:.18s}
+.btn-cta:hover{background:var(--accent)}
+/* Three panels */
+.dp-panels{border-bottom:1px solid var(--line-strong)}
+.dp-panels-inner{max-width:1220px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:5fr 4fr 3fr;border-left:1px solid var(--line-strong)}
+.dp-panel{padding:32px 28px;border-right:1px solid var(--line-strong)}
+.dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.dp-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--slate)}
+.dp-info{font-size:13px;color:var(--slate);cursor:help;margin-left:4px}
+.dp-caveat-sm{font-size:13px;color:var(--slate);line-height:1.65;margin-bottom:14px}
+.dp-caveat-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.dp-link-sm{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
+.dp-link-sm:hover{text-decoration-color:var(--accent)}
+.dp-bars-head{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);margin:20px 0 12px}
+.dp-bars-sub{text-transform:none;letter-spacing:0;font-size:10.5px}
+.dp-map-link{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--accent);margin-top:12px;text-decoration:underline;text-decoration-color:var(--accent)44}
+.dp-map-link:hover{text-decoration-color:var(--accent)}
+/* Demand stats */
+.dp-stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line-strong);margin:14px 0 4px}
+.dp-stat{padding:14px 12px}
+.dp-stat:not(:last-child){border-right:1px solid var(--line-strong)}
+.dp-val{display:block;font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.dp-stat-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:4px}
+/* Bar rows */
+.dp-bar-row{display:grid;grid-template-columns:1fr 80px 60px;gap:8px;align-items:center;margin-bottom:9px}
+.dp-bar-label{font-size:12px;color:var(--ink)}
+.dp-bar-track{height:4px;background:var(--line-strong);border-radius:2px}
+.dp-bar-fill{height:4px;background:var(--accent);border-radius:2px}
+.dp-bar-val{font-family:var(--mono);font-size:11px;color:var(--slate);text-align:right}
+/* Live signal */
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;margin-right:2px}
+.ls-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.ls-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 6px 8px 0;border-bottom:1px solid var(--line-strong)}
+.ls-table td{padding:9px 6px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.ls-table a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
+.ls-table a:hover{text-decoration-color:var(--accent)}
+.ls-buyer{color:var(--slate);font-size:11.5px}
+.ls-val{font-family:var(--mono);font-size:11.5px;white-space:nowrap;text-align:right}
+.ls-date{font-family:var(--mono);font-size:11.5px;color:var(--slate);white-space:nowrap;text-align:right}
+.ls-th-r{text-align:right}
+.ls-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:12px}
+/* Buyer watchlist */
+.bw-row{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.bw-row:last-of-type{border-bottom:none}
+.bw-avatar{width:34px;height:34px;border-radius:3px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9.5px;font-weight:500;display:flex;align-items:center;justify-content:center;letter-spacing:.04em;flex-shrink:0;margin-top:1px}
+.bw-info{flex:1;min-width:0}
+.bw-name{font-size:12.5px;font-weight:500;line-height:1.3;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-tag{font-family:var(--mono);font-size:9px;letter-spacing:.05em;padding:2px 5px;border-radius:2px;display:inline-block;margin-bottom:4px}
+.bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
+.bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
+.bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
+.bw-tag-edu{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
+.bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.bw-meta{font-family:var(--mono);font-size:10.5px;color:var(--slate);line-height:1.5}
+.bw-spend{font-size:13px;color:var(--ink);font-family:var(--serif);font-weight:600;margin-right:2px}
+.bw-meta-label{font-size:10.5px;color:var(--slate)}
+.bw-sample{font-weight:400;opacity:.55;letter-spacing:.03em}
+/* Demand map */
+.dm-section{padding:44px 0;border-bottom:1px solid var(--line-strong)}
+.dm-section-inner{max-width:1220px;margin:0 auto;padding:0 28px}
+.dm-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.dm-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.dm-title-info{font-size:13px;color:var(--slate);cursor:help;margin-left:5px}
+.dm-sub{font-size:13px;color:var(--slate);margin-bottom:20px}
+.dm-open-all{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--slate);border:1px solid var(--line-strong);padding:5px 11px;cursor:pointer;background:var(--paper);transition:.15s}
+.dm-open-all:hover{border-color:var(--ink);color:var(--ink)}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px}
+.dm-card{border:1px solid var(--line-strong);padding:16px 16px;background:var(--paper-2)}
+.dm-card-head{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px}
+.dm-icon-wrap{flex-shrink:0;width:24px;height:24px;color:var(--slate);margin-top:1px}
+.dm-icon{width:100%;height:100%}
+.dm-name{font-size:12.5px;font-weight:600;line-height:1.3}
+.dm-count{font-family:var(--mono);font-size:11px;color:var(--slate);font-weight:400}
+.dm-subs{list-style:none;font-size:11.5px;color:var(--slate);line-height:1.8}
+.dm-more{color:var(--accent);font-family:var(--mono);font-size:10.5px;margin-top:2px}
+/* Sources bar */
+.dm-sources-bar{background:var(--paper-2);border-top:1px solid var(--line-strong)}
+.dm-sources-inner{max-width:1220px;margin:0 auto;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.dm-sources-left{font-size:12.5px;color:var(--slate)}
+.dm-sources-right{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.dm-src-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-right:6px}
+.dm-src-link{font-family:var(--mono);font-size:11px;color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong);padding:0 6px}
+.dm-src-link:hover{color:var(--ink)}
+.dm-foot-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:12px 0 16px;border-top:1px solid var(--line)}
+@media(max-width:960px){
+  .dp-panels-inner{grid-template-columns:1fr}
+  .dm-mast-inner{grid-template-columns:1fr}
+  .dm-mast-cta{display:none}
 }
+@media(max-width:700px){
+  .gh-tag,.gh-badge{display:none}
+  .dp-stats{grid-template-columns:1fr 1fr 1fr}
+  .ls-val,.ls-date,.ls-buyer{display:none}
+  .dm-grid{grid-template-columns:1fr 1fr}
+  .dp-bar-row{grid-template-columns:1fr 52px}
+  .dp-bar-track{display:none}
+  .dm-mast h1{font-size:30px}
+}
+@media(max-width:480px){.dm-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="topstrip"><div class="wrap">
-  <div>UK public procurement intelligence</div>
-  <div>United Kingdom &middot; Public record</div>
-</div></div>
-<header class="mast"><div class="wrap">
-  <div class="logo">Gov<b>Revenue</b></div>
-  <nav class="primary">
-    <a href="/">Home</a><a href="/#desks">Desks</a><a href="/scan">The Scan</a>
-  </nav>
-  <a class="mast-cta" href="/scan">Run a scan</a>
-</div></header>
-<div class="verticals"><div class="wrap">
-  ${navLinks}
-</div></div>
-
-<section class="desk-masthead">
-  <div class="wrap">
-    <div class="eyebrow">Desk &middot; Public record &middot; Contracts Finder + Find a Tender</div>
-    <h1>${escapeHtml(profile.label)}</h1>
-    <p class="lede">${escapeHtml(profile.standfirst)}</p>
-    <div class="desk-meta">
-      ${compilingBadge}
-      ${!isCompiling && profile.live ? `<span class="chip">${escapeHtml(String(openNotices.length))} open notices</span>` : ""}
-      <span class="chip">Source: CF &middot; FTS</span>
-      <span class="chip">Public record &middot; UK-wide</span>
+<header class="gh">
+  <div class="gh-inner">
+    <div class="gh-brand">
+      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <span class="gh-tag">Public-sector revenue intelligence</span>
+    </div>
+    <nav class="gh-nav">${navLinks}</nav>
+    <div class="gh-badge">
+      <span>CF &middot; public record</span>
+      <span>Built for public trust</span>
     </div>
   </div>
-</section>
+</header>
 
-<section class="desk-section" id="demand-signal">
-  <div class="wrap">
-    ${profile.live && !isCompiling ? (() => {
-      const topCats = [...demandCategories].sort((a, b) => b.value - a.value).slice(0, 5).filter(c => c.value > 0);
-      const maxVal = topCats[0]?.value || 1;
-      const fmtVal = (v: number) => v >= 1_000_000_000
-        ? `£${(v / 1_000_000_000).toFixed(2)}bn`
-        : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(2)}m`
-        : v >= 1_000 ? `£${Math.round(v / 1_000)}k` : `£${Math.round(v)}`;
-      const fmtBig = (v: number) => v >= 1_000_000_000
-        ? `£${(v / 1_000_000_000).toFixed(2)}bn`
-        : `£${(v / 1_000_000).toFixed(2)}m`;
-      const barRows = topCats.map(c => {
-        const pct = Math.round((c.value / maxVal) * 100);
-        return `<div class="ds-bar-row">
-          <span class="ds-bar-label">${escapeHtml(c.label)}</span>
-          <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${pct}%"></div></div>
-          <span class="ds-bar-val">${escapeHtml(fmtVal(c.value))}</span>
-        </div>`;
-      }).join("");
-      return `<div class="ds-card">
-        <div class="ds-card-head">
-          <div class="eyebrow">Awarded demand signal</div>
-        </div>
-        <div class="ds-stats">
-          <div class="ds-stat">
-            <span class="ds-val">${escapeHtml(fmtBig(totalAwarded))}</span>
-            <span class="ds-label">Total awarded value</span>
-          </div>
-          <div class="ds-stat">
-            <span class="ds-val">${escapeHtml(awardedCount.toLocaleString("en-GB"))}</span>
-            <span class="ds-label">Awarded notices</span>
-          </div>
-          <div class="ds-stat">
-            <span class="ds-val">${escapeHtml(uniqueBuyerCount.toLocaleString("en-GB"))}</span>
-            <span class="ds-label">Public buyers</span>
-          </div>
-        </div>
-        ${topCats.length ? `<div class="ds-bars">
-          <div class="ds-bars-head">Top recurring demand areas <span class="ds-muted">(by awarded value)</span></div>
-          ${barRows}
-        </div>` : ""}
-        <p class="ds-caveat">Based on awarded notices found in the public record for this desk profile (last 12 months). Not a whole-market estimate. See sources below.</p>
-        <a class="ds-map-link" href="#demand-map">Open the demand map &darr;</a>
-      </div>`;
-    })() : `<div class="ds-card ds-card--cold">
-      <div class="eyebrow">Awarded demand signal</div>
-      <p style="color:var(--slate);margin-top:12px">Demand data compiles on first request. Refresh after ~90 seconds.</p>
-    </div>`}
-  </div>
-</section>
-
-${feedHtml}
-${interstitialHtml}
-
-<section class="desk-section" id="demand-map">
-  <div class="wrap">
-    <div class="section-head">
-      <h2>Demand map &mdash; ${escapeHtml(profile.label)}</h2>
-      <span class="eyebrow">All major categories this desk scans for</span>
-    </div>
-    <div class="dm-grid">
-      ${profile.categories.map(cat => {
-        const inferred = demandCategories.find(c => c.label === cat.label);
-        const count = inferred?.count ?? 0;
-        return `<div class="dm-card">
-          <div class="dm-name">${escapeHtml(cat.label)}${count > 0 ? ` <span class="dm-count">(${count})</span>` : ""}</div>
-          ${cat.subcategories.length ? `<ul class="dm-subs">${cat.subcategories.slice(0, 7).map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
-        </div>`;
-      }).join("")}
-    </div>
-  </div>
-</section>
-
-<section class="desk-cta">
-  <div class="wrap">
-    <div class="eyebrow">The product underneath</div>
-    <h2>This is the public record for ${escapeHtml(profile.label)}.<br>Run it against your firm.</h2>
-    <p>Submit your firm&rsquo;s services and the agent maps who is buying, who is winning, and the one route where you can realistically compete &mdash; every claim sourced from the same public record.</p>
-    <a class="btn-primary" href="/scan">Run a scan &rarr;</a>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap">
+<section class="dm-mast">
+  <div class="dm-mast-inner">
     <div>
-      <div class="logo">Gov<b>Revenue</b></div>
-      <p>A public-sector revenue intelligence service.</p>
+      <div class="dm-mast-eyebrow">DESK</div>
+      <h1>${escapeHtml(profile.label)}</h1>
+      <p class="dm-mast-lede">${escapeHtml(profile.standfirst)}</p>
+      <div class="dm-source-badge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.9V12c0 5.5-3.8 10.7-9 12-5.2-1.3-9-6.5-9-12V6.9z"/></svg>
+        <span>Public record only. Sourced from Contracts Finder and Find a Tender.</span>
+      </div>
     </div>
-    <div>
-      <h4>Desks</h4>
-      <ul>${DESK_PROFILES.map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}</ul>
-    </div>
-    <div>
-      <h4>Product</h4>
-      <ul>
-        <li><a href="/scan">The Scan</a></li>
-        <li><a href="/">Home</a></li>
-      </ul>
+    <div class="dm-mast-cta">
+      <p>This is the public record for ${escapeHtml(profile.label)}.<br>Run it against your firm.</p>
+      <a class="btn-cta" href="/scan">RUN A SCAN &nbsp;&rarr;</a>
     </div>
   </div>
-  <div class="foot-copy">&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</div>
-</footer>
+</section>
+
+<div class="dp-panels">
+  <div class="dp-panels-inner">
+    <div class="dp-panel">${demandHtml}</div>
+    <div class="dp-panel">${liveHtml}</div>
+    <div class="dp-panel">${watchlistHtml}</div>
+  </div>
+</div>
+
+<section class="dm-section" id="demand-map">
+  <div class="dm-section-inner">
+    <div class="dm-head-row">
+      <div>
+        <span class="dm-title">DEMAND MAP &ndash; ${escapeHtml(profile.label.toUpperCase())}</span>
+        <span class="dm-title-info" title="All major categories and sub-categories this desk scans for">ⓘ</span>
+      </div>
+      <button class="dm-open-all" onclick="this.closest('section').querySelectorAll('.dm-more').forEach(el=>{el.style.display='none'});this.closest('section').querySelectorAll('.dm-subs li').forEach(el=>{el.style.display='list-item'})">Open all</button>
+    </div>
+    <p class="dm-sub">All major categories and sub-categories this desk scans for.</p>
+    <div class="dm-grid">${dmGridHtml}</div>
+  </div>
+</section>
+
+<div class="dm-sources-bar">
+  <div class="dm-sources-inner">
+    <span class="dm-sources-left">Public record. No insider information. Always verify on the source.</span>
+    <div class="dm-sources-right">
+      <span class="dm-src-label">SOURCES</span>
+      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener">Contracts Finder &#8599;</a>
+      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener">Find a Tender &#8599;</a>
+      <a class="dm-src-link" href="https://www.localspend.co.uk" target="_blank" rel="noopener">Local Authority Transparency &#8599;</a>
+      <a class="dm-src-link" href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener">Companies House &#8599;</a>
+    </div>
+    <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
+  </div>
+</div>
+<div class="dm-foot-copy">&copy; GovRevenue</div>
+
 </body>
 </html>`;
 }
