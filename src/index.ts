@@ -3570,7 +3570,7 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .ticker .row{display:flex;gap:48px;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:11px 0;animation:scroll 38s linear infinite;width:max-content}
 .ticker .row span b{color:var(--accent-2);font-weight:600;margin-right:8px}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.chartband{background:var(--paper);border-bottom:1px solid var(--line-strong);padding:74px 0}
+.chartband{background:var(--paper-2);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);padding:74px 0}
 .chartband .wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
 .chartband h2{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.015em;margin:14px 0 16px;line-height:1.1}
 .chartband p{color:#3a444d;font-size:16px;max-width:30em;margin-bottom:18px}
@@ -3693,7 +3693,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
     </div>
   </div>
 </section>
-<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span></div></div>
+<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span></div></div>
 <section class="chartband" id="chart">
   <div class="wrap">
     <div>
