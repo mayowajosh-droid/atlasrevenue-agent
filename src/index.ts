@@ -4150,7 +4150,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </head>
 <body>
 <div class="topstrip"><div class="wrap">
-  <div class="live"><span class="dot"></span> Public record &middot; updated continuously</div>
+  <div class="live"><span class="dot"></span> Sample intelligence &middot; UK public procurement</div>
   <div>Birmingham, UK &middot; Confidential intelligence</div>
 </div></div>
 <header class="mast"><div class="wrap">
@@ -4179,8 +4179,8 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
       </div>
       <div class="chips">
         <div class="chip"><b>&pound;400bn</b> annual public spend</div>
-        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> notices today <span class="up">&#9650;</span></div>
-        <div class="chip"><b>2</b> sources live &middot; CF &middot; FTS</div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> signals tracked &middot; 24h</div>
+        <div class="chip">Live: Contracts Finder + Find a Tender</div>
       </div>
     </div>
     <div class="record">
@@ -4200,13 +4200,13 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
-      <div class="eyebrow">Category signal</div>
+      <div class="eyebrow">Category signal &middot; illustrative</div>
       <h2>Watch the money move before the tender does.</h2>
       <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
       <ul>
-        <li><b>Housing maintenance</b> &middot; West Midlands &middot; +34% / 24mo</li>
-        <li><b>Re-let signal</b> &middot; framework expiry clustering in Q1</li>
-        <li><b>Entry window</b> &middot; 18 months to incumbent renewal</li>
+        <li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
+        <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
+        <li><b>Entry window</b> &middot; illustrative 18-month renewal window</li>
       </ul>
     </div>
     <div class="chartwrap">
