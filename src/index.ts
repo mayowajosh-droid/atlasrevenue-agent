@@ -3770,50 +3770,75 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div><h4>Sources</h4><ul><li><a href="#">Contracts Finder</a></li><li><a href="#">Find a Tender</a></li><li><a href="#">LA transparency</a></li><li><a href="#">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 (function(){
-  const canvas = document.getElementById('globe-canvas');
-  if(!canvas) return;
-  function tryWebGL(){
-    try{ const t=document.createElement('canvas'); return !!(t.getContext('webgl')||t.getContext('experimental-webgl')); }catch(e){ return false; }
+  const cv=document.getElementById('globe-canvas');
+  if(!cv) return;
+  const ctx=cv.getContext('2d');
+  if(!ctx) return;
+  let W=0,H=0,R=0,cx=0,cy=0,angle=0;
+  const DOTS=[];
+  for(let i=0;i<300;i++){
+    const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random();
+    DOTS.push({phi,th,r:Math.random()>.72?2.6:1.5,a:0.45+Math.random()*0.55});
   }
-  if(window.THREE && tryWebGL()){
-    const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42,1,0.1,100);
-    camera.position.set(0,0,6.2);
-    const group = new THREE.Group(); scene.add(group);
-    group.add(new THREE.Mesh(new THREE.SphereGeometry(2,64,64),new THREE.MeshPhongMaterial({color:0x12202c,emissive:0x0a1622,specular:0x6fa8d6,shininess:60,transparent:true,opacity:0.55})));
-    group.add(new THREE.Mesh(new THREE.SphereGeometry(2.02,36,24),new THREE.MeshBasicMaterial({color:0x3d5d72,wireframe:true,transparent:true,opacity:0.28})));
-    const N=320,pos=new Float32Array(N*3);
-    for(let i=0;i<N;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random(),r=2.04;pos[i*3]=r*Math.sin(phi)*Math.cos(th);pos[i*3+1]=r*Math.cos(phi);pos[i*3+2]=r*Math.sin(phi)*Math.sin(th);}
-    const pg=new THREE.BufferGeometry(); pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    const points=new THREE.Points(pg,new THREE.PointsMaterial({color:0xC2553F,size:0.045,transparent:true,opacity:0.85}));
-    group.add(points);
-    group.add(new THREE.Mesh(new THREE.SphereGeometry(2.28,48,48),new THREE.MeshBasicMaterial({color:0x9B2C2C,transparent:true,opacity:0.06,side:THREE.BackSide})));
-    scene.add(new THREE.AmbientLight(0x335577,0.7));
-    const key=new THREE.DirectionalLight(0x9fc4e6,1.1); key.position.set(5,3,5); scene.add(key);
-    const rim=new THREE.DirectionalLight(0xC2553F,0.6); rim.position.set(-4,-2,2); scene.add(rim);
-    group.rotation.x=0.35;
-    function size(){const rect=canvas.parentElement.getBoundingClientRect();if(!rect.width||!rect.height)return;renderer.setSize(rect.width,rect.height,false);camera.aspect=rect.width/rect.height;camera.updateProjectionMatrix();}
-    size(); window.addEventListener('resize',size);
-    (function loop(){requestAnimationFrame(loop);if(!reduce){group.rotation.y+=0.0022;points.rotation.y+=0.0004;}renderer.render(scene,camera);})();
-  } else {
-    /* 2-D canvas fallback */
-    const ctx=canvas.getContext('2d');
-    let W=0,H=0,R=0,cx=0,cy=0,angle=0;
-    const dots=[];
-    for(let i=0;i<260;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random();dots.push({phi,th,r:Math.random()>.7?2.2:1.4,a:0.4+Math.random()*0.6});}
-    function resize(){const pr=window.devicePixelRatio||1,p=canvas.parentElement.getBoundingClientRect();W=p.width;H=p.height;canvas.width=W*pr;canvas.height=H*pr;ctx.setTransform(pr,0,0,pr,0,0);cx=W*.72;cy=H*.46;R=Math.min(W,H)*.30;}
-    resize(); window.addEventListener('resize',resize);
-    function project(phi,th,a){const x=Math.sin(phi)*Math.cos(th+a),y=Math.cos(phi),z=Math.sin(phi)*Math.sin(th+a);return{x:cx+R*x*.98,y:cy-R*y*.98,z,vis:z>-0.18};}
-    function drawGrid(a){ctx.strokeStyle='rgba(61,93,114,0.22)';ctx.lineWidth=0.7;for(let lat=-75;lat<=75;lat+=15){const phi=(90-lat)*Math.PI/180;ctx.beginPath();let f=true;for(let lon=0;lon<=360;lon+=4){const p=project(phi,lon*Math.PI/180,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}ctx.stroke();}for(let lon=0;lon<360;lon+=20){const th2=lon*Math.PI/180;ctx.beginPath();let f=true;for(let lat=90;lat>=-90;lat-=4){const p=project((90-lat)*Math.PI/180,th2,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}ctx.stroke();}}
-    function frame(){ctx.clearRect(0,0,W,H);const g=ctx.createRadialGradient(cx,cy,R*.1,cx,cy,R*1.4);g.addColorStop(0,'rgba(155,44,44,0.08)');g.addColorStop(1,'rgba(11,15,20,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.4,0,7);ctx.fill();const s=ctx.createRadialGradient(cx-R*.28,cy-R*.2,R*.05,cx,cy,R);s.addColorStop(0,'rgba(30,48,68,0.7)');s.addColorStop(1,'rgba(10,16,24,0.85)');ctx.fillStyle=s;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();drawGrid(angle);for(const d of dots){const p=project(d.phi,d.th,angle);if(!p.vis)continue;const fade=(p.z+0.18)/1.18;ctx.beginPath();ctx.arc(p.x,p.y,d.r,0,7);ctx.fillStyle='rgba(194,85,63,'+(d.a*fade).toFixed(2)+')';ctx.fill();}ctx.strokeStyle='rgba(100,130,150,0.18)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();if(!reduce)angle+=0.004;requestAnimationFrame(frame);}
-    frame();
+  function resize(){
+    const pr=Math.min(window.devicePixelRatio||1,2);
+    const rect=cv.parentElement.getBoundingClientRect();
+    W=rect.width||window.innerWidth; H=rect.height||600;
+    cv.width=W*pr; cv.height=H*pr;
+    ctx.setTransform(pr,0,0,pr,0,0);
+    cx=W*0.73; cy=H*0.50;
+    R=Math.min(W*0.31,H*0.43);
   }
+  resize(); window.addEventListener('resize',resize);
+  function proj(phi,th,a){
+    const x=Math.sin(phi)*Math.cos(th+a),y=Math.cos(phi),z=Math.sin(phi)*Math.sin(th+a);
+    return{x:cx+R*x,y:cy-R*y*0.97,z,vis:z>-0.14};
+  }
+  function drawGrid(a){
+    for(let lat=-75;lat<=75;lat+=15){
+      const phi=(90-lat)*Math.PI/180;
+      ctx.strokeStyle='rgba(70,110,140,0.20)'; ctx.lineWidth=0.8;
+      ctx.beginPath(); let f=true;
+      for(let lon=0;lon<=363;lon+=3){const p=proj(phi,lon*Math.PI/180,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}
+      ctx.stroke();
+    }
+    for(let lon=0;lon<360;lon+=20){
+      ctx.strokeStyle='rgba(70,110,140,0.16)'; ctx.lineWidth=0.8;
+      ctx.beginPath(); let f=true;
+      for(let lat=90;lat>=-90;lat-=3){const p=proj((90-lat)*Math.PI/180,lon*Math.PI/180,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}
+      ctx.stroke();
+    }
+  }
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    const atm=ctx.createRadialGradient(cx,cy,R*0.85,cx,cy,R*1.65);
+    atm.addColorStop(0,'rgba(155,44,44,0.13)'); atm.addColorStop(0.5,'rgba(50,90,120,0.06)'); atm.addColorStop(1,'rgba(11,15,20,0)');
+    ctx.fillStyle=atm; ctx.beginPath(); ctx.arc(cx,cy,R*1.65,0,6.3); ctx.fill();
+    const body=ctx.createRadialGradient(cx-R*0.3,cy-R*0.28,R*0.04,cx,cy,R);
+    body.addColorStop(0,'rgba(26,50,74,0.88)'); body.addColorStop(0.55,'rgba(13,22,36,0.93)'); body.addColorStop(1,'rgba(7,10,16,0.97)');
+    ctx.fillStyle=body; ctx.beginPath(); ctx.arc(cx,cy,R,0,6.3); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,R,0,6.3); ctx.clip();
+    drawGrid(angle);
+    for(const d of DOTS){
+      const p=proj(d.phi,d.th,angle); if(!p.vis) continue;
+      const depth=(p.z+0.14)/1.14, alpha=d.a*depth;
+      if(d.r>2){ctx.beginPath();ctx.arc(p.x,p.y,d.r*2.8,0,6.3);ctx.fillStyle='rgba(194,85,63,'+(alpha*0.22).toFixed(2)+')';ctx.fill();}
+      ctx.beginPath(); ctx.arc(p.x,p.y,d.r,0,6.3);
+      ctx.fillStyle='rgba(194,85,63,'+alpha.toFixed(2)+')'; ctx.fill();
+    }
+    ctx.restore();
+    const spec=ctx.createRadialGradient(cx-R*0.33,cy-R*0.30,0,cx-R*0.18,cy-R*0.16,R*0.58);
+    spec.addColorStop(0,'rgba(130,175,210,0.24)'); spec.addColorStop(1,'rgba(130,175,210,0)');
+    ctx.fillStyle=spec; ctx.beginPath(); ctx.arc(cx,cy,R,0,6.3); ctx.fill();
+    ctx.strokeStyle='rgba(90,130,160,0.28)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,6.3); ctx.stroke();
+    if(!reduce) angle+=0.0032;
+    requestAnimationFrame(frame);
+  }
+  frame();
 })();
 (function(){
   const cv=document.getElementById('growthChart'); if(!cv) return;
