@@ -3577,7 +3577,7 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .ticker .row{display:flex;gap:48px;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:11px 0;animation:scroll 38s linear infinite;width:max-content}
 .ticker .row span b{color:var(--accent-2);font-weight:600;margin-right:8px}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.chartband{background:var(--paper-2);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);padding:74px 0}
+.chartband{background:var(--paper);border-bottom:1px solid var(--line-strong);padding:74px 0}
 .chartband .wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
 .chartband h2{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.015em;margin:14px 0 16px;line-height:1.1}
 .chartband p{color:#3a444d;font-size:16px;max-width:30em;margin-bottom:18px}
@@ -3700,10 +3700,10 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
     </div>
   </div>
 </section>
-<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span></div></div>
+<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"></div></div>
 <section class="chartband" id="chart">
   <div class="wrap">
-    <div>
+    <div class="reveal">
       <div class="eyebrow">Category signal</div>
       <h2>Watch the money move before the tender does.</h2>
       <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
@@ -3713,7 +3713,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
         <li><b>Entry window</b> &middot; 18 months to incumbent renewal</li>
       </ul>
     </div>
-    <div class="chartwrap">
+    <div class="chartwrap reveal">
       <div class="ch-head">
         <span class="lab">Recurring category spend &middot; &pound;m</span>
         <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
@@ -3770,88 +3770,51 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div><h4>Sources</h4><ul><li><a href="#">Contracts Finder</a></li><li><a href="#">Find a Tender</a></li><li><a href="#">LA transparency</a></li><li><a href="#">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 (function(){
-  const cv=document.getElementById('globe-canvas');
-  if(!cv) return;
-  const ctx=cv.getContext('2d');
-  let W=0,H=0,R=0,cx=0,cy=0,angle=0;
-  const dots=[];
-  for(let i=0;i<260;i++){
-    const phi=Math.acos(2*Math.random()-1);
-    const th=2*Math.PI*Math.random();
-    dots.push({phi,th,r:Math.random()>.7?2.2:1.4,a:0.4+Math.random()*0.6});
+  const canvas = document.getElementById('globe-canvas');
+  if(!canvas) return;
+  function tryWebGL(){
+    try{ const t=document.createElement('canvas'); return !!(t.getContext('webgl')||t.getContext('experimental-webgl')); }catch(e){ return false; }
   }
-  function resize(){
-    const pr=window.devicePixelRatio||1;
-    const p=cv.parentElement.getBoundingClientRect();
-    W=p.width; H=p.height;
-    cv.width=W*pr; cv.height=H*pr;
-    ctx.setTransform(pr,0,0,pr,0,0);
-    cx=W*.72; cy=H*.46; R=Math.min(W,H)*.30;
+  if(window.THREE && tryWebGL()){
+    const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42,1,0.1,100);
+    camera.position.set(0,0,6.2);
+    const group = new THREE.Group(); scene.add(group);
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(2,64,64),new THREE.MeshPhongMaterial({color:0x12202c,emissive:0x0a1622,specular:0x6fa8d6,shininess:60,transparent:true,opacity:0.55})));
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(2.02,36,24),new THREE.MeshBasicMaterial({color:0x3d5d72,wireframe:true,transparent:true,opacity:0.28})));
+    const N=320,pos=new Float32Array(N*3);
+    for(let i=0;i<N;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random(),r=2.04;pos[i*3]=r*Math.sin(phi)*Math.cos(th);pos[i*3+1]=r*Math.cos(phi);pos[i*3+2]=r*Math.sin(phi)*Math.sin(th);}
+    const pg=new THREE.BufferGeometry(); pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const points=new THREE.Points(pg,new THREE.PointsMaterial({color:0xC2553F,size:0.045,transparent:true,opacity:0.85}));
+    group.add(points);
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(2.28,48,48),new THREE.MeshBasicMaterial({color:0x9B2C2C,transparent:true,opacity:0.06,side:THREE.BackSide})));
+    scene.add(new THREE.AmbientLight(0x335577,0.7));
+    const key=new THREE.DirectionalLight(0x9fc4e6,1.1); key.position.set(5,3,5); scene.add(key);
+    const rim=new THREE.DirectionalLight(0xC2553F,0.6); rim.position.set(-4,-2,2); scene.add(rim);
+    group.rotation.x=0.35;
+    function size(){const rect=canvas.parentElement.getBoundingClientRect();if(!rect.width||!rect.height)return;renderer.setSize(rect.width,rect.height,false);camera.aspect=rect.width/rect.height;camera.updateProjectionMatrix();}
+    size(); window.addEventListener('resize',size);
+    (function loop(){requestAnimationFrame(loop);if(!reduce){group.rotation.y+=0.0022;points.rotation.y+=0.0004;}renderer.render(scene,camera);})();
+  } else {
+    /* 2-D canvas fallback */
+    const ctx=canvas.getContext('2d');
+    let W=0,H=0,R=0,cx=0,cy=0,angle=0;
+    const dots=[];
+    for(let i=0;i<260;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random();dots.push({phi,th,r:Math.random()>.7?2.2:1.4,a:0.4+Math.random()*0.6});}
+    function resize(){const pr=window.devicePixelRatio||1,p=canvas.parentElement.getBoundingClientRect();W=p.width;H=p.height;canvas.width=W*pr;canvas.height=H*pr;ctx.setTransform(pr,0,0,pr,0,0);cx=W*.72;cy=H*.46;R=Math.min(W,H)*.30;}
+    resize(); window.addEventListener('resize',resize);
+    function project(phi,th,a){const x=Math.sin(phi)*Math.cos(th+a),y=Math.cos(phi),z=Math.sin(phi)*Math.sin(th+a);return{x:cx+R*x*.98,y:cy-R*y*.98,z,vis:z>-0.18};}
+    function drawGrid(a){ctx.strokeStyle='rgba(61,93,114,0.22)';ctx.lineWidth=0.7;for(let lat=-75;lat<=75;lat+=15){const phi=(90-lat)*Math.PI/180;ctx.beginPath();let f=true;for(let lon=0;lon<=360;lon+=4){const p=project(phi,lon*Math.PI/180,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}ctx.stroke();}for(let lon=0;lon<360;lon+=20){const th2=lon*Math.PI/180;ctx.beginPath();let f=true;for(let lat=90;lat>=-90;lat-=4){const p=project((90-lat)*Math.PI/180,th2,a);if(!p.vis){f=true;continue;}if(f){ctx.moveTo(p.x,p.y);f=false;}else ctx.lineTo(p.x,p.y);}ctx.stroke();}}
+    function frame(){ctx.clearRect(0,0,W,H);const g=ctx.createRadialGradient(cx,cy,R*.1,cx,cy,R*1.4);g.addColorStop(0,'rgba(155,44,44,0.08)');g.addColorStop(1,'rgba(11,15,20,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.4,0,7);ctx.fill();const s=ctx.createRadialGradient(cx-R*.28,cy-R*.2,R*.05,cx,cy,R);s.addColorStop(0,'rgba(30,48,68,0.7)');s.addColorStop(1,'rgba(10,16,24,0.85)');ctx.fillStyle=s;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();drawGrid(angle);for(const d of dots){const p=project(d.phi,d.th,angle);if(!p.vis)continue;const fade=(p.z+0.18)/1.18;ctx.beginPath();ctx.arc(p.x,p.y,d.r,0,7);ctx.fillStyle='rgba(194,85,63,'+(d.a*fade).toFixed(2)+')';ctx.fill();}ctx.strokeStyle='rgba(100,130,150,0.18)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();if(!reduce)angle+=0.004;requestAnimationFrame(frame);}
+    frame();
   }
-  resize(); window.addEventListener('resize',resize);
-  function project(phi,th,a){
-    const x=Math.sin(phi)*Math.cos(th+a);
-    const y=Math.cos(phi);
-    const z=Math.sin(phi)*Math.sin(th+a);
-    return {x:cx+R*x*.98,y:cy-R*y*.98,z,vis:z>-0.18};
-  }
-  function drawGrid(a){
-    ctx.strokeStyle='rgba(61,93,114,0.22)'; ctx.lineWidth=0.7;
-    for(let lat=-75;lat<=75;lat+=15){
-      const phi=(90-lat)*Math.PI/180;
-      ctx.beginPath();
-      let first=true;
-      for(let lon=0;lon<=360;lon+=4){
-        const th2=lon*Math.PI/180;
-        const p=project(phi,th2,a);
-        if(!p.vis){first=true;continue;}
-        if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);
-      }
-      ctx.stroke();
-    }
-    for(let lon=0;lon<360;lon+=20){
-      const th2=lon*Math.PI/180;
-      ctx.beginPath();
-      let first=true;
-      for(let lat=90;lat>=-90;lat-=4){
-        const phi=(90-lat)*Math.PI/180;
-        const p=project(phi,th2,a);
-        if(!p.vis){first=true;continue;}
-        if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);
-      }
-      ctx.stroke();
-    }
-  }
-  function frame(){
-    ctx.clearRect(0,0,W,H);
-    const glow=ctx.createRadialGradient(cx,cy,R*0.1,cx,cy,R*1.4);
-    glow.addColorStop(0,'rgba(155,44,44,0.08)');
-    glow.addColorStop(1,'rgba(11,15,20,0)');
-    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx,cy,R*1.4,0,7); ctx.fill();
-    const sphere=ctx.createRadialGradient(cx-R*.28,cy-R*.2,R*.05,cx,cy,R);
-    sphere.addColorStop(0,'rgba(30,48,68,0.7)');
-    sphere.addColorStop(1,'rgba(10,16,24,0.85)');
-    ctx.fillStyle=sphere; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
-    drawGrid(angle);
-    for(const d of dots){
-      const p=project(d.phi,d.th,angle);
-      if(!p.vis) continue;
-      const fade=(p.z+0.18)/1.18;
-      ctx.beginPath(); ctx.arc(p.x,p.y,d.r,0,7);
-      ctx.fillStyle='rgba(194,85,63,'+( d.a*fade).toFixed(2)+')';
-      ctx.fill();
-    }
-    ctx.strokeStyle='rgba(100,130,150,0.18)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
-    if(!reduce) angle+=0.004;
-    requestAnimationFrame(frame);
-  }
-  frame();
 })();
-(function(){
 (function(){
   const cv=document.getElementById('growthChart'); if(!cv) return;
   const ctx=cv.getContext('2d');
@@ -3906,8 +3869,9 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }}),{threshold:.5}); io.observe(el);
 })();
 (function(){
+  const items=['<b>FTS</b> 14 new construction-PM notices &middot; West Midlands','<b>CF</b> Cleaning framework re-let signalled &middot; NHS trust','<b>SPEND</b> Council passenger transport up 9% QoQ','<b>AWARD</b> 3yr facilities contract &middot; renewal Q1','<b>FRAMEWORK</b> CCS lot expressions of interest closing'];
   const row=document.getElementById('tickerRow');
-  if(row) row.innerHTML=row.innerHTML+row.innerHTML;
+  if(row){const html=items.map(i=>'<span>'+i+'</span>').join('');row.innerHTML=html+html;}
   const ln=document.getElementById('liveNotices'); let n=128;
   setInterval(()=>{if(Math.random()>.6){n+=1;ln.textContent=n;}},3400);
 })();
