@@ -2788,12 +2788,19 @@ const DESK_MAPPING: Array<{ tag: string; category: string }> = [
   { tag: "Technology", category: "passenger-transport" },
 ];
 
+type DeskCategory = {
+  label: string;
+  keywords: string[];  // matched against (title + description).toLowerCase(); first match wins
+  subcategories: string[];
+};
+
 type DeskProfile = {
   slug: string;
   label: string;
   standfirst: string;
   live: boolean;        // false = interstitial; set to true to promote a desk
   pinnedProfile: z.infer<typeof intakeSchema>;
+  categories: DeskCategory[];
 };
 
 const DESK_PROFILES: DeskProfile[] = [
@@ -2807,7 +2814,18 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "construction project management estate management building refurbishment capital works planned maintenance",
       idealBuyers: "local authorities housing associations NHS trusts",
       mainGoal: "find construction and estate management contracts"
-    })
+    }),
+    categories: [
+      { label: "Repairs, Maintenance & Voids",         keywords: ["repair", "maintenance", "void", "responsive", "reactive", "handyman"],                                          subcategories: ["Reactive repairs","Planned maintenance","Void property works","Minor works","Handyman services","Multi-trade repairs","Damp & mould works"] },
+      { label: "Refurbishment & Fit-out",               keywords: ["refurb", "fit-out", "fitout", "renovation", "internal works", "conversion"],                                    subcategories: ["Refurbishment","Internal fit-out","Extensions","Classroom refurbishment","Toilet refurbishment","Kitchen refurbishment","Office fit-out"] },
+      { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                 subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating"] },
+      { label: "Mechanical, Electrical & Plumbing",    keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],          subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance"] },
+      { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "compliance", "remediation", "access control", "cctv"],                 subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Access control & CCTV"] },
+      { label: "Decarbonisation & Retrofit",            keywords: ["retrofit", "decarb", "energy efficiency", "solar", "heat pump", "led upgrade", "net zero", "insulation"],       subcategories: ["Energy efficiency","Retrofit works","Heat pumps","Solar PV","LED upgrades","Insulation","Net zero works"] },
+      { label: "Grounds, Civils & External Works",      keywords: ["grounds", "civil", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath"],    subcategories: ["Drainage","Surfacing","Landscaping","Fencing","Car parks","Playgrounds","Footpaths"] },
+      { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],        subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins"] },
+      { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "project management", "architectural", "quantity", "structural", "clerk of works"],  subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy"] },
+    ]
   },
   {
     slug: "facilities",
@@ -2819,7 +2837,14 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "facilities management hard FM soft FM mechanical electrical maintenance managed services",
       idealBuyers: "local authorities NHS trusts central government",
       mainGoal: "find facilities management contracts"
-    })
+    }),
+    categories: [
+      { label: "Hard FM",             keywords: ["hard fm", "mechanical", "electrical", "boiler", "heating", "hvac", "lift"],                    subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
+      { label: "Soft FM",             keywords: ["soft fm", "cleaning", "catering", "security", "portering", "reception", "waste"],              subcategories: ["Cleaning","Catering","Security","Portering","Reception","Waste management","Mail room"] },
+      { label: "Managed Services",    keywords: ["managed service", "total fm", "integrated", "outsourced", "facilities management"],            subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
+      { label: "Energy Management",   keywords: ["energy", "utilities", "metering", "sustainability", "carbon"],                                 subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
+      { label: "Compliance & Safety", keywords: ["compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing"],      subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
+    ]
   },
   {
     slug: "transport",
@@ -2831,7 +2856,13 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "passenger transport SEND home to school transport community transport special educational needs",
       idealBuyers: "local authorities councils transport authorities",
       mainGoal: "find passenger transport and SEND contracts"
-    })
+    }),
+    categories: [
+      { label: "SEND Transport",              keywords: ["send", "special educational needs", "home to school", "school transport", "children with"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
+      { label: "Passenger Transport",         keywords: ["passenger transport", "bus", "community transport", "minibus", "dial-a-ride"],               subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport"] },
+      { label: "Fleet & Vehicle Management",  keywords: ["fleet", "vehicle", "taxi", "accessible vehicle", "wheelchair"],                             subcategories: ["Fleet management","Taxi commissioning","Wheelchair-accessible vehicles","Vehicle maintenance"] },
+      { label: "Rail & Specialist",           keywords: ["rail", "coach", "specialist transport", "escort", "accompany"],                             subcategories: ["Rail contracts","Coach hire","Escorted journeys","School crossings"] },
+    ]
   },
   {
     slug: "recruitment",
@@ -2843,7 +2874,14 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider",
       idealBuyers: "NHS trusts local councils central government departments",
       mainGoal: "find recruitment and staffing contracts"
-    })
+    }),
+    categories: [
+      { label: "Clinical & Medical",    keywords: ["nursing", "medical", "doctor", "clinical", "healthcare professional", "locum"],         subcategories: ["Nursing","Medical locums","Allied health","Healthcare assistants","Band 5–7 nursing","Specialist clinical"] },
+      { label: "Social Work & Care",    keywords: ["social work", "social care", "care worker", "support worker", "children services"],     subcategories: ["Social workers","Children services","Adult social care","Support workers","AMHP","IRO"] },
+      { label: "Education Staffing",    keywords: ["teacher", "teaching", "supply teacher", "education", "school staff"],                  subcategories: ["Supply teaching","Teaching assistants","SEN support","School leadership","Education admin"] },
+      { label: "Admin & Corporate",     keywords: ["admin", "clerical", "office", "secretarial", "finance", "hr staff"],                   subcategories: ["Admin & clerical","Finance officers","HR professionals","Project coordinators","PA/EA"] },
+      { label: "Technical & IT",        keywords: ["it staff", "technical", "developer", "engineering", "digital"],                        subcategories: ["IT contractors","Software developers","Data analysts","Digital specialists","Engineers"] },
+    ]
   },
   {
     slug: "frameworks",
@@ -2855,7 +2893,14 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "framework agreement dynamic purchasing system DPS call-off contract multi-provider",
       idealBuyers: "Crown Commercial Service local authorities NHS central government",
       mainGoal: "find framework and DPS opportunities"
-    })
+    }),
+    categories: [
+      { label: "Construction Frameworks",         keywords: ["construction framework", "works framework", "jct", "nec"],                       subcategories: ["Works frameworks","NEC contracts","JCT frameworks","Minor works","Capital delivery"] },
+      { label: "Professional Services",           keywords: ["professional services", "consultancy framework", "advisory"],                    subcategories: ["Consultancy","Project management","Legal","Finance advisory","HR advisory"] },
+      { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "ict", "g-cloud", "digital outcomes"], subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
+      { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "purchase order"],          subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
+      { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market"],                                   subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
+    ]
   },
   {
     slug: "procurement-act",
@@ -2867,7 +2912,14 @@ const DESK_PROFILES: DeskProfile[] = [
       mainServices: "framework agreement dynamic purchasing system transparency notice pipeline notice competitive flexible procedure",
       idealBuyers: "Cabinet Office Crown Commercial Service contracting authorities",
       mainGoal: "track Procurement Act 2023 implementation notices and new procurement routes"
-    })
+    }),
+    categories: [
+      { label: "Pipeline Notices",           keywords: ["pipeline", "planned procurement notice", "pn"],                                   subcategories: ["12-month pipeline","Category planning","Forward workload"] },
+      { label: "Dynamic Markets",            keywords: ["dynamic market", "dynamic purchasing", "dps"],                                    subcategories: ["Open dynamic markets","DPS continuation","New dynamic markets"] },
+      { label: "Competitive Flexible",       keywords: ["competitive flexible", "competitive negotiated", "innovation partnership"],       subcategories: ["Competitive flexible procedure","Negotiated procedure","Innovation partnership"] },
+      { label: "Transparency Notices",       keywords: ["transparency", "contract award notice", "can"],                                   subcategories: ["Contract award notices","Modifications","Voluntary transparency"] },
+      { label: "Below-Threshold Routes",     keywords: ["below threshold", "sub-threshold", "low value", "direct award"],                  subcategories: ["Below threshold procedure","Direct award","Quote-based award"] },
+    ]
   }
 ];
 
@@ -4976,6 +5028,23 @@ app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
 
 // ─── Desk page helpers ────────────────────────────────────────────────────────
 
+type InferredCategory = { label: string; count: number; value: number; subcategories: string[] };
+
+function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCategory[]): InferredCategory[] {
+  const result: InferredCategory[] = categories.map(c => ({ label: c.label, count: 0, value: 0, subcategories: c.subcategories }));
+  for (const notice of notices) {
+    const text = (notice.title + " " + notice.description).toLowerCase();
+    for (let i = 0; i < categories.length; i++) {
+      if (categories[i].keywords.some(kw => text.includes(kw))) {
+        result[i].count++;
+        result[i].value += notice.awardedValue ?? 0;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 function renderNoticeRow(n: ProcurementNotice): string {
   const dateStr = (n.publishedDate || n.awardedDate)
     ? new Date((n.publishedDate || n.awardedDate)!).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
@@ -5055,25 +5124,15 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       })()
     : null;
 
+  const uniqueBuyerCount = new Set(awardedNotices.map(n => n.buyer).filter(b => b && b !== "Not stated")).size;
+
+  const demandCategories = profile.live && !isCompiling
+    ? inferDeskCategories(awardedNotices, profile.categories)
+    : [];
+
   const navLinks = DESK_PROFILES.map(d =>
     `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' style="color:var(--ink);border-bottom:1.5px solid var(--ink)"' : ''}>${escapeHtml(d.label)}</a>`
   ).join("");
-
-  const spendCard = !isCompiling && profile.live ? `
-    <div class="chartwrap">
-      <div class="ch-head">
-        <span class="lab">Awarded category spend &middot; &pound;m &middot; keyword-filtered public record</span>
-        <span class="big">&pound;${escapeHtml(totalAwardedM)}m<span class="up">${escapeHtml(String(awardedCount))} awards</span></span>
-      </div>
-      <p style="font-size:13px;color:var(--slate);margin-top:12px;font-family:var(--mono)">Derived from ${escapeHtml(String(awardedNotices.length))} awarded notices matched to desk keywords. Not exhaustive — covers public record only.</p>
-    </div>` : `
-    <div class="chartwrap">
-      <div class="ch-head">
-        <span class="lab">Awarded category spend &middot; &pound;m &middot; illustrative</span>
-        <span class="big" style="opacity:.4">&pound;—</span>
-      </div>
-      <p style="font-size:13px;color:var(--slate);margin-top:12px;font-family:var(--mono)">Spend data loads when this desk is compiled.</p>
-    </div>`;
 
   const feedHtml = !profile.live || isCompiling ? `` : `
 <section class="desk-section">
@@ -5151,13 +5210,28 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .chip{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:6px 12px;border:1px solid var(--line-strong);background:var(--paper-2)}
 .chip-green{border-color:#1d6b4f44;color:#1d6b4f}
 .chip-amber{border-color:#a9793244;color:#a97932}
-.chartband-desk{padding:52px 0;border-bottom:1px solid var(--line-strong)}
-.chartband-desk .wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
-.chartwrap{border:1px solid var(--line-strong);padding:28px 30px;background:var(--paper-2)}
-.ch-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
-.lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
-.big{font-family:var(--serif);font-size:36px;font-weight:600;letter-spacing:-.02em}
-.up{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--slate);margin-left:8px}
+.ds-card{border:1px solid var(--line-strong);padding:36px 40px;background:var(--paper-2)}
+.ds-card--cold{padding:28px 32px}
+.ds-card-head{margin-bottom:24px}
+.ds-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--line-strong);padding-bottom:28px;margin-bottom:28px}
+.ds-stat{padding-right:32px}
+.ds-stat:not(:last-child){border-right:1px solid var(--line-strong);margin-right:32px}
+.ds-val{display:block;font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.ds-label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-top:7px}
+.ds-bars-head{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-bottom:16px}
+.ds-muted{color:var(--slate);text-transform:none;letter-spacing:0;font-size:11px}
+.ds-bar-row{display:grid;grid-template-columns:220px 1fr 90px;gap:14px;align-items:center;margin-bottom:12px}
+.ds-bar-label{font-size:13px;font-family:var(--sans);color:var(--ink)}
+.ds-bar-track{height:5px;background:var(--line-strong);border-radius:2px}
+.ds-bar-fill{height:5px;background:var(--accent);border-radius:2px;transition:width .4s ease}
+.ds-bar-val{font-family:var(--mono);font-size:12px;color:var(--slate);text-align:right}
+.ds-caveat{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:24px;padding-top:18px;border-top:1px solid var(--line-strong);line-height:1.6}
+.ds-map-link{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-top:12px;text-decoration:underline;text-decoration-color:var(--accent)44}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.dm-card{border:1px solid var(--line-strong);padding:20px 22px;background:var(--paper-2)}
+.dm-name{font-size:14px;font-weight:600;margin-bottom:12px;line-height:1.3}
+.dm-count{font-family:var(--mono);font-size:12px;color:var(--slate);font-weight:400}
+.dm-subs{list-style:none;font-size:12px;color:var(--slate);line-height:1.85;font-family:var(--sans)}
 .desk-section{padding:52px 0;border-bottom:1px solid var(--line-strong)}
 .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
 .section-head h2{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em}
@@ -5190,7 +5264,11 @@ footer li{margin-bottom:8px;font-size:14px}
 footer a:hover{color:var(--accent)}
 .foot-copy{text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#4a5a68;margin-top:36px;padding-top:20px;border-top:1px solid #ffffff14}
 @media(max-width:768px){
-  .chartband-desk .wrap{grid-template-columns:1fr}
+  .ds-stats{grid-template-columns:1fr;gap:16px}
+  .ds-stat:not(:last-child){border-right:none;margin-right:0;border-bottom:1px solid var(--line-strong);padding-bottom:16px;margin-bottom:0}
+  .ds-bar-row{grid-template-columns:1fr 1fr;gap:8px}
+  .ds-bar-track{display:none}
+  .dm-grid{grid-template-columns:1fr 1fr}
   .desk-masthead h1{font-size:34px}
   footer .wrap{grid-template-columns:1fr}
   .nt-buyer,.nt-date{display:none}
@@ -5228,19 +5306,79 @@ footer a:hover{color:var(--accent)}
   </div>
 </section>
 
-<section class="chartband-desk">
+<section class="desk-section" id="demand-signal">
   <div class="wrap">
-    <div>
-      <div class="eyebrow">Spend signal &middot; ${profile.live && !isCompiling ? "public record" : "illustrative"}</div>
-      <h2 style="font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin:12px 0 16px">Awarded spend in this sector</h2>
-      <p style="color:var(--slate);line-height:1.6">Awarded contract value from Contracts Finder, filtered to desk keywords. Use this to gauge category-level spend before your firm enters.</p>
-    </div>
-    ${spendCard}
+    ${profile.live && !isCompiling ? (() => {
+      const topCats = [...demandCategories].sort((a, b) => b.value - a.value).slice(0, 5).filter(c => c.value > 0);
+      const maxVal = topCats[0]?.value || 1;
+      const fmtVal = (v: number) => v >= 1_000_000_000
+        ? `£${(v / 1_000_000_000).toFixed(2)}bn`
+        : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(2)}m`
+        : v >= 1_000 ? `£${Math.round(v / 1_000)}k` : `£${Math.round(v)}`;
+      const fmtBig = (v: number) => v >= 1_000_000_000
+        ? `£${(v / 1_000_000_000).toFixed(2)}bn`
+        : `£${(v / 1_000_000).toFixed(2)}m`;
+      const barRows = topCats.map(c => {
+        const pct = Math.round((c.value / maxVal) * 100);
+        return `<div class="ds-bar-row">
+          <span class="ds-bar-label">${escapeHtml(c.label)}</span>
+          <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${pct}%"></div></div>
+          <span class="ds-bar-val">${escapeHtml(fmtVal(c.value))}</span>
+        </div>`;
+      }).join("");
+      return `<div class="ds-card">
+        <div class="ds-card-head">
+          <div class="eyebrow">Awarded demand signal</div>
+        </div>
+        <div class="ds-stats">
+          <div class="ds-stat">
+            <span class="ds-val">${escapeHtml(fmtBig(totalAwarded))}</span>
+            <span class="ds-label">Total awarded value</span>
+          </div>
+          <div class="ds-stat">
+            <span class="ds-val">${escapeHtml(awardedCount.toLocaleString("en-GB"))}</span>
+            <span class="ds-label">Awarded notices</span>
+          </div>
+          <div class="ds-stat">
+            <span class="ds-val">${escapeHtml(uniqueBuyerCount.toLocaleString("en-GB"))}</span>
+            <span class="ds-label">Public buyers</span>
+          </div>
+        </div>
+        ${topCats.length ? `<div class="ds-bars">
+          <div class="ds-bars-head">Top recurring demand areas <span class="ds-muted">(by awarded value)</span></div>
+          ${barRows}
+        </div>` : ""}
+        <p class="ds-caveat">Based on awarded notices found in the public record for this desk profile (last 12 months). Not a whole-market estimate. See sources below.</p>
+        <a class="ds-map-link" href="#demand-map">Open the demand map &darr;</a>
+      </div>`;
+    })() : `<div class="ds-card ds-card--cold">
+      <div class="eyebrow">Awarded demand signal</div>
+      <p style="color:var(--slate);margin-top:12px">Demand data compiles on first request. Refresh after ~90 seconds.</p>
+    </div>`}
   </div>
 </section>
 
 ${feedHtml}
 ${interstitialHtml}
+
+<section class="desk-section" id="demand-map">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Demand map &mdash; ${escapeHtml(profile.label)}</h2>
+      <span class="eyebrow">All major categories this desk scans for</span>
+    </div>
+    <div class="dm-grid">
+      ${profile.categories.map(cat => {
+        const inferred = demandCategories.find(c => c.label === cat.label);
+        const count = inferred?.count ?? 0;
+        return `<div class="dm-card">
+          <div class="dm-name">${escapeHtml(cat.label)}${count > 0 ? ` <span class="dm-count">(${count})</span>` : ""}</div>
+          ${cat.subcategories.length ? `<ul class="dm-subs">${cat.subcategories.slice(0, 7).map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
+        </div>`;
+      }).join("")}
+    </div>
+  </div>
+</section>
 
 <section class="desk-cta">
   <div class="wrap">
