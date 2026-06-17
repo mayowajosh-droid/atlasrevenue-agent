@@ -1418,49 +1418,103 @@ function parseMoneyCap(input: any) {
   return 75_000;
 }
 
-function getClientSector(input: any) {
-  const text = [
-    input?.companyName,
-    input?.mainServices,
-    input?.secondaryServices,
-    input?.mainGoal,
-    input?.preferredOutput
-  ]
-    .join(" ")
-    .toLowerCase();
+type SectorResult = { key: string; label: string; terms: string[] };
 
-  if (text.includes("construction") || text.includes("quantity surveying") || text.includes("cost management") || text.includes("employer") || text.includes("building surveying") || text.includes("estate")) {
+// Single canonical sector resolver. Check order matters: social-housing and cleaning
+// must win before facilities/built-environment to prevent false reclassification.
+function resolveSector(text: string): SectorResult {
+  const t = text.toLowerCase();
+
+  if (t.includes("social housing") || t.includes("housing maintenance") ||
+      t.includes("responsive repairs") || t.includes("void") ||
+      t.includes("damp and mould") || t.includes("tenancy")) {
     return {
+      key: "social-housing",
+      label: "Social housing / housing maintenance",
+      terms: ["social housing", "housing maintenance", "responsive repairs", "void properties", "damp and mould", "tenancy", "housing association", "council housing"]
+    };
+  }
+
+  if (t.includes("cleaning") || t.includes("deep clean") || t.includes("hygiene") ||
+      t.includes("clinical") || t.includes("domestic cleaning") || t.includes("commercial cleaning")) {
+    return {
+      key: "cleaning",
+      label: "Specialist cleaning / facilities hygiene",
+      terms: ["cleaning", "contract cleaning", "deep clean", "clinical cleaning", "domestic cleaning", "commercial cleaning", "hygiene", "facilities cleaning"]
+    };
+  }
+
+  if (t.includes("facilities") || t.includes(" fm ") || t.includes("soft fm") ||
+      t.includes("hard fm") || t.includes("property services") || t.includes("maintenance")) {
+    return {
+      key: "facilities",
+      label: "Facilities management / property services",
+      terms: ["facilities management", "fm services", "soft fm", "hard fm", "maintenance", "property services", "estates management"]
+    };
+  }
+
+  if (t.includes("construction") || t.includes("quantity surveying") ||
+      t.includes("cost management") || t.includes("employer") ||
+      t.includes("building surveying") || t.includes("estate")) {
+    return {
+      key: "built-environment",
       label: "Built environment / construction consultancy",
       terms: ["construction", "quantity surveying", "cost management", "project management", "employer", "building surveying", "estate", "asset management", "contract administration", "programme management"]
     };
   }
 
-  if (text.includes("marketing") || text.includes("creative") || text.includes("campaign") || text.includes("video") || text.includes("film") || text.includes("communications") || text.includes("event production") || text.includes("drpg")) {
+  if (t.includes("marketing") || t.includes("creative") || t.includes("campaign") ||
+      t.includes("video") || t.includes("film") || t.includes("communications") ||
+      t.includes("event production") || t.includes("drpg")) {
     return {
+      key: "creative",
       label: "Creative / marketing production / events",
       terms: ["marketing", "creative", "campaign", "video", "film", "communications", "event", "production", "digital content", "media services"]
     };
   }
 
-  if (text.includes("photography") || text.includes("portrait") || text.includes("graduation") || text.includes("property photography") || text.includes("wedding")) {
+  if (t.includes("photography") || t.includes("portrait") || t.includes("graduation") ||
+      t.includes("property photography") || t.includes("wedding")) {
     return {
+      key: "photography",
       label: "Photography / visual content / public communications",
       terms: ["photography", "event photography", "corporate photography", "graduation", "portrait", "property photography", "visual content", "creative services"]
     };
   }
 
-  if (text.includes("cleaning") || text.includes("facilities") || text.includes("maintenance")) {
+  if (t.includes("retrofit") || t.includes("solar") || t.includes("energy") ||
+      t.includes("decarbonisation") || t.includes("net zero")) {
     return {
-      label: "Facilities / cleaning / property services",
-      terms: ["cleaning", "facilities management", "maintenance", "soft fm", "hard fm", "property services"]
+      key: "energy",
+      label: "Energy / retrofit / built-environment decarbonisation",
+      terms: ["energy", "retrofit", "solar", "decarbonisation", "net zero", "energy efficiency", "low carbon", "sustainability"]
     };
   }
 
   return {
+    key: "general",
     label: "General public-sector services",
     terms: text.split(/\s+/).filter((word: string) => word.length > 5).slice(0, 12)
   };
+}
+
+function resolveSectorFromInput(input: any): SectorResult {
+  const text = [
+    input?.companyName, input?.mainServices, input?.secondaryServices,
+    input?.mainGoal, input?.preferredOutput, input?.idealBuyers
+  ].filter(Boolean).join(" ");
+  return resolveSector(text);
+}
+
+function resolveSectorFromScan(scan: any): SectorResult {
+  const input: any = scan.input_json || {};
+  const text = [
+    input.companyName, input.mainServices, input.secondaryServices,
+    input.idealBuyers, input.mainGoal, input.preferredOutput,
+    scan.company_name, scan.sector, scan.industry,
+    scan.services, scan.main_services,
+  ].filter(Boolean).join(" ");
+  return resolveSector(text);
 }
 
 function normaliseCompanyName(value: string) {
@@ -1514,7 +1568,7 @@ function trustStatusForNotice(score: number, notice: any, input: any) {
 }
 
 function scoreNoticeForClient(notice: any, input: any) {
-  const sector = getClientSector(input);
+  const sector = resolveSectorFromInput(input);
   const text = noticeText(notice);
   const company = normaliseCompanyName(input?.companyName || "");
   const supplier = normaliseCompanyName(notice?.awardedSupplier || "");
@@ -1617,7 +1671,7 @@ function buildTrustLayer(input: any, data: any) {
 
   return {
     generatedAt: nowIso(),
-    sectorLens: getClientSector(input).label,
+    sectorLens: resolveSectorFromInput(input).label,
     clientCapacityCap: parseMoneyCap(input),
     pulledCount: pulled.length,
     relevantCount: relevant.length,
@@ -2212,7 +2266,7 @@ function calcPremiumScores(scan: ScanRecord) {
         : "Partner/subcontract first";
 
   const sector =
-    construction ? escapeHtml(inferSectorLens(scan)) :
+    construction ? escapeHtml(resolveSectorFromScan(scan).label) :
     creative ? "Creative, media and visual services" :
     "Professional services";
 
@@ -2314,75 +2368,6 @@ function getNoticeValue(notice: any) {
 
 
 
-function inferSectorLens(scan: ScanRecord) {
-  const input: any = scan.input_json || {};
-  const text = [
-    input.companyName,
-    input.mainServices,
-    input.secondaryServices,
-    input.idealBuyers,
-    input.mainGoal,
-    input.preferredOutput
-  ].join(" ").toLowerCase();
-
-  if (
-    text.includes("marketing") ||
-    text.includes("creative") ||
-    text.includes("campaign") ||
-    text.includes("video") ||
-    text.includes("film") ||
-    text.includes("event production") ||
-    text.includes("communications") ||
-    text.includes("drpg")
-  ) {
-    return "Creative / marketing production / events";
-  }
-
-  if (
-    text.includes("photography") ||
-    text.includes("portrait") ||
-    text.includes("graduation") ||
-    text.includes("wedding") ||
-    text.includes("property photography")
-  ) {
-    return "Photography / visual content / public communications";
-  }
-
-  if (
-    text.includes("construction") ||
-    text.includes("quantity surveying") ||
-    text.includes("cost management") ||
-    text.includes("project management") ||
-    text.includes("employer") ||
-    text.includes("building surveying") ||
-    text.includes("estate")
-  ) {
-   const scanData = scan as Record<string, any>;
-const explicitSectorLens = String(scanData.sector_lens ?? scanData.sectorLens ?? "").trim();
-
-if (explicitSectorLens) return explicitSectorLens;
-
-const sector = inferGovRevenueSector(scan).toLowerCase();
-
-if (sector.includes("clean")) {
-  return "Specialist cleaning, healthcare deep cleaning, education facilities cleaning, local authority estate cleaning and reactive hygiene support";
-}
-
-return inferGovRevenueSector(scan);
-  }
-
-  if (
-    text.includes("retrofit") ||
-    text.includes("solar") ||
-    text.includes("energy") ||
-    text.includes("decarbonisation") ||
-    text.includes("net zero")
-  ) {
-    return "Energy / retrofit / built-environment decarbonisation";
-  }
-
-  return "General public-sector services";
-}
 
 function assessDataQuality(scan: ScanRecord) {
   const input: any = scan.input_json || {};
@@ -2571,7 +2556,7 @@ function validateReportConsistency(
 
 function reportPage(scan: ScanRecord) {
   const data = scan.procurement_json as ProcurementData | null;
-  const sectorLens = inferSectorLens(scan);
+  const sectorLens = resolveSectorFromScan(scan).label;
   const dataQuality = assessDataQuality(scan);
   const openCount = data?.contractsFinder?.open?.length || 0;
   const awardedCount = data?.contractsFinder?.awarded?.length || 0;
@@ -3741,28 +3726,3 @@ initDb()
     console.error("[startup] failed", err);
     process.exit(1);
   });
-function inferGovRevenueSector(scan: any): string {
-  const text = [
-    scan.company_name,
-    scan.companyName,
-    scan.sector,
-    scan.industry,
-    scan.report_markdown,
-    scan.services,
-    scan.main_services,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (
-    text.includes("cleaning") ||
-    text.includes("deep clean") ||
-    text.includes("hygiene") ||
-    text.includes("clinical")
-  ) {
-    return "cleaning";
-  }
-
-  return "public-sector services";
-}
