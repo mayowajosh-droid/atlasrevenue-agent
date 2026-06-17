@@ -3693,10 +3693,10 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
     </div>
   </div>
 </section>
-<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"></div></div>
+<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"><span><b>FTS</b> 14 new construction-PM notices</span><span><b>CF</b> Cleaning framework re-let signalled</span><span><b>SPEND</b> Council passenger transport up 9% QoQ</span><span><b>AWARD</b> 3yr facilities contract renewal Q1</span><span><b>FRAMEWORK</b> CCS lot expressions of interest closing</span></div></div>
 <section class="chartband" id="chart">
   <div class="wrap">
-    <div class="reveal">
+    <div>
       <div class="eyebrow">Category signal</div>
       <h2>Watch the money move before the tender does.</h2>
       <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
@@ -3706,7 +3706,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
         <li><b>Entry window</b> &middot; 18 months to incumbent renewal</li>
       </ul>
     </div>
-    <div class="chartwrap reveal">
+    <div class="chartwrap">
       <div class="ch-head">
         <span class="lab">Recurring category spend &middot; &pound;m</span>
         <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
@@ -3899,10 +3899,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }}),{threshold:.5}); io.observe(el);
 })();
 (function(){
-  const items=['<b>FTS</b> 14 new construction-PM notices','<b>CF</b> Cleaning framework re-let signalled','<b>SPEND</b> Council passenger transport up 9% QoQ','<b>AWARD</b> 3yr facilities contract renewal Q1','<b>FRAMEWORK</b> CCS lot expressions of interest closing'];
   const row=document.getElementById('tickerRow');
-  const html=items.map(i=>'<span>'+i+'</span>').join('');
-  row.innerHTML=html+html;
+  if(row) row.innerHTML=row.innerHTML+row.innerHTML;
   const ln=document.getElementById('liveNotices'); let n=128;
   setInterval(()=>{if(Math.random()>.6){n+=1;ln.textContent=n;}},3400);
 })();
