@@ -5697,14 +5697,16 @@ a{color:inherit;text-decoration:none}
 .chip-amber{border-color:#a9793244;color:#a97932}
 /* Global header */
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
-.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
-.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:40px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:first-child{padding-left:0}
 .gh-nav a:hover{color:var(--paper)}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
@@ -5818,29 +5820,39 @@ a{color:inherit;text-decoration:none}
 }
 @media(max-width:760px){
   .gh-tag,.gh-badge{display:none}
-  .dp-stats{grid-template-columns:1fr 1fr 1fr}
-  .ls-val,.ls-date,.ls-buyer{display:none}
-  .dm-grid{grid-template-columns:1fr 1fr}
+  .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
+  .dm-mast{padding:40px 0 36px}
+  .dm-mast-inner{grid-template-columns:1fr;gap:0}
+  .dm-mast h1{font-size:34px}
+  .dp-panels-inner{grid-template-columns:1fr;border-left:none}
+  .dp-panel{padding:28px 0;border-right:none;border-bottom:1px solid var(--line-strong)}
+  .dp-stats{grid-template-columns:1fr 1fr}
+  .dp-val{font-size:28px}
   .dp-bar-row{grid-template-columns:1fr 60px}
   .dp-bar-track{display:none}
-  .dm-mast h1{font-size:38px}
-  .dp-val{font-size:32px}
+  .dm-grid{grid-template-columns:1fr 1fr}
+  .ls-val,.ls-date,.ls-buyer{display:none}
 }
-@media(max-width:480px){.dm-grid{grid-template-columns:1fr}}
+@media(max-width:480px){
+  .dm-grid{grid-template-columns:1fr}
+  .dp-stats{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
 <header class="gh">
   <div class="gh-inner">
-    <div class="gh-brand">
-      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-      <span class="gh-tag">Public-sector revenue intelligence</span>
+    <div class="gh-top">
+      <div class="gh-brand">
+        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <span class="gh-tag">Public-sector revenue intelligence</span>
+      </div>
+      <div class="gh-badge">
+        <span>CF &middot; public record</span>
+        <span>Built for public trust</span>
+      </div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
-    <div class="gh-badge">
-      <span>CF &middot; public record</span>
-      <span>Built for public trust</span>
-    </div>
   </div>
 </header>
 
@@ -6007,14 +6019,16 @@ function subPage(
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
-.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
-.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:40px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:first-child{padding-left:0}
 .gh-nav a:hover{color:var(--paper)}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
@@ -6084,9 +6098,15 @@ a{color:inherit;text-decoration:none}
 @media(max-width:1100px){.sub-two-col{grid-template-columns:1fr}}
 @media(max-width:760px){
   .gh-tag,.gh-badge{display:none}
-  .sub-mast h1{font-size:36px}
+  .gh-inner,.sub-mast-inner,.sub-body-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
+  .sub-mast{padding:32px 0 28px}
+  .sub-mast h1{font-size:30px}
   .sub-stats{grid-template-columns:1fr 1fr}
+  .sub-two-col{grid-template-columns:1fr}
   .ls-val,.ls-date,.ls-buyer{display:none}
+}
+@media(max-width:480px){
+  .sub-stats{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -6094,15 +6114,17 @@ a{color:inherit;text-decoration:none}
 
 <header class="gh">
   <div class="gh-inner">
-    <div class="gh-brand">
-      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-      <span class="gh-tag">Public-sector revenue intelligence</span>
+    <div class="gh-top">
+      <div class="gh-brand">
+        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <span class="gh-tag">Public-sector revenue intelligence</span>
+      </div>
+      <div class="gh-badge">
+        <span>CF &middot; public record</span>
+        <span>Built for public trust</span>
+      </div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
-    <div class="gh-badge">
-      <span>CF &middot; public record</span>
-      <span>Built for public trust</span>
-    </div>
   </div>
 </header>
 
@@ -6221,14 +6243,16 @@ function pageShellCss(): string {
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
-.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
-.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:40px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:first-child{padding-left:0}
 .gh-nav a:hover{color:var(--paper)}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
@@ -6259,7 +6283,17 @@ a{color:inherit;text-decoration:none}
 .pg-foot{background:var(--paper-2);border-top:1px solid var(--line-strong)}
 .pg-foot-inner{max-width:1440px;margin:0 auto;padding:14px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
 .pg-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:10px 0 14px;border-top:1px solid var(--line)}
-@media(max-width:760px){.gh-tag,.gh-badge{display:none}.pg-mast h1{font-size:32px}.pg-stats{width:100%}}`;
+@media(max-width:760px){
+  .gh-tag,.gh-badge{display:none}
+  .gh-inner,.pg-mast-inner,.pg-body-inner,.pg-foot-inner{padding-left:16px;padding-right:16px}
+  .pg-mast{padding:28px 0 24px}
+  .pg-mast h1{font-size:26px}
+  .pg-stats{width:100%;flex-wrap:wrap}
+  .pg-stat{flex:1 1 45%;border-bottom:1px solid var(--line-strong)}
+}
+@media(max-width:480px){
+  .pg-stat{flex:1 1 100%}
+}`;
 }
 
 function pageShellHeader(profile: DeskProfile): string {
@@ -6268,12 +6302,14 @@ function pageShellHeader(profile: DeskProfile): string {
   ).join("");
   return `<header class="gh">
   <div class="gh-inner">
-    <div class="gh-brand">
-      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-      <span class="gh-tag">Public-sector revenue intelligence</span>
+    <div class="gh-top">
+      <div class="gh-brand">
+        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <span class="gh-tag">Public-sector revenue intelligence</span>
+      </div>
+      <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
-    <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
   </div>
 </header>`;
 }
