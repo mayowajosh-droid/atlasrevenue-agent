@@ -5370,6 +5370,25 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
   res.type("html").send(subPage(profile, matchCat, matchSub, cached));
 }));
 
+app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
+  if (!profile) { res.status(404).send("Desk not found"); return; }
+  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+  const buyerFilter = typeof req.query.buyer === "string" ? req.query.buyer : null;
+  res.type("html").send(noticesPage(profile, cached, buyerFilter));
+}));
+
+app.get("/desk/:slug/buyers", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
+  if (!profile) { res.status(404).send("Desk not found"); return; }
+  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+  res.type("html").send(buyersPage(profile, cached));
+}));
+
 app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || scan.status !== "completed") {
@@ -5557,7 +5576,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       <span class="live-dot"></span>
       <span class="dp-eyebrow">LIVE SIGNAL &ndash; CF + FIND A TENDER</span>
     </div>
-    <a href="#demand-map" class="dp-link-sm">View all notices &rarr;</a>
+    <a href="/desk/${profile.slug}/notices" class="dp-link-sm">View all notices &rarr;</a>
   </div>
   ${!profile.live || isCompiling
     ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
@@ -5585,11 +5604,11 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   // Buyer watchlist panel
   const watchlistHtml = `<div class="dp-head-row">
     <div>
-      <span class="dp-eyebrow">BUYER WATCHLIST <span class="bw-sample">(SAMPLE)</span></span>
+      <span class="dp-eyebrow">BUYER WATCHLIST</span>
     </div>
     <span class="dp-info" title="Top buyers by estimated 12-month spend on this desk">ⓘ</span>
   </div>
-  <a href="#demand-map" class="dp-link-sm" style="display:block;margin-bottom:16px">View full watchlist &rarr;</a>
+  <a href="/desk/${profile.slug}/buyers" class="dp-link-sm" style="display:block;margin-bottom:16px">View full watchlist &rarr;</a>
   ${!profile.live || isCompiling || topBuyers.length === 0
     ? `<p class="dp-caveat-sm">Buyer data compiles with the demand signal.<br>Refresh after ~90 seconds.</p>`
     : topBuyers.map(([buyer, info]) => {
@@ -6179,6 +6198,437 @@ a{color:inherit;text-decoration:none}
 </div>
 <div class="dm-foot-copy">&copy; GovRevenue</div>
 
+</body>
+</html>`;
+}
+
+// ─── shared page shell ────────────────────────────────────────────────────────
+
+function pageShellCss(): string {
+  return `
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.gh{background:var(--ink);color:var(--paper)}
+.gh-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
+.gh-logo b{color:#d97070}
+.gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav::-webkit-scrollbar{display:none}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:hover{color:var(--paper)}
+.gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
+.gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
+.gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+.pg-mast{padding:48px 0 40px;border-bottom:1px solid var(--line-strong)}
+.pg-mast-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.pg-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pg-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
+.pg-crumb a:hover{color:var(--accent)}
+.pg-crumb-sep{color:var(--line-strong)}
+.pg-crumb-active{color:var(--ink)}
+.pg-mast h1{font-family:var(--serif);font-size:44px;line-height:1.05;letter-spacing:-.01em;text-transform:uppercase;margin-bottom:28px}
+.pg-stats{display:flex;gap:0;border:1px solid var(--line-strong);width:fit-content;flex-wrap:wrap}
+.pg-stat{padding:16px 28px;border-right:1px solid var(--line-strong)}
+.pg-stat:last-child{border-right:none}
+.pg-stat-val{display:block;font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.pg-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:5px}
+.pg-body{padding:48px 0 64px}
+.pg-body-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block}
+.bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
+.bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
+.bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
+.bw-tag-edu{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
+.bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.pg-empty{font-family:var(--mono);font-size:13px;color:var(--slate);padding:40px 0}
+.pg-foot{background:var(--paper-2);border-top:1px solid var(--line-strong)}
+.pg-foot-inner{max-width:1280px;margin:0 auto;padding:14px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
+.pg-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:10px 0 14px;border-top:1px solid var(--line)}
+@media(max-width:760px){.gh-tag,.gh-badge{display:none}.pg-mast h1{font-size:32px}.pg-stats{width:100%}}`;
+}
+
+function pageShellHeader(profile: DeskProfile): string {
+  const navLinks = DESK_PROFILES.map(d =>
+    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
+  ).join("");
+  return `<header class="gh">
+  <div class="gh-inner">
+    <div class="gh-brand">
+      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <span class="gh-tag">Public-sector revenue intelligence</span>
+    </div>
+    <nav class="gh-nav">${navLinks}</nav>
+    <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
+  </div>
+</header>`;
+}
+
+function pageShellFoot(): string {
+  return `<footer class="pg-foot">
+  <div class="pg-foot-inner">
+    <span>Public record only. Always verify on the source.</span>
+    <span>Contracts Finder &middot; Find a Tender</span>
+    <span>Data is indicative, not exhaustive.</span>
+  </div>
+</footer>
+<div class="pg-copy">&copy; GovRevenue</div>`;
+}
+
+// ─── /desk/:slug/notices ──────────────────────────────────────────────────────
+
+function noticesPage(
+  profile: DeskProfile,
+  cached: { data: ProcurementData; cached_at: string } | null,
+  buyerFilter: string | null = null
+): string {
+  const data = cached?.data;
+  const isCompiling = cached === null;
+
+  const allOpen = (data?.contractsFinder.open || [])
+    .concat(data?.findTender?.notices || [])
+    .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
+
+  const allAwarded = (data?.contractsFinder.awarded || [])
+    .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
+
+  const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+  const uniqueBuyers = new Set([...allOpen, ...allAwarded].map(n => n.buyer).filter(Boolean)).size;
+
+  const renderRow = (n: ProcurementNotice, status: "open" | "awarded") => {
+    const rawVal = status === "open" ? (n.valueHigh ?? n.valueLow ?? n.awardedValue) : n.awardedValue;
+    const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
+    const date = status === "open" ? (n.publishedDate || n.awardedDate) : (n.awardedDate || n.publishedDate);
+    const dateStr = date ? new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+    const src = n.source === "Find a Tender" ? "FTS" : "CF";
+    return `<tr data-status="${status}" data-search="${escapeHtml((n.title + " " + (n.buyer || "")).toLowerCase())}">
+      <td class="nt-status"><span class="nt-chip nt-chip-${status}">${status === "open" ? "OPEN" : "AWARDED"}</span></td>
+      <td class="nt-title"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 100))}</a></td>
+      <td class="nt-buyer">${escapeHtml((n.buyer || "—").slice(0, 50))}</td>
+      <td class="nt-val">${escapeHtml(val)}</td>
+      <td class="nt-date">${escapeHtml(dateStr)}</td>
+      <td class="nt-src"><span class="nt-src-badge">${escapeHtml(src)}</span></td>
+    </tr>`;
+  };
+
+  const openRows = allOpen.map(n => renderRow(n, "open")).join("");
+  const awardedRows = allAwarded.map(n => renderRow(n, "awarded")).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>All Notices &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<style>
+${pageShellCss()}
+.nt-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:28px;flex-wrap:wrap}
+.nt-tabs{display:flex;border:1px solid var(--line-strong);overflow:hidden}
+.nt-tab{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;padding:9px 18px;cursor:pointer;background:var(--paper);color:var(--slate);border:none;border-right:1px solid var(--line-strong);transition:.15s}
+.nt-tab:last-child{border-right:none}
+.nt-tab.active,.nt-tab:hover{background:var(--ink);color:var(--paper)}
+.nt-search{flex:1;min-width:200px;max-width:360px;font-family:var(--mono);font-size:12px;padding:9px 14px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);outline:none}
+.nt-search:focus{border-color:var(--ink)}
+.nt-count{font-family:var(--mono);font-size:11px;color:var(--slate);margin-left:auto}
+.nt-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.nt-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 10px 12px 0;border-bottom:2px solid var(--line-strong)}
+.nt-table td{padding:13px 10px 13px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.nt-table tr:hover td{background:#F7F4EE}
+.nt-table tr[style*="display:none"]{display:none!important}
+.nt-title{max-width:480px}
+.nt-title a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nt-title a:hover{text-decoration-color:var(--accent)}
+.nt-buyer{color:var(--slate);font-size:12.5px;max-width:200px}
+.nt-val{font-family:var(--mono);font-size:12.5px;white-space:nowrap;text-align:right}
+.nt-date{font-family:var(--mono);font-size:12.5px;color:var(--slate);white-space:nowrap;text-align:right}
+.nt-src{text-align:right}
+.nt-src-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;padding:2px 6px;border:1px solid var(--line-strong);color:var(--slate);background:var(--paper-2)}
+.nt-status{white-space:nowrap}
+.nt-chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;padding:2px 7px;border-radius:2px;font-weight:500}
+.nt-chip-open{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.nt-chip-awarded{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+@media(max-width:760px){.nt-buyer,.nt-val,.nt-src{display:none}}
+</style>
+</head>
+<body>
+${pageShellHeader(profile)}
+
+<section class="pg-mast">
+  <div class="pg-mast-inner">
+    <div class="pg-crumb">
+      <a href="/desk/${profile.slug}">${escapeHtml(profile.label)}</a>
+      <span class="pg-crumb-sep">&rsaquo;</span>
+      <span class="pg-crumb-active">All Notices</span>
+    </div>
+    <h1>ALL NOTICES</h1>
+    <div class="pg-stats">
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : String(allOpen.length)}</span>
+        <span class="pg-stat-label">Open opportunities</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : String(allAwarded.length)}</span>
+        <span class="pg-stat-label">Awarded contracts</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue) : "—"}</span>
+        <span class="pg-stat-label">Total awarded value</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : String(uniqueBuyers)}</span>
+        <span class="pg-stat-label">Unique buyers</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pg-body">
+  <div class="pg-body-inner">
+    ${isCompiling
+      ? `<p class="pg-empty">Compiling &mdash; data ready within 90 seconds. Refresh to check.</p>`
+      : `<div class="nt-toolbar">
+          <div class="nt-tabs">
+            <button class="nt-tab active" data-filter="all">All (${allOpen.length + allAwarded.length})</button>
+            <button class="nt-tab" data-filter="open">Open (${allOpen.length})</button>
+            <button class="nt-tab" data-filter="awarded">Awarded (${allAwarded.length})</button>
+          </div>
+          <input class="nt-search" type="search" placeholder="Search notices or buyers…" id="nt-search"${buyerFilter ? ` value="${escapeHtml(buyerFilter)}"` : ""}>
+          <span class="nt-count" id="nt-count">${allOpen.length + allAwarded.length} notices</span>
+        </div>
+        <table class="nt-table" id="nt-table">
+          <thead><tr>
+            <th></th>
+            <th>Notice</th>
+            <th>Buyer</th>
+            <th style="text-align:right">Value</th>
+            <th style="text-align:right">Date</th>
+            <th style="text-align:right">Src</th>
+          </tr></thead>
+          <tbody id="nt-body">${openRows}${awardedRows}</tbody>
+        </table>
+        <script>
+        (function(){
+          var activeFilter='all';
+          var searchVal='';
+          function update(){
+            var rows=document.querySelectorAll('#nt-body tr');
+            var vis=0;
+            rows.forEach(function(r){
+              var statusOk=activeFilter==='all'||r.dataset.status===activeFilter;
+              var searchOk=!searchVal||r.dataset.search.includes(searchVal);
+              var show=statusOk&&searchOk;
+              r.style.display=show?'':'none';
+              if(show)vis++;
+            });
+            document.getElementById('nt-count').textContent=vis+' notices';
+          }
+          document.querySelectorAll('.nt-tab').forEach(function(btn){
+            btn.addEventListener('click',function(){
+              document.querySelectorAll('.nt-tab').forEach(function(b){b.classList.remove('active')});
+              btn.classList.add('active');
+              activeFilter=btn.dataset.filter;
+              update();
+            });
+          });
+          var t;
+          var inp=document.getElementById('nt-search');
+          inp.addEventListener('input',function(e){
+            clearTimeout(t);
+            t=setTimeout(function(){searchVal=e.target.value.toLowerCase().trim();update();},120);
+          });
+          if(inp.value){searchVal=inp.value.toLowerCase().trim();update();}
+        })();
+        </script>`
+    }
+  </div>
+</section>
+
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+// ─── /desk/:slug/buyers ───────────────────────────────────────────────────────
+
+function buyersPage(
+  profile: DeskProfile,
+  cached: { data: ProcurementData; cached_at: string } | null
+): string {
+  const data = cached?.data;
+  const isCompiling = cached === null;
+
+  const allOpen  = (data?.contractsFinder.open  || []).concat(data?.findTender?.notices || []);
+  const allAwarded = data?.contractsFinder.awarded || [];
+  const allNotices = [...allAwarded, ...allOpen];
+
+  type BuyerEntry = {
+    name: string; initials: string; orgType: string;
+    totalSpend: number; openCount: number; awardedCount: number;
+    latestDate: number; categories: { label: string; count: number }[];
+  };
+
+  const buyerMap = new Map<string, BuyerEntry>();
+
+  for (const n of allNotices) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    let e = buyerMap.get(n.buyer);
+    if (!e) {
+      e = { name: n.buyer, initials: buyerInitials(n.buyer), orgType: buyerOrgType(n.buyer),
+             totalSpend: 0, openCount: 0, awardedCount: 0, latestDate: 0, categories: [] };
+      buyerMap.set(n.buyer, e);
+    }
+    const isAwarded = n.status === "awarded" || allAwarded.includes(n as any);
+    if (isAwarded) { e.awardedCount++; e.totalSpend += n.awardedValue ?? 0; }
+    else e.openCount++;
+    const d = new Date(n.publishedDate || n.awardedDate || "").getTime();
+    if (!isNaN(d) && d > e.latestDate) e.latestDate = d;
+    // Map to desk categories
+    const text = `${n.title} ${n.description || ""}`.toLowerCase();
+    for (const cat of profile.categories) {
+      if (cat.keywords.some(kw => text.includes(kw))) {
+        const existing = e.categories.find(c => c.label === cat.label);
+        if (existing) existing.count++;
+        else e.categories.push({ label: cat.label, count: 1 });
+        break;
+      }
+    }
+  }
+
+  const buyers = [...buyerMap.values()]
+    .sort((a, b) => b.totalSpend - a.totalSpend || b.awardedCount - a.awardedCount);
+
+  const totalSpend = buyers.reduce((s, b) => s + b.totalSpend, 0);
+  const totalOpen  = buyers.reduce((s, b) => s + b.openCount, 0);
+
+  const buyerCards = buyers.map((b, i) => {
+    const tagClass = b.orgType === "HEALTH" ? "bw-tag-health" : b.orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : b.orgType === "CENTRAL GOV" ? "bw-tag-gov" : b.orgType === "HOUSING" ? "bw-tag-housing" : b.orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
+    const spend = b.totalSpend > 0 ? fmtMoney(b.totalSpend) : "—";
+    const lastSeen = b.latestDate ? new Date(b.latestDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+    const topCats = [...b.categories].sort((a, c) => c.count - a.count).slice(0, 3);
+    return `<div class="bi-card" data-search="${escapeHtml(b.name.toLowerCase())} ${escapeHtml(b.orgType.toLowerCase())}">
+      <div class="bi-card-left">
+        <div class="bi-rank">${i + 1}</div>
+        <div class="bi-avatar">${escapeHtml(b.initials)}</div>
+      </div>
+      <div class="bi-card-body">
+        <div class="bi-name">${escapeHtml(b.name)}</div>
+        <div class="bi-tags">
+          ${b.orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(b.orgType)}</span>` : ""}
+          ${topCats.map(c => `<span class="bi-cat-tag">${escapeHtml(c.label)}</span>`).join("")}
+        </div>
+        <div class="bi-meta-row">
+          <span class="bi-spend">${escapeHtml(spend)}</span><span class="bi-spend-label"> awarded spend</span>
+          <span class="bi-sep">&middot;</span>
+          <span class="bi-notices">${b.awardedCount} awarded</span>
+          ${b.openCount > 0 ? `<span class="bi-sep">&middot;</span><span class="bi-open">${b.openCount} open now</span>` : ""}
+          <span class="bi-sep">&middot;</span>
+          <span class="bi-last">Last seen ${escapeHtml(lastSeen)}</span>
+        </div>
+      </div>
+      ${b.openCount > 0 ? `<div class="bi-card-right"><a href="/desk/${profile.slug}/notices?buyer=${encodeURIComponent(b.name)}" class="bi-cta">View notices &rarr;</a></div>` : ""}
+    </div>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Buyer Intelligence &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<style>
+${pageShellCss()}
+.bi-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:28px;flex-wrap:wrap}
+.bi-search{flex:1;min-width:200px;max-width:360px;font-family:var(--mono);font-size:12px;padding:9px 14px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);outline:none}
+.bi-search:focus{border-color:var(--ink)}
+.bi-count{font-family:var(--mono);font-size:11px;color:var(--slate);margin-left:auto}
+.bi-card{display:flex;align-items:flex-start;gap:16px;padding:22px 0;border-bottom:1px solid var(--line)}
+.bi-card:first-child{border-top:1px solid var(--line-strong)}
+.bi-card:last-child{border-bottom:1px solid var(--line-strong)}
+.bi-card-left{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
+.bi-rank{font-family:var(--mono);font-size:10px;color:var(--slate);letter-spacing:.04em}
+.bi-avatar{width:44px;height:44px;border-radius:4px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11px;display:flex;align-items:center;justify-content:center;letter-spacing:.04em}
+.bi-card-body{flex:1;min-width:0}
+.bi-name{font-size:15px;font-weight:600;line-height:1.3;margin-bottom:8px}
+.bi-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+.bi-cat-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;padding:2px 7px;border-radius:2px;background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.bi-meta-row{font-family:var(--mono);font-size:11.5px;color:var(--slate);display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.bi-spend{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink)}
+.bi-spend-label{font-size:11px}
+.bi-sep{color:var(--line-strong);margin:0 2px}
+.bi-open{color:#1d6b4f;font-weight:600}
+.bi-card-right{flex-shrink:0;align-self:center}
+.bi-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44;white-space:nowrap}
+.bi-cta:hover{text-decoration-color:var(--accent)}
+@media(max-width:760px){.bi-card-right{display:none}}
+</style>
+</head>
+<body>
+${pageShellHeader(profile)}
+
+<section class="pg-mast">
+  <div class="pg-mast-inner">
+    <div class="pg-crumb">
+      <a href="/desk/${profile.slug}">${escapeHtml(profile.label)}</a>
+      <span class="pg-crumb-sep">&rsaquo;</span>
+      <span class="pg-crumb-active">Buyer Intelligence</span>
+    </div>
+    <h1>BUYER INTELLIGENCE</h1>
+    <div class="pg-stats">
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : String(buyers.length)}</span>
+        <span class="pg-stat-label">Unique buyers</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : totalSpend > 0 ? fmtMoney(totalSpend) : "—"}</span>
+        <span class="pg-stat-label">Total awarded spend</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${isCompiling ? "—" : String(totalOpen)}</span>
+        <span class="pg-stat-label">Open opportunities</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pg-body">
+  <div class="pg-body-inner">
+    ${isCompiling
+      ? `<p class="pg-empty">Compiling &mdash; data ready within 90 seconds. Refresh to check.</p>`
+      : buyers.length === 0
+        ? `<p class="pg-empty">No buyer data found. Check back after next compile.</p>`
+        : `<div class="bi-toolbar">
+            <input class="bi-search" type="search" placeholder="Search buyers or org type…" id="bi-search">
+            <span class="bi-count" id="bi-count">${buyers.length} buyers</span>
+          </div>
+          <div id="bi-list">${buyerCards}</div>
+          <script>
+          (function(){
+            var t;
+            document.getElementById('bi-search').addEventListener('input',function(e){
+              clearTimeout(t);
+              t=setTimeout(function(){
+                var q=e.target.value.toLowerCase().trim();
+                var cards=document.querySelectorAll('#bi-list .bi-card');
+                var vis=0;
+                cards.forEach(function(c){
+                  var show=!q||c.dataset.search.includes(q);
+                  c.style.display=show?'':'none';
+                  if(show)vis++;
+                });
+                document.getElementById('bi-count').textContent=vis+' buyers';
+              },120);
+            });
+          })();
+          </script>`
+    }
+  </div>
+</section>
+
+${pageShellFoot()}
 </body>
 </html>`;
 }
