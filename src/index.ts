@@ -4856,7 +4856,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </section>
 <footer><div class="wrap">
   <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
-  <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 6).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}</ul></div>
+  <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">See all desks →</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/scan" title="Buyer Watchlist is included in your scan report">Watchlist</a></li><li><a href="/scan" title="Available after your first scan">Consultant license</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
@@ -6437,6 +6437,184 @@ function pageShellFoot(): string {
   </div>
 </footer>
 <div class="pg-copy">&copy; GovRevenue</div>`;
+}
+
+// ─── /desks ────────────────────────────────────────────────────────────────────
+
+function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: ProcurementData; cached_at: string } | null }>): string {
+  type DS = {
+    profile: DeskProfile;
+    openCount: number;
+    awardedCount: number;
+    totalValue: number;
+    uniqueBuyers: number;
+    topCats: InferredCategory[];
+    cachedAt: string | null;
+  };
+  const stats: DS[] = entries.map(({ profile, cached }) => {
+    if (!cached) return { profile, openCount: 0, awardedCount: 0, totalValue: 0, uniqueBuyers: 0, topCats: [], cachedAt: null };
+    const open = cached.data.contractsFinder.open ?? [];
+    const awarded = cached.data.contractsFinder.awarded ?? [];
+    const all = [...open, ...awarded];
+    const totalValue = awarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+    const uniqueBuyers = new Set(all.map(n => n.buyer).filter((b): b is string => !!b)).size;
+    const topCats = inferDeskCategories(awarded, profile.categories).filter(c => c.count > 0).sort((a, b) => b.value - a.value).slice(0, 3);
+    return { profile, openCount: open.length, awardedCount: awarded.length, totalValue, uniqueBuyers, topCats, cachedAt: cached.cached_at };
+  });
+  const sorted = [...stats].sort((a, b) => b.totalValue - a.totalValue);
+  const grandTotal = stats.reduce((s, d) => s + d.totalValue, 0);
+  const totalOpen = stats.reduce((s, d) => s + d.openCount, 0);
+  const totalAwarded = stats.reduce((s, d) => s + d.awardedCount, 0);
+  const totalBuyers = stats.reduce((s, d) => s + d.uniqueBuyers, 0);
+  const liveCount = stats.filter(d => d.cachedAt !== null).length;
+  const totalNotices = totalOpen + totalAwarded;
+
+  const renderCard = (d: DS, rank: number): string => {
+    const sharePct = grandTotal > 0 ? Math.round((d.totalValue / grandTotal) * 100) : 0;
+    const maxCatVal = d.topCats.length > 0 ? d.topCats[0].value : 0;
+    const updatedStr = d.cachedAt ? timeAgo(d.cachedAt) : null;
+
+    const pillBlock = d.cachedAt
+      ? `<span class="dl-live-pill"><span class="dl-live-dot"></span>LIVE DATA</span>`
+      : `<span class="dl-no-data-pill">COMPILING</span>`;
+
+    const shareBlock = d.cachedAt ? `
+      <div class="dl-share-section">
+        <div class="dl-share-lbl"><span>VALUE SHARE</span><span>${sharePct}%</span></div>
+        <div class="dl-share-track"><div class="dl-share-fill" style="width:${sharePct}%"></div></div>
+      </div>` : "";
+
+    const statsGrid = `
+      <div class="dl-stats">
+        <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue) : "—"}</div><div class="dl-stat-lbl">Awarded Value</div></div>
+        <div class="dl-stat"><div class="dl-stat-val">${d.openCount > 0 ? d.openCount : "—"}</div><div class="dl-stat-lbl">Open Now</div></div>
+        <div class="dl-stat"><div class="dl-stat-val">${d.awardedCount > 0 ? d.awardedCount : "—"}</div><div class="dl-stat-lbl">Awarded</div></div>
+        <div class="dl-stat"><div class="dl-stat-val">${d.uniqueBuyers > 0 ? d.uniqueBuyers : "—"}</div><div class="dl-stat-lbl">Buyers</div></div>
+      </div>`;
+
+    const catsBlock = d.topCats.length > 0 ? `
+      <div class="dl-cats">
+        <div class="dl-cats-title">Top Categories</div>
+        ${d.topCats.map(cat => `
+          <div class="dl-cat-row"><span class="dl-cat-name">${escapeHtml(cat.label)}</span><span class="dl-cat-val">${cat.value > 0 ? fmtMoney(cat.value) : cat.count + " contracts"}</span></div>
+          <div class="dl-cat-bar-wrap"><div class="dl-cat-bar-fill" style="width:${maxCatVal > 0 ? Math.round((cat.value / maxCatVal) * 100) : 0}%"></div></div>
+        `).join("")}
+      </div>` : "";
+
+    return `<article class="dl-card">
+      <div class="dl-card-head">
+        <div class="dl-card-rank">#${rank + 1} &middot; BY VALUE</div>
+        <div class="dl-card-label"><a href="/desk/${escapeHtml(d.profile.slug)}">${escapeHtml(d.profile.label)}</a></div>
+        ${pillBlock}
+        <p class="dl-card-stand">${escapeHtml(d.profile.standfirst)}</p>
+      </div>
+      ${shareBlock}${statsGrid}${catsBlock}
+      <div class="dl-meta">
+        <span class="dl-meta-cats">${d.profile.categories.length} ${d.profile.categories.length === 1 ? "category" : "categories"}</span>
+        ${updatedStr ? `<span class="dl-meta-updated">Updated ${escapeHtml(updatedStr)}</span>` : `<a class="dl-meta-link" href="/desk/${escapeHtml(d.profile.slug)}">View desk →</a>`}
+      </div>
+    </article>`;
+  };
+
+  const cards = sorted.map((d, i) => renderCard(d, i)).join("");
+  const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>All Intelligence Desks — GovRevenue</title>
+<meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.length} industry desks. Live data from Contracts Finder and Find a Tender.">
+<style>
+${pageShellCss()}
+.dl-hero{background:var(--ink);color:var(--paper);padding:72px 0 60px}
+.dl-hero-inner,.dl-body-inner{max-width:1200px;margin:0 auto;padding:0 56px}
+.dl-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9aabb7;margin-bottom:18px}
+.dl-hero h1{font-family:var(--serif);font-size:52px;font-weight:400;line-height:1.1;margin-bottom:14px}
+.dl-hero-sub{font-size:15px;color:#9aabb7;max-width:540px;line-height:1.6;margin-bottom:48px}
+.dl-agg{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.dl-agg-stat{padding:24px 20px;background:#131f2a}
+.dl-agg-val{font-family:var(--serif);font-size:32px;color:var(--paper);margin-bottom:4px}
+.dl-agg-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aabb7}
+.dl-body{background:var(--paper);padding:60px 0 80px}
+.dl-sort-bar{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:36px;padding-bottom:16px;border-bottom:1px solid var(--line-strong)}
+.dl-sort-title{font-family:var(--serif);font-size:26px}
+.dl-sort-meta{font-family:var(--mono);font-size:11px;color:var(--slate);letter-spacing:.06em}
+.dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.dl-card{background:#fff;border:1px solid var(--line-strong);border-radius:2px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
+.dl-card:hover{border-color:rgba(15,25,35,.3);box-shadow:0 4px 24px rgba(15,25,35,.07)}
+.dl-card-head{padding:28px 28px 20px}
+.dl-card-rank{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:10px}
+.dl-card-label{font-family:var(--serif);font-size:24px;line-height:1.2;margin-bottom:8px}
+.dl-card-label a{color:var(--ink)}
+.dl-card-label a:hover{color:var(--accent)}
+.dl-live-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#1a6b3a;background:#e8f5ee;padding:3px 8px;border-radius:100px;margin-bottom:10px}
+.dl-live-dot{width:5px;height:5px;border-radius:50%;background:#1a6b3a;animation:dlPulse 2s infinite}
+@keyframes dlPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dl-no-data-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#9aabb7;background:var(--paper-2);padding:3px 8px;border-radius:100px;margin-bottom:10px}
+.dl-card-stand{font-size:13px;color:var(--slate);line-height:1.5}
+.dl-share-section{padding:0 28px 20px}
+.dl-share-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-bottom:7px}
+.dl-share-track{height:3px;background:var(--paper-2);border-radius:2px;overflow:hidden}
+.dl-share-fill{height:100%;background:var(--accent);border-radius:2px}
+.dl-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-strong);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong)}
+.dl-stat{background:#fff;padding:16px 28px}
+.dl-stat-val{font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:2px}
+.dl-stat-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)}
+.dl-cats{padding:20px 28px}
+.dl-cats-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
+.dl-cat-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+.dl-cat-name{font-size:12px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dl-cat-val{font-family:var(--mono);font-size:11px;color:var(--slate);flex-shrink:0}
+.dl-cat-bar-wrap{height:2px;background:var(--paper-2);border-radius:1px;margin-bottom:8px}
+.dl-cat-bar-fill{height:100%;background:var(--accent);opacity:.55;border-radius:1px}
+.dl-meta{padding:16px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-family:var(--mono);font-size:10px;letter-spacing:.06em}
+.dl-meta-cats,.dl-meta-updated{color:var(--slate)}
+.dl-meta-link{color:var(--accent)}
+@media(max-width:1100px){.dl-agg{grid-template-columns:repeat(3,1fr)}.dl-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.dl-hero-inner,.dl-body-inner{padding-left:16px;padding-right:16px}.dl-hero{padding:48px 0 40px}.dl-hero h1{font-size:34px}.dl-agg{grid-template-columns:1fr 1fr}.dl-agg-val{font-size:26px}.dl-sort-bar{flex-direction:column;gap:6px}.dl-grid{grid-template-columns:1fr;gap:16px}.dl-body{padding:36px 0 56px}}
+</style>
+</head>
+<body>
+<header class="gh">
+  <div class="gh-inner">
+    <div class="gh-top">
+      <div class="gh-brand">
+        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <span class="gh-tag">Public-sector revenue intelligence</span>
+      </div>
+      <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
+    </div>
+    <nav class="gh-nav">${navLinks}</nav>
+  </div>
+</header>
+<section class="dl-hero">
+  <div class="dl-hero-inner">
+    <div class="dl-eyebrow">All Intelligence Desks</div>
+    <h1>UK Public-Sector<br>Contract Intelligence</h1>
+    <p class="dl-hero-sub">Live procurement data across ${liveCount} active desks. Sourced from Contracts Finder and Find a Tender. Updated continuously.</p>
+    <div class="dl-agg">
+      <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal) : "—"}</div><div class="dl-agg-lbl">Total Contract Value</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${totalOpen > 0 ? totalOpen.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Open Now</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${totalAwarded > 0 ? totalAwarded.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Awarded</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${totalBuyers > 0 ? totalBuyers.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Buyers Tracked</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${liveCount}<span style="font-size:18px;opacity:.5">/${DESK_PROFILES.length}</span></div><div class="dl-agg-lbl">Desks Live</div></div>
+    </div>
+  </div>
+</section>
+<section class="dl-body">
+  <div class="dl-body-inner">
+    <div class="dl-sort-bar">
+      <div class="dl-sort-title">All Desks — ranked by contract value</div>
+      <div class="dl-sort-meta">${DESK_PROFILES.length} desks &middot; ${totalNotices.toLocaleString()} notices indexed</div>
+    </div>
+    <div class="dl-grid">${cards}</div>
+  </div>
+</section>
+${pageShellFoot()}
+</body>
+</html>`;
 }
 
 // ─── /desk/:slug/notices ──────────────────────────────────────────────────────
