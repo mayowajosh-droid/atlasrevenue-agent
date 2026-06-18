@@ -5410,6 +5410,7 @@ function timeAgo(dateStr: string | null | undefined): string {
   if (h < 1) return "< 1h ago";
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
+  if (d > 90) return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   return `${d}d ago`;
 }
 
@@ -5489,7 +5490,11 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       const db = new Date(b.publishedDate || b.awardedDate || 0).getTime();
       return db - da;
     });
-  const openNotices = allOpen.slice(0, 6);
+  const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
+  const openNotices = allOpen.filter(n => {
+    const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
+    return t > cutoff365;
+  }).slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
   const totalAwarded = awardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
@@ -5942,7 +5947,12 @@ function subPage(
     `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
   ).join("");
 
-  const openRowsHtml = allOpen.slice(0, 30).map(n => {
+  const cutoff365sub = Date.now() - 365 * 24 * 3_600_000;
+  const recentOpen = allOpen.filter(n => {
+    const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
+    return t > cutoff365sub;
+  });
+  const openRowsHtml = recentOpen.slice(0, 30).map(n => {
     const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
     const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
     return `<tr>
@@ -6113,7 +6123,7 @@ a{color:inherit;text-decoration:none}
         <span class="sub-stat-label">Awarded value</span>
       </div>
       <div class="sub-stat">
-        <span class="sub-stat-val">${isCompiling ? "—" : String(allOpen.length)}</span>
+        <span class="sub-stat-val">${isCompiling ? "—" : String(recentOpen.length)}</span>
         <span class="sub-stat-label">Open opportunities</span>
       </div>
       <div class="sub-stat">
@@ -6130,11 +6140,11 @@ a{color:inherit;text-decoration:none}
       <div class="sub-col-main">
         <div class="sub-sec-head">
           <span class="sub-sec-eyebrow"><span class="live-dot"></span>&nbsp;Live Signal</span>
-          <span class="sub-sec-count">${isCompiling ? "compiling…" : `${allOpen.length} open`}</span>
+          <span class="sub-sec-count">${isCompiling ? "compiling…" : `${recentOpen.length} open`}</span>
         </div>
         ${isCompiling
           ? `<p class="sub-empty">Compiling &mdash; check back in 90 seconds.</p>`
-          : allOpen.length > 0
+          : recentOpen.length > 0
             ? `<table class="ls-table">
                 <thead><tr>
                   <th>Notice</th><th>Buyer</th>
@@ -6143,7 +6153,7 @@ a{color:inherit;text-decoration:none}
                 </tr></thead>
                 <tbody>${openRowsHtml}</tbody>
               </table>
-              ${allOpen.length > 30 ? `<p class="ls-foot">Showing 30 of ${allOpen.length} matched notices.</p>` : ""}`
+              ${recentOpen.length > 30 ? `<p class="ls-foot">Showing 30 of ${recentOpen.length} matched notices.</p>` : ""}`
             : `<p class="sub-empty">No open opportunities found matching this subcategory. Data refreshes every 24 hours.</p>`
         }
       </div>
