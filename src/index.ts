@@ -5048,8 +5048,12 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* hero card value is server-rendered; no count-up needed */
 /* ticker + count are server-rendered; no client fill needed */
 (function(){
-  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.15});
-  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.05,rootMargin:'0px 0px 60px 0px'});
+  document.querySelectorAll('.reveal').forEach(function(el){
+    const r=el.getBoundingClientRect();
+    if(r.top<window.innerHeight&&r.bottom>0){el.classList.add('in');}
+    else{io.observe(el);}
+  });
 })();
 (function(){
   if(reduce) return;
