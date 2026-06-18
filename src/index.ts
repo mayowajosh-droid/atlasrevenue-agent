@@ -5263,17 +5263,23 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const dmGridHtml = profile.categories.map(cat => {
     const inferred = demandCategories.find(c => c.label === cat.label);
     const count = inferred?.count ?? 0;
-    const shown = cat.subcategories.slice(0, 7);
-    const more = cat.subcategories.length - shown.length;
+    const more = cat.subcategories.length - 7;
+    const subsHtml = cat.subcategories.map((s, i) =>
+      `<li${i >= 7 ? ' class="dm-sub-x" style="display:none"' : ""}>${escapeHtml(s)}</li>`
+    ).join("");
+    const toggleHtml = more > 0
+      ? `<button class="dm-more-btn" data-open="0" data-more="${more}" onclick="var x=this.closest('.dm-card').querySelectorAll('.dm-sub-x');var o=this.dataset.open==='1';x.forEach(e=>e.style.display=o?'none':'list-item');this.textContent=o?'+ '+this.dataset.more+' more':'Show less';this.dataset.open=o?'0':'1'">+ ${more} more</button>`
+      : "";
     return `<div class="dm-card">
       <div class="dm-card-head">
         <div class="dm-icon-wrap">${getCategoryIcon(cat.label)}</div>
-        <span class="dm-name">${escapeHtml(cat.label)}${count > 0 ? ` <span class="dm-count">(${count})</span>` : ""}</span>
+        <div class="dm-card-title">
+          <span class="dm-name">${escapeHtml(cat.label)}</span>
+          ${count > 0 ? `<span class="dm-count">${count} ${count === 1 ? "notice" : "notices"}</span>` : ""}
+        </div>
       </div>
-      <ul class="dm-subs">
-        ${shown.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
-        ${more > 0 ? `<li class="dm-more">+ ${more} more</li>` : ""}
-      </ul>
+      <ul class="dm-subs">${subsHtml}</ul>
+      ${toggleHtml}
     </div>`;
   }).join("");
 
@@ -5382,23 +5388,27 @@ a{color:inherit;text-decoration:none}
 .bw-meta-label{font-size:10.5px;color:var(--slate)}
 .bw-sample{font-weight:400;opacity:.55;letter-spacing:.03em}
 /* Demand map */
-.dm-section{padding:44px 0;border-bottom:1px solid var(--line-strong)}
+.dm-section{padding:56px 0;border-bottom:1px solid var(--line-strong)}
 .dm-section-inner{max-width:1220px;margin:0 auto;padding:0 28px}
-.dm-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.dm-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .dm-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
 .dm-title-info{font-size:13px;color:var(--slate);cursor:help;margin-left:5px}
-.dm-sub{font-size:13px;color:var(--slate);margin-bottom:20px}
-.dm-open-all{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--slate);border:1px solid var(--line-strong);padding:5px 11px;cursor:pointer;background:var(--paper);transition:.15s}
+.dm-sub{font-size:13px;color:var(--slate);margin-bottom:28px}
+.dm-open-all{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--slate);border:1px solid var(--line-strong);padding:6px 14px;cursor:pointer;background:var(--paper);transition:.15s}
 .dm-open-all:hover{border-color:var(--ink);color:var(--ink)}
-.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px}
-.dm-card{border:1px solid var(--line-strong);padding:16px 16px;background:var(--paper-2)}
-.dm-card-head{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px}
-.dm-icon-wrap{flex-shrink:0;width:24px;height:24px;color:var(--slate);margin-top:1px}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
+.dm-card{border:1px solid var(--line-strong);padding:22px 20px 18px;background:var(--paper-2);transition:border-color .15s,background .15s;cursor:default}
+.dm-card:hover{border-color:#0B0F1440;background:#F0ECE2}
+.dm-card-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.dm-icon-wrap{flex-shrink:0;width:36px;height:36px;background:var(--paper);border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;padding:7px;color:var(--slate)}
 .dm-icon{width:100%;height:100%}
-.dm-name{font-size:12.5px;font-weight:600;line-height:1.3}
-.dm-count{font-family:var(--mono);font-size:11px;color:var(--slate);font-weight:400}
-.dm-subs{list-style:none;font-size:11.5px;color:var(--slate);line-height:1.8}
-.dm-more{color:var(--accent);font-family:var(--mono);font-size:10.5px;margin-top:2px}
+.dm-card-title{flex:1;min-width:0}
+.dm-name{display:block;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--ink)}
+.dm-count{font-family:var(--mono);font-size:10.5px;color:var(--slate);font-weight:400;margin-top:3px;display:block}
+.dm-subs{list-style:none;font-size:12px;color:var(--slate);line-height:1.9;margin-top:4px}
+.dm-subs li{padding-left:0}
+.dm-more-btn{font-family:var(--mono);font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:6px 0 0;text-decoration:underline;text-decoration-color:var(--accent)44;display:block}
+.dm-more-btn:hover{text-decoration-color:var(--accent)}
 /* Sources bar */
 .dm-sources-bar{background:var(--paper-2);border-top:1px solid var(--line-strong)}
 .dm-sources-inner{max-width:1220px;margin:0 auto;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
@@ -5473,7 +5483,7 @@ a{color:inherit;text-decoration:none}
         <span class="dm-title">DEMAND MAP &ndash; ${escapeHtml(profile.label.toUpperCase())}</span>
         <span class="dm-title-info" title="All major categories and sub-categories this desk scans for">ⓘ</span>
       </div>
-      <button class="dm-open-all" onclick="this.closest('section').querySelectorAll('.dm-more').forEach(el=>{el.style.display='none'});this.closest('section').querySelectorAll('.dm-subs li').forEach(el=>{el.style.display='list-item'})">Open all</button>
+      <button class="dm-open-all" data-open="0" onclick="var o=this.dataset.open==='1';this.closest('section').querySelectorAll('.dm-sub-x').forEach(e=>e.style.display=o?'none':'list-item');this.closest('section').querySelectorAll('.dm-more-btn').forEach(b=>{b.textContent=o?('+ '+b.dataset.more+' more'):'Show less';b.dataset.open=o?'0':'1'});this.textContent=o?'Open all':'Close all';this.dataset.open=o?'0':'1'">Open all</button>
     </div>
     <p class="dm-sub">All major categories and sub-categories this desk scans for.</p>
     <div class="dm-grid">${dmGridHtml}</div>
