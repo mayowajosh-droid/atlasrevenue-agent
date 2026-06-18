@@ -4800,7 +4800,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </section>
 <section class="section" id="desks">
   <div class="wrap">
-    <div class="section-head"><h2>The desks</h2><a href="/desk/construction">All desks &rarr;</a></div>
+    <div class="section-head"><h2>The desks</h2><a href="/desks">All desks &rarr;</a></div>
     <div class="desk-grid">
       ${DESK_PROFILES.filter(d => d.live).map(d => {
         const sig = deskSignals.get(d.slug);
