@@ -6017,7 +6017,7 @@ function subPage(
 
   const matchTitle = (n: ProcurementNotice): boolean => {
     const title = n.title.toLowerCase();
-    return allKw.some(kw => title.includes(kw));
+    return cat.keywords.some(kw => title.includes(kw));
   };
 
   const allOpen = (data?.contractsFinder.open || [])
