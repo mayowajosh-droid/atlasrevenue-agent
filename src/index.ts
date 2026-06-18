@@ -4839,7 +4839,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </section>
 <footer><div class="wrap">
   <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
-  <div><h4>Desks</h4><ul><li><a href="#desks">Government</a></li><li><a href="#desks">Finance</a></li><li><a href="#desks">Economics</a></li><li><a href="#desks">Technology &middot; AI</a></li></ul></div>
+  <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 6).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}</ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/scan" title="Buyer Watchlist is included in your scan report">Watchlist</a></li><li><a href="/scan" title="Available after your first scan">Consultant license</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
@@ -5627,7 +5627,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     : openNotices.length
       ? `<table class="ls-table">
           <thead><tr>
-            <th>NOTICE</th><th>BUYER</th><th class="ls-th-r">VALUE</th><th class="ls-th-r">PUBLISHED</th>
+            <th>NOTICE</th><th class="ls-buyer">BUYER</th><th class="ls-val ls-th-r">VALUE</th><th class="ls-date ls-th-r">PUBLISHED</th>
           </tr></thead>
           <tbody>${openNotices.map(n => {
             const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
@@ -5873,6 +5873,7 @@ a{color:inherit;text-decoration:none}
   .ls-val,.ls-date,.ls-buyer{display:none}
   .dm-sources-inner{flex-direction:column;align-items:flex-start;gap:6px;padding-top:14px;padding-bottom:14px}
   .dm-sources-right{flex-wrap:wrap}
+  .ls-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 @media(max-width:480px){
   .dm-grid{grid-template-columns:1fr}
@@ -6153,6 +6154,7 @@ a{color:inherit;text-decoration:none}
   .ls-val,.ls-date,.ls-buyer{display:none}
   .dm-sources-inner{flex-direction:column;align-items:flex-start;gap:6px;padding-top:14px;padding-bottom:14px}
   .dm-sources-right{flex-wrap:wrap}
+  .ls-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 @media(max-width:480px){
   .sub-stats{grid-template-columns:1fr}
@@ -6218,9 +6220,9 @@ a{color:inherit;text-decoration:none}
           : recentOpen.length > 0
             ? `<table class="ls-table">
                 <thead><tr>
-                  <th>Notice</th><th>Buyer</th>
-                  <th class="ls-th-r">Value</th>
-                  <th class="ls-th-r">Posted</th>
+                  <th>Notice</th><th class="ls-buyer">Buyer</th>
+                  <th class="ls-val ls-th-r">Value</th>
+                  <th class="ls-date ls-th-r">Posted</th>
                 </tr></thead>
                 <tbody>${openRowsHtml}</tbody>
               </table>
@@ -6250,9 +6252,9 @@ a{color:inherit;text-decoration:none}
       </div>
       <table class="ls-table">
         <thead><tr>
-          <th>Notice</th><th>Buyer</th>
-          <th class="ls-th-r">Value</th>
-          <th class="ls-th-r">Awarded</th>
+          <th>Notice</th><th class="ls-buyer">Buyer</th>
+          <th class="ls-val ls-th-r">Value</th>
+          <th class="ls-date ls-th-r">Awarded</th>
         </tr></thead>
         <tbody>${awardedRowsHtml}</tbody>
       </table>
@@ -6446,7 +6448,11 @@ ${pageShellCss()}
 .nt-chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;padding:2px 7px;border-radius:2px;font-weight:500}
 .nt-chip-open{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
 .nt-chip-awarded{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
-@media(max-width:760px){.nt-buyer,.nt-val,.nt-src{display:none}}
+@media(max-width:760px){
+  .nt-buyer,.nt-val,.nt-src{display:none}
+  .nt-title{max-width:none}
+  .nt-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
 </style>
 </head>
 <body>
@@ -6498,10 +6504,10 @@ ${pageShellHeader(profile)}
           <thead><tr>
             <th></th>
             <th>Notice</th>
-            <th>Buyer</th>
-            <th style="text-align:right">Value</th>
+            <th class="nt-buyer">Buyer</th>
+            <th class="nt-val" style="text-align:right">Value</th>
             <th style="text-align:right">Date</th>
-            <th style="text-align:right">Src</th>
+            <th class="nt-src" style="text-align:right">Src</th>
           </tr></thead>
           <tbody id="nt-body">${openRows}${awardedRows}</tbody>
         </table>
