@@ -6152,19 +6152,19 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         <div class="cat-breakdown-val">${escapeHtml(fmtMoney(c.value))}</div>
       </div>`;
     }).join("")
-    : `<p style="color:#3a4a58;font-size:14px;margin-top:16px">Category breakdown compiles on first desk load.</p>`;
+    : `<p style="color:#74879a;font-size:14px;margin-top:16px">Category breakdown compiles on first desk load.</p>`;
 
   const analyticsHtml = profile.live && !isCompiling ? `
   <section class="analytics-section">
     <div class="analytics-inner">
       <div>
         <div class="analytics-head">12-MONTH SPEND TREND</div>
-        <p style="font-size:13px;color:#3a4a58;margin-bottom:20px;letter-spacing:.01em">Monthly awarded contract value &mdash; public record</p>
+        <p style="font-size:13px;color:#74879a;margin-bottom:20px;letter-spacing:.01em">Monthly awarded contract value &mdash; public record</p>
         ${spendChartHtml}
       </div>
       <div>
         <div class="analytics-head">CATEGORY BREAKDOWN</div>
-        <p style="font-size:13px;color:#3a4a58;margin-bottom:24px;letter-spacing:.01em">Top sub-sectors by awarded spend (12 months)</p>
+        <p style="font-size:13px;color:#74879a;margin-bottom:24px;letter-spacing:.01em">Top sub-sectors by awarded spend (12 months)</p>
         ${catBreakdownHtml}
       </div>
     </div>
@@ -6176,7 +6176,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       <div class="awards-inner">
         <div class="awards-head-row">
           <span class="awards-title">RECENT AWARDS &mdash; LAST 90 DAYS</span>
-          <span style="font-family:var(--mono);font-size:10.5px;color:#2e3e4c">${recentAwards.length} award${recentAwards.length === 1 ? "" : "s"} found</span>
+          <span style="font-family:var(--mono);font-size:10.5px;color:#6b7d8c">${recentAwards.length} award${recentAwards.length === 1 ? "" : "s"} found</span>
         </div>
         <div class="awards-grid">
           ${recentAwards.map(n => {
@@ -6283,14 +6283,14 @@ a{color:inherit;text-decoration:none}
 .dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid rgba(255,255,255,.06)}
 .dp-panel{padding:52px 40px;border-right:1px solid rgba(255,255,255,.06)}
 .dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5a6e7e}
-.dp-info{font-size:13px;color:#3a4a58;cursor:help;margin-left:4px}
+.dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94a6b4}
+.dp-info{font-size:13px;color:#74879a;cursor:help;margin-left:4px}
 .dp-caveat-sm{font-size:13.5px;color:#7a909e;line-height:1.7;margin-bottom:24px}
-.dp-caveat-foot{font-family:var(--mono);font-size:11px;color:#2e3e4c;margin-top:28px;padding-top:18px;border-top:1px solid rgba(255,255,255,.06)}
+.dp-caveat-foot{font-family:var(--mono);font-size:11px;color:#6b7d8c;margin-top:28px;padding-top:18px;border-top:1px solid rgba(255,255,255,.06)}
 .dp-link-sm{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#C2553F;text-decoration:underline;text-decoration-color:rgba(194,85,63,.35)}
 .dp-link-sm:hover{text-decoration-color:#C2553F;color:#e06848}
-.dp-bars-head{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#3a4a58;margin:34px 0 20px}
-.dp-bars-sub{text-transform:none;letter-spacing:0;font-size:11px;color:#3a4a58}
+.dp-bars-head{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#74879a;margin:34px 0 20px}
+.dp-bars-sub{text-transform:none;letter-spacing:0;font-size:11px;color:#74879a}
 .dp-map-link{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#C2553F;margin-top:20px;text-decoration:underline;text-decoration-color:rgba(194,85,63,.35)}
 .dp-map-link:hover{text-decoration-color:#C2553F}
 /* Demand stats — raised terminal card */
@@ -6298,13 +6298,13 @@ a{color:inherit;text-decoration:none}
 .dp-stat{padding:30px 22px}
 .dp-stat:not(:last-child){border-right:1px solid rgba(255,255,255,.07)}
 .dp-val{display:block;font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.05;color:#FAF8F3}
-.dp-stat-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#3a4a58;margin-top:9px}
+.dp-stat-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#74879a;margin-top:9px}
 /* Bar rows on dark */
 .dp-bar-row{display:grid;grid-template-columns:1fr 80px 68px;gap:12px;align-items:center;margin-bottom:16px}
 .dp-bar-label{font-size:13px;color:#b8c4cc}
 .dp-bar-track{height:3px;background:rgba(255,255,255,.07);border-radius:2px}
 .dp-bar-fill{height:3px;background:#9B2C2C;border-radius:2px}
-.dp-bar-val{font-family:var(--mono);font-size:12px;color:#4a5e6e;text-align:right}
+.dp-bar-val{font-family:var(--mono);font-size:12px;color:#8b9dac;text-align:right}
 /* Live dot */
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2d9b6f;flex-shrink:0;margin-right:4px;animation:ldpulse 2.4s ease-in-out infinite}
 @keyframes ldpulse{0%{box-shadow:0 0 0 0 #2d9b6f55}70%{box-shadow:0 0 0 6px #2d9b6f00}100%{box-shadow:0 0 0 0 #2d9b6f00}}
@@ -6314,7 +6314,7 @@ a{color:inherit;text-decoration:none}
 .dp-pulse-stat{flex:1;padding:20px 24px;border-right:1px solid rgba(255,255,255,.06)}
 .dp-pulse-stat:last-child{border-right:none}
 .dp-pulse-val{display:block;font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;color:#FAF8F3;line-height:1.1}
-.dp-pulse-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#3a4a58;margin-top:6px}
+.dp-pulse-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#74879a;margin-top:6px}
 .dp-pulse-urgent .dp-pulse-val{color:#C2553F}
 .dp-pulse-urgent .dp-pulse-label{color:#7a2020}
 /* Urgency strip */
@@ -6326,43 +6326,43 @@ a{color:inherit;text-decoration:none}
 .urgency-badge{font-family:var(--mono);font-size:10px;background:#7a1f1f;color:#FAF8F3;padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
 /* Analytics section — dark zone continuation */
 .analytics-section{background:#0B0F14;padding:56px 0;border-bottom:1px solid rgba(255,255,255,.06)}
-.analytics-inner{padding:0 56px;display:grid;grid-template-columns:3fr 2fr;gap:64px;align-items:start}
-.analytics-head{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5a6e7e;margin-bottom:8px}
+.analytics-inner{padding:0 56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+.analytics-head{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94a6b4;margin-bottom:8px}
 /* Spend trend chart */
 .trend-chart{background:#111820;border:1px solid rgba(255,255,255,.07);padding:28px 24px 0}
-.trend-bars{display:flex;align-items:flex-end;gap:5px;height:140px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:0;overflow:hidden}
-.trend-bar-col{flex:1;max-width:32px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.trend-bars{display:flex;align-items:flex-end;justify-content:space-between;gap:5px;height:140px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:0;overflow:hidden}
+.trend-bar-col{flex:1;max-width:46px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
 .trend-bar{width:100%;background:linear-gradient(to top,#7a1f1f,#C2553F);border-radius:2px 2px 0 0;transition:opacity .15s;cursor:default}
 .trend-bar:hover{opacity:.75}
-.trend-bar-label{font-family:var(--mono);font-size:8.5px;color:#2e3e4c;text-align:center;padding:10px 0 12px;line-height:1.4}
+.trend-bar-label{font-family:var(--mono);font-size:8.5px;color:#6b7d8c;text-align:center;padding:10px 0 12px;line-height:1.4}
 .trend-foot{padding:20px 0 28px;display:flex;align-items:baseline;gap:12px}
 .trend-total{font-family:var(--serif);font-size:30px;font-weight:600;color:#FAF8F3}
-.trend-total-label{font-family:var(--mono);font-size:10px;color:#3a4a58;letter-spacing:.06em;text-transform:uppercase}
+.trend-total-label{font-family:var(--mono);font-size:10px;color:#74879a;letter-spacing:.06em;text-transform:uppercase}
 /* Category breakdown — dark */
 .cat-breakdown-item{display:grid;grid-template-columns:1fr 72px;gap:16px;align-items:center;margin-bottom:22px}
 .cat-breakdown-label{font-size:13.5px;color:#b8c4cc;margin-bottom:6px}
 .cat-breakdown-track{height:3px;background:rgba(255,255,255,.07);border-radius:2px}
 .cat-breakdown-fill{height:3px;background:#9B2C2C;border-radius:2px}
-.cat-breakdown-val{font-family:var(--mono);font-size:12px;color:#4a5e6e;text-align:right;padding-top:20px}
+.cat-breakdown-val{font-family:var(--mono);font-size:12px;color:#8b9dac;text-align:right;padding-top:20px}
 /* Recent awards — dark */
 .awards-section{background:#111820;border-bottom:1px solid rgba(255,255,255,.06)}
 .awards-inner{padding:56px 56px}
 .awards-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
-.awards-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5a6e7e}
+.awards-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94a6b4}
 .awards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .award-card{background:#141c25;border:1px solid rgba(255,255,255,.07);padding:22px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
 .award-card:hover{border-color:rgba(194,85,63,.3);box-shadow:0 4px 24px rgba(0,0,0,.4)}
-.award-card-buyer{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:#2e3e4c;margin-bottom:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.award-card-buyer{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:#6b7d8c;margin-bottom:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .award-card-title{font-size:13.5px;font-weight:500;color:#e8e0d5;line-height:1.45;margin-bottom:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1}
 .award-card-meta{display:flex;justify-content:space-between;align-items:baseline}
 .award-card-val{font-family:var(--serif);font-size:18px;font-weight:600;color:#FAF8F3}
-.award-card-date{font-family:var(--mono);font-size:10px;color:#3a4a58}
-.award-card-winner{font-family:var(--mono);font-size:10.5px;color:#3a4a58;margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(255,255,255,.06);padding-top:10px}
+.award-card-date{font-family:var(--mono);font-size:10px;color:#74879a}
+.award-card-winner{font-family:var(--mono);font-size:10.5px;color:#74879a;margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(255,255,255,.06);padding-top:10px}
 /* Buyer tier & spend bar */
 .bw-tier{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;padding:2px 7px;border-radius:2px;flex-shrink:0}
 .bw-tier-1{background:rgba(194,85,63,.15);color:#C2553F;border:1px solid rgba(194,85,63,.25)}
 .bw-tier-2{background:rgba(45,155,111,.1);color:#2d9b6f;border:1px solid rgba(45,155,111,.2)}
-.bw-tier-3{background:rgba(255,255,255,.04);color:#3a4a58;border:1px solid rgba(255,255,255,.08)}
+.bw-tier-3{background:rgba(255,255,255,.04);color:#74879a;border:1px solid rgba(255,255,255,.08)}
 .bw-spend-bar-track{height:2px;background:rgba(255,255,255,.07);border-radius:1px;margin:8px 0 4px}
 .bw-spend-bar-fill{height:2px;background:#C2553F;border-radius:1px;opacity:.7}
 /* ls-table (used in subPage) */
@@ -6389,10 +6389,10 @@ a{color:inherit;text-decoration:none}
 .bw-tag-gov{background:#261c0e;color:#c4a35a;border:1px solid rgba(196,163,90,.2)}
 .bw-tag-housing{background:#1c0e2e;color:#a07ad4;border:1px solid rgba(160,122,212,.2)}
 .bw-tag-edu{background:#261a0e;color:#d4924a;border:1px solid rgba(212,146,74,.2)}
-.bw-tag-other{background:rgba(255,255,255,.04);color:#5a6e7e;border:1px solid rgba(255,255,255,.08)}
-.bw-meta{font-family:var(--mono);font-size:11px;color:#5a6e7e;line-height:1.65}
+.bw-tag-other{background:rgba(255,255,255,.04);color:#94a6b4;border:1px solid rgba(255,255,255,.08)}
+.bw-meta{font-family:var(--mono);font-size:11px;color:#94a6b4;line-height:1.65}
 .bw-spend{font-size:16px;color:#FAF8F3;font-family:var(--serif);font-weight:600;margin-right:2px}
-.bw-meta-label{font-size:11px;color:#5a6e7e}
+.bw-meta-label{font-size:11px;color:#94a6b4}
 .bw-sample{font-weight:400;opacity:.4;letter-spacing:.03em}
 /* Demand map */
 .dm-section{padding:64px 0;border-bottom:1px solid var(--line-strong)}
@@ -6471,7 +6471,7 @@ ${oppCardCss()}
 .dp-panel .opp-card--low_confidence{opacity:.75;box-shadow:0 1px 8px rgba(0,0,0,.2)}
 .dp-panel .opp-cold{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#9aabb7}
 .dp-panel .opp-cold strong{color:#c3ccd2}
-.dp-panel .ls-foot{color:#2e3e4c}
+.dp-panel .ls-foot{color:#6b7d8c}
 .dp-panel .opp-cards{gap:14px}
 ${deskOpportunityCss()}
 </style>
