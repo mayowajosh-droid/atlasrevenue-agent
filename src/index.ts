@@ -1228,12 +1228,15 @@ const DESK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 async function getDeskCache(slug: string): Promise<{ data: ProcurementData; cached_at: string } | null> {
   if (pool) {
     const r = await pool.query<{ data: ProcurementData; cached_at: string }>(
-      `SELECT data, cached_at::text FROM desk_cache WHERE slug = $1`,
+      `SELECT data, cached_at::text FROM desk_cache WHERE slug = $1 AND cached_at > NOW() - INTERVAL '6 hours'`,
       [slug]
     );
     return r.rows[0] || null;
   }
-  return deskCacheMemStore.get(slug) || null;
+  const mem = deskCacheMemStore.get(slug);
+  if (!mem) return null;
+  if (Date.now() - new Date(mem.cached_at).getTime() > DESK_CACHE_TTL_MS) return null;
+  return mem;
 }
 
 async function setDeskCache(slug: string, data: ProcurementData): Promise<void> {
@@ -5198,6 +5201,16 @@ app.post("/admin/signals/rebuild", requireAdmin, asyncRoute(async (_req, res) =>
   if (pool) await pool.query("TRUNCATE TABLE homepage_signals");
   refreshHomepageSignals().catch(err => console.error("[signals] rebuild failed", err));
   res.json({ ok: true, message: "Signals table cleared. Rebuild started in background." });
+}));
+
+app.post("/admin/desks/rebuild", requireAdmin, asyncRoute(async (_req, res) => {
+  if (pool) await pool.query("TRUNCATE TABLE desk_cache");
+  deskCacheMemStore.clear();
+  const liveDesks = DESK_PROFILES.filter(d => d.live);
+  for (const profile of liveDesks) {
+    compileDeskInBackground(profile).catch(err => console.error(`[desk] rebuild failed for ${profile.slug}`, err));
+  }
+  res.json({ ok: true, message: `Cache cleared. Rebuilding ${liveDesks.length} desks in background.` });
 }));
 
 app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
