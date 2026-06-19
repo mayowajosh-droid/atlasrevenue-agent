@@ -3600,20 +3600,6 @@ function scoreLabel(score: number) {
   return "Weak";
 }
 
-function scoreCard(title: string, score: number, note: string) {
-  return `
-    <div class="score-card">
-      <div class="score-top">
-        <span>${escapeHtml(title)}</span>
-        <strong>${score}</strong>
-      </div>
-      <div class="score-track">
-        <div class="score-fill" style="width:${clampScore(score)}%"></div>
-      </div>
-      <p>${escapeHtml(scoreLabel(score))}. ${escapeHtml(note)}</p>
-    </div>
-  `;
-}
 
 function premiumDashboardHtml(scan: ScanRecord) {
   return `
@@ -4139,15 +4125,6 @@ function reportPage(scan: ScanRecord) {
       margin-bottom:8px;
     }
 
-    .dash-head {
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:18px;
-      align-items:start;
-      margin-bottom:20px;
-    }
-
-    .dash-head h2,
     .marketing-close h2 {
       font-family:"Spectral","Iowan Old Style",Georgia,serif;
       margin:0 0 8px;
@@ -4155,120 +4132,12 @@ function reportPage(scan: ScanRecord) {
       letter-spacing:-.02em;
     }
 
-    .dash-head p,
     .marketing-close p {
       margin:0;
       color:var(--muted);
       line-height:1.65;
       text-align:justify;
       text-align-last:left;
-    }
-
-    .score-grid {
-      display:grid;
-      grid-template-columns:repeat(5, 1fr);
-      gap:12px;
-      margin:18px 0 22px;
-    }
-
-    .score-card {
-      border:1px solid var(--line);
-      background:var(--paper);
-      padding:14px;
-      min-height:132px;
-    }
-
-    .score-top {
-      display:flex;
-      justify-content:space-between;
-      align-items:baseline;
-      gap:10px;
-      margin-bottom:10px;
-    }
-
-    .score-top span {
-      font-size:12px;
-      color:var(--muted);
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-    }
-
-    .score-top strong {
-      font-family:"Spectral","Iowan Old Style",Georgia,serif;
-      font-size:30px;
-    }
-
-    .score-track,
-    .mini-bar-track {
-      height:8px;
-      background:var(--gold-soft);
-      overflow:hidden;
-    }
-
-    .score-fill,
-    .mini-bar-fill {
-      height:100%;
-      background:linear-gradient(90deg, var(--gold), var(--ink));
-    }
-
-    .score-card p {
-      margin:10px 0 0;
-      color:var(--muted);
-      font-size:12.5px;
-      line-height:1.45;
-      text-align:left;
-    }
-
-    .visual-grid {
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:14px;
-    }
-
-    .chart-card {
-      border:1px solid var(--line);
-      padding:18px;
-      background:#fff;
-      break-inside:avoid;
-    }
-
-    .chart-card h3 {
-      margin:0 0 14px;
-      font-size:18px;
-      font-family:"Spectral","Iowan Old Style",Georgia,serif;
-    }
-
-    .mini-bar-row {
-      display:grid;
-      grid-template-columns:190px 1fr 42px;
-      gap:10px;
-      align-items:center;
-      padding:10px 0;
-      border-top:1px solid var(--gold-soft);
-    }
-
-    .mini-bar-row:first-of-type {
-      border-top:0;
-    }
-
-    .mini-bar-label strong {
-      display:block;
-      font-size:13px;
-      color:var(--ink);
-    }
-
-    .mini-bar-label span {
-      display:block;
-      font-size:11.5px;
-      color:var(--muted);
-      line-height:1.35;
-    }
-
-    .mini-bar-row b {
-      font-family:"Spectral","Iowan Old Style",Georgia,serif;
-      font-size:18px;
-      text-align:right;
     }
 
     .report {
@@ -4425,10 +4294,8 @@ function reportPage(scan: ScanRecord) {
 
     @media (max-width:900px) {
       .cover h1 { font-size:40px; }
-      .meta, .score-grid { grid-template-columns:1fr 1fr; }
-      .visual-grid, .dash-head, .close-grid { grid-template-columns:1fr; }
-      .mini-bar-row { grid-template-columns:1fr; }
-      .mini-bar-row b { text-align:left; }
+      .meta { grid-template-columns:1fr 1fr; }
+      .close-grid { grid-template-columns:1fr; }
       .report { padding:22px; }
     }
 
@@ -4468,14 +4335,6 @@ function reportPage(scan: ScanRecord) {
       .report,
       .marketing-close {
         padding:8mm;
-      }
-
-      .score-grid {
-        grid-template-columns:repeat(5, 1fr);
-      }
-
-      .visual-grid {
-        grid-template-columns:1fr 1fr;
       }
 
       .report-table {
