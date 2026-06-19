@@ -1213,13 +1213,15 @@ type ChartDataPoint = { month: string; total_m: number };
 async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean }> {
   if (pool) {
     const r = await pool.query<ChartDataPoint>(
-      `SELECT to_char(date_trunc('month', fetched_at), 'Mon') AS month,
+      `SELECT to_char(date_trunc('month', notice_date), 'Mon') AS month,
               ROUND(SUM(COALESCE(value_amount, 0)) / 1e6::numeric, 2)::float AS total_m
        FROM homepage_signals
-       WHERE fetched_at > NOW() - INTERVAL '12 months'
+       WHERE notice_date > NOW() - INTERVAL '12 months'
+         AND notice_date <= NOW()
          AND value_amount IS NOT NULL
-       GROUP BY date_trunc('month', fetched_at)
-       ORDER BY date_trunc('month', fetched_at)`
+         AND value_amount > 0
+       GROUP BY date_trunc('month', notice_date)
+       ORDER BY date_trunc('month', notice_date)`
     );
     return { points: r.rows, illustrative: r.rows.length < 3 };
   }
@@ -4572,9 +4574,10 @@ app.get("/", asyncRoute(async (_req, res) => {
     arr.map(s =>
       `<span><b>${escapeHtml(s.source)}</b> ${escapeHtml(s.title.slice(0, 70))}${s.buyer ? ` &middot; ${escapeHtml(s.buyer.slice(0, 40))}` : ""}</span>`
     ).join("");
+  // 4× repetition keeps the seam invisible even when only 3 signals are loaded
   const tickerHtml = tickerSrc
-    ? buildTickerItems(tickerSrc) + buildTickerItems(tickerSrc)
-    : "<span><b>FTS</b> Illustrative signal &middot; data loads on first refresh</span>".repeat(6);
+    ? buildTickerItems(tickerSrc) + buildTickerItems(tickerSrc) + buildTickerItems(tickerSrc) + buildTickerItems(tickerSrc)
+    : "<span><b>FTS</b> Illustrative signal &middot; data loads on first refresh</span>".repeat(12);
 
   // Hero card values
   const heroCategory = isLive
@@ -4855,7 +4858,7 @@ ${oppCardCss()}
     <div class="chartwrap">
       <div class="ch-head">
         <span class="lab">Recurring category spend &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
-        <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
+        <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
     </div>
@@ -5040,9 +5043,9 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
   function animate(){if(prog<1){prog+=reduce?1:0.018;if(prog>1)prog=1;draw();requestAnimationFrame(animate);}else draw();}
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!started){started=true;animate();
-    const el=document.getElementById('chartTotal');let v=0;
+    const el=document.getElementById('chartTotalVal');let v=0;
     const cfv=${chartFinalVal},cst=${chartStep};
-    const ci=setInterval(()=>{v+=cst;if(v>=cfv){v=cfv;clearInterval(ci);}el.firstChild.textContent='£'+v.toFixed(1)+'m';},22);
+    const ci=setInterval(()=>{v+=cst;if(v>=cfv){v=cfv;clearInterval(ci);}el.textContent='£'+v.toFixed(1)+'m';},22);
   }}),{threshold:.4});
   io.observe(cv);
 })();
@@ -5749,7 +5752,8 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     if (!n.buyer || n.buyer === "Not stated") continue;
     const e = buyerMap.get(n.buyer) || { awardedValue: 0, awardedCount: 0, openCount: 0 };
     e.awardedCount++;
-    e.awardedValue += n.awardedValue ?? 0;
+    // Cap per-notice value at £2bn — guards against source data errors (e.g. academy showing £18bn)
+    e.awardedValue += Math.min(n.awardedValue ?? 0, 2_000_000_000);
     buyerMap.set(n.buyer, e);
   }
   for (const n of allOpen) {
@@ -5800,22 +5804,22 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
   }).length;
 
-  // Monthly spend trend (last 12 months, from awardedNotices)
+  // Monthly spend trend (last 12 months, from awardedNotices, no future dates)
   const monthlySpend = new Map<string, number>();
   for (const n of awardedNotices) {
     const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
-    if (!d || d.getTime() < cutoff365) continue;
+    if (!d || d.getTime() < cutoff365 || d.getTime() > nowMs) continue;
     const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     monthlySpend.set(mk, (monthlySpend.get(mk) || 0) + (n.awardedValue || 0));
   }
   const trendData = [...monthlySpend.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   const maxMonthVal = Math.max(...trendData.map(([, v]) => v), 1);
 
-  // Recent awards (keyword-matched, last 90 days)
+  // Recent awards (keyword-matched, last 90 days, no future dates)
   const cutoff90ms = nowMs - 90 * 24 * 3_600_000;
   const recentAwards = awardedNotices.filter(n => {
     const t = new Date(n.awardedDate || n.publishedDate || 0).getTime();
-    if (t < cutoff90ms) return false;
+    if (t < cutoff90ms || t > nowMs) return false;
     return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
   }).sort((a, b) =>
     new Date(b.awardedDate || b.publishedDate || 0).getTime() -
@@ -5954,7 +5958,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
             ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
             <div class="bw-meta" style="margin-top:6px">
               <span class="bw-spend">${escapeHtml(spend)}</span>
-              <span class="bw-meta-label"> est. annual</span>
+              <span class="bw-meta-label"> total awarded</span>
             </div>
             <div class="bw-spend-bar-track"><div class="bw-spend-bar-fill" style="width:${spendPct}%"></div></div>
             <div class="bw-meta"><span class="bw-meta-label">Active notices: ${activeCount}</span></div>
@@ -6918,7 +6922,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 
     const shareBlock = d.cachedAt ? `
       <div class="dl-share-section">
-        <div class="dl-share-lbl"><span>VALUE SHARE <span style="opacity:.55;font-size:9px;text-transform:none;letter-spacing:.03em">of all desk spend</span></span><span>${sharePct}%</span></div>
+        <div class="dl-share-lbl"><span>VALUE SHARE <span style="opacity:.55;font-size:9px;text-transform:none;letter-spacing:.03em">of indexed spend</span></span><span>${sharePct}%</span></div>
         <div class="dl-share-track"><div class="dl-share-fill" style="width:${sharePct}%"></div></div>
       </div>` : "";
 
@@ -7090,8 +7094,10 @@ function noticesPage(
   const data = cached?.data;
   const isCompiling = cached === null;
 
+  const boardKw = profile.categories.flatMap(c => c.keywords);
   const allOpen = (data?.contractsFinder.open || [])
     .concat(data?.findTender?.notices || [])
+    .filter(n => !isAggregatorBuyer(n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
     .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const allAwarded = (data?.contractsFinder.awarded || [])
