@@ -7599,7 +7599,7 @@ ${subs.map(s => `
     <td>${(s.alerted_notice_ids || []).length}</td>
     <td>
       <form method="POST" action="/admin/subscriptions/${s.id}/fire?token=${encodeURIComponent(token)}">
-        <button style="background:#1a4a2e;color:#fff;border:0;padding:6px 10px;cursor:pointer">Fire Now</button>
+        <button style="background:#1d6b4f;color:#fff;border:0;padding:6px 10px;cursor:pointer">Fire Now</button>
       </form>
     </td>
   </tr>`).join("")}
