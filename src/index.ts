@@ -7104,7 +7104,7 @@ ${pageShellFoot()}
 
   // Sort select
   var sortSel=document.getElementById('nb-sort');
-  if(sortSel)sortSel.addEventListener('change',function(){activeSort=(sortSel as HTMLSelectElement).value;page=1;render();});
+  if(sortSel)sortSel.addEventListener('change',function(){activeSort=sortSel.value;page=1;render();});
 
   // Sidebar bucket filter
   document.querySelectorAll('.nb-sb-item[data-filter]').forEach(function(btn){
