@@ -2263,29 +2263,29 @@ function renderIncumbentSection(data: ProcurementData): string {
       ? new Date(e.latestAward).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
       : "—";
     return `<tr>
-      <td style="padding:9px 14px;font-size:14px;color:#24140f;border-bottom:1px solid #e8d9c4">${escapeHtml(e.name)}</td>
-      <td style="padding:9px 14px;text-align:center;font-size:13px;font-family:monospace;border-bottom:1px solid #e8d9c4">${e.count}</td>
-      <td style="padding:9px 14px;text-align:right;font-size:13px;font-family:monospace;border-bottom:1px solid #e8d9c4">${escapeHtml(val)}</td>
-      <td style="padding:9px 14px;border-bottom:1px solid #e8d9c4">
+      <td style="padding:9px 14px;font-size:14px;color:var(--ink);border-bottom:1px solid var(--line)">${escapeHtml(e.name)}</td>
+      <td style="padding:9px 14px;text-align:center;font-size:13px;font-family:var(--mono);border-bottom:1px solid var(--line)">${e.count}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:13px;font-family:var(--mono);border-bottom:1px solid var(--line)">${escapeHtml(val)}</td>
+      <td style="padding:9px 14px;border-bottom:1px solid var(--line)">
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="height:6px;width:${Math.max(pct, 2)}%;background:#a97932;border-radius:3px"></div>
-          <span style="font-size:11px;font-family:monospace;color:#6f5b50">${pct}%</span>
+          <div style="height:6px;width:${Math.max(pct, 2)}%;background:var(--gold);border-radius:2px"></div>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">${pct}%</span>
         </div>
       </td>
-      <td style="padding:9px 14px;font-size:12px;font-family:monospace;color:#6f5b50;border-bottom:1px solid #e8d9c4">${escapeHtml(latest)}</td>
+      <td style="padding:9px 14px;font-size:12px;font-family:var(--mono);color:var(--muted);border-bottom:1px solid var(--line)">${escapeHtml(latest)}</td>
     </tr>`;
   }).join("");
-  return `<section style="margin:40px 0;background:#fffaf3;border:1px solid #d2b88f;padding:28px 32px" class="no-print">
-  <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:6px;color:#24140f">Incumbent map</h2>
-  <p style="font-size:13px;color:#6f5b50;margin-bottom:18px;font-family:monospace">Derived from awarded contract records in this dataset. Not exhaustive — covers notices returned by keyword search only.</p>
+  return `<section style="margin:40px 0;background:var(--paper);border:1px solid var(--line);padding:28px 32px" class="no-print">
+  <h2 style="font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:6px;color:var(--ink)">Incumbent map</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:18px;font-family:var(--mono)">Derived from awarded contract records in this dataset. Not exhaustive — covers notices returned by keyword search only.</p>
   <table style="width:100%;border-collapse:collapse">
     <thead>
-      <tr style="background:#f3eadc">
-        <th style="padding:8px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Supplier</th>
-        <th style="padding:8px 14px;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Awards</th>
-        <th style="padding:8px 14px;text-align:right;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Total value</th>
-        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Share</th>
-        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Latest award</th>
+      <tr style="background:var(--cream)">
+        <th style="padding:8px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Supplier</th>
+        <th style="padding:8px 14px;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Awards</th>
+        <th style="padding:8px 14px;text-align:right;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Total value</th>
+        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Share</th>
+        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Latest award</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -3982,7 +3982,7 @@ function reportPage(scan: ScanRecord) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --ink:#24140f;
+      --ink:#0B0F14;
       --muted:#6f5b50;
       --paper:#fffaf3;
       --cream:#f3eadc;
@@ -3991,6 +3991,8 @@ function reportPage(scan: ScanRecord) {
       --gold-soft:#f0e2c6;
       --green:#1d6b4f;
       --red:#9b2d20;
+      --serif:"Spectral","Iowan Old Style",Georgia,serif;
+      --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
     }
 
     * { box-sizing:border-box; }
@@ -4574,18 +4576,18 @@ function reportPage(scan: ScanRecord) {
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
 
     ${scan.status === "completed" ? `
-    <div class="no-print" style="margin:40px auto;max-width:680px;padding:24px 28px;background:#fffaf3;border:1px solid #d2b88f;border-radius:8px">
-      <h3 style="margin-top:0;font-family:Georgia,serif;color:#24140f">Get weekly opportunity alerts</h3>
-      <p style="color:#5a3e28;margin-bottom:16px">We'll re-scan Contracts Finder every 7 days and email you when new tenders match your profile.</p>
+    <div class="no-print" style="margin:40px auto;max-width:680px;padding:24px 28px;background:var(--paper);border:1px solid var(--line)">
+      <h3 style="margin-top:0;font-family:var(--serif);color:var(--ink)">Get weekly opportunity alerts</h3>
+      <p style="color:var(--muted);margin-bottom:16px">We'll re-scan Contracts Finder every 7 days and email you when new tenders match your profile.</p>
       <form id="alert-form" style="display:flex;gap:10px;flex-wrap:wrap">
         <input type="email" id="alert-email" placeholder="your@email.com" required
-          style="flex:1;min-width:220px;padding:10px 14px;border:1px solid #c9a87c;border-radius:6px;font-size:15px;background:#fff" />
+          style="flex:1;min-width:220px;padding:10px 14px;border:1px solid var(--line);font-size:15px;background:#fff" />
         <button type="submit"
-          style="padding:10px 20px;background:#1a4a2e;color:#fff;border:0;border-radius:6px;font-size:15px;cursor:pointer;white-space:nowrap">
+          style="padding:10px 20px;background:var(--green);color:#fff;border:0;font-size:15px;cursor:pointer;white-space:nowrap">
           Subscribe
         </button>
       </form>
-      <p id="alert-msg" style="margin-top:12px;font-size:14px;color:#1a4a2e;display:none"></p>
+      <p id="alert-msg" style="margin-top:12px;font-size:14px;color:var(--green);display:none"></p>
       <script>
         document.getElementById("alert-form").addEventListener("submit", async function(e) {
           e.preventDefault();
@@ -4600,7 +4602,7 @@ function reportPage(scan: ScanRecord) {
             const data = await r.json();
             msg.style.display = "block";
             msg.textContent = r.ok ? "Subscribed. We'll email you when new opportunities appear." : (data.error || "Subscription failed.");
-            msg.style.color = r.ok ? "#1a4a2e" : "#9b2d20";
+            msg.style.color = r.ok ? "#1d6b4f" : "#9b2d20";
             if (r.ok) document.getElementById("alert-form").style.display = "none";
           } catch {
             msg.style.display = "block";
@@ -4724,6 +4726,30 @@ app.get("/", asyncRoute(async (_req, res) => {
 
   const noticesDisplay = count24h > 0 ? String(count24h) : "—";
 
+  const chartPoints = chartResult.illustrative
+    ? [1.9, 2.1, 2.0, 2.4, 2.7, 2.6, 3.0, 3.3, 3.5, 3.8, 4.0, 4.2]
+    : chartResult.points.map(p => p.total_m);
+  const chartFinalVal = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1] : 4.2;
+  const chartMinVal = chartResult.illustrative
+    ? 1.6
+    : parseFloat((Math.max(0, Math.min(...chartPoints) * 0.85)).toFixed(2));
+  const chartMaxVal = chartResult.illustrative
+    ? 4.6
+    : parseFloat((Math.max(...chartPoints) * 1.15).toFixed(2));
+  const chartTrendPct = chartPoints.length >= 2 && chartPoints[0] > 0
+    ? Math.round(((chartFinalVal - chartPoints[0]) / chartPoints[0]) * 100)
+    : 34;
+  const chartStep = parseFloat((Math.max(chartFinalVal / 35, 0.01)).toFixed(3));
+  const chartTick1 = parseFloat((chartMinVal + (chartMaxVal - chartMinVal) / 3).toFixed(1));
+  const chartTick2 = parseFloat((chartMinVal + 2 * (chartMaxVal - chartMinVal) / 3).toFixed(1));
+  const chartBullets = chartResult.illustrative
+    ? `<li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
+        <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
+        <li><b>Entry window</b> &middot; illustrative 18-month renewal window</li>`
+    : `<li><b>Aggregate spend</b> &middot; live trend ${chartTrendPct >= 0 ? '+' : ''}${chartTrendPct}% / ${chartPoints.length}mo</li>
+        <li><b>Re-let signal</b> &middot; framework expiry clusters tracked</li>
+        <li><b>Entry window</b> &middot; 18-month renewal windows monitored</li>`;
+
   const sampleLink = samplePdfUrl
     ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
     : `<span style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#7a8890;border:1px dashed #ffffff33;padding:8px 14px;cursor:default" title="Sample report available after first scan">Sample report — available after first scan</span>`;
@@ -4733,6 +4759,7 @@ app.get("/", asyncRoute(async (_req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="UK public-sector revenue intelligence. Turn Contracts Finder and Find a Tender data into a commercial decision for your firm — in minutes.">
 <title>GovRevenue — Public-Sector Revenue Intelligence</title>
 <style>
 :root{
@@ -4947,19 +4974,17 @@ ${oppCardCss()}
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
-      <div class="eyebrow">Category signal &middot; illustrative</div>
+      <div class="eyebrow">Category signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
       <h2>Watch the money move before the tender does.</h2>
       <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
       <ul>
-        <li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
-        <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
-        <li><b>Entry window</b> &middot; illustrative 18-month renewal window</li>
+        ${chartBullets}
       </ul>
     </div>
     <div class="chartwrap">
       <div class="ch-head">
         <span class="lab">Recurring category spend &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
-        <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
+        <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
     </div>
@@ -5114,17 +5139,17 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 (function(){
   const cv=document.getElementById('growthChart'); if(!cv) return;
   const ctx=cv.getContext('2d');
-  const data=[1.9,2.1,2.0,2.4,2.7,2.6,3.0,3.3,3.5,3.8,4.0,4.2];
+  const data=${JSON.stringify(chartPoints)};
   function fit(){const dpr=Math.min(devicePixelRatio,2);const r=cv.getBoundingClientRect();cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);return r;}
   let r=fit(); window.addEventListener('resize',()=>{r=fit();});
-  const pad={l:34,r:8,t:14,b:22},max=4.6,min=1.6;
+  const pad={l:34,r:8,t:14,b:22},max=${chartMaxVal},min=${chartMinVal};
   function X(i){return pad.l+(i/(data.length-1))*(r.width-pad.l-pad.r);}
   function Y(v){return pad.t+(1-(v-min)/(max-min))*(r.height-pad.t-pad.b);}
   let prog=0,started=false;
   function draw(){
     ctx.clearRect(0,0,r.width,r.height);
     ctx.strokeStyle='#0f14140f';ctx.lineWidth=1;ctx.font='10px monospace';ctx.fillStyle='#5A6B7B';
-    for(let g=2;g<=4;g++){const y=Y(g);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(r.width-pad.r,y);ctx.stroke();ctx.fillText(''+g+'m',6,y+3);}
+    for(const g of [${chartTick1},${chartTick2}]){const y=Y(g);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(r.width-pad.r,y);ctx.stroke();ctx.fillText(g+'m',6,y+3);}
     const upto=prog*(data.length-1);
     ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
     for(let i=1;i<=Math.floor(upto);i++) ctx.lineTo(X(i),Y(data[i]));
@@ -5145,7 +5170,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function animate(){if(prog<1){prog+=reduce?1:0.018;if(prog>1)prog=1;draw();requestAnimationFrame(animate);}else draw();}
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!started){started=true;animate();
     const el=document.getElementById('chartTotal');let v=0;
-    const ci=setInterval(()=>{v+=0.12;if(v>=4.2){v=4.2;clearInterval(ci);}el.firstChild.textContent=v.toFixed(1)+'m';},22);
+    const cfv=${chartFinalVal},cst=${chartStep};
+    const ci=setInterval(()=>{v+=cst;if(v>=cfv){v=cfv;clearInterval(ci);}el.firstChild.textContent='£'+v.toFixed(1)+'m';},22);
   }}),{threshold:.4});
   io.observe(cv);
 })();
@@ -5285,9 +5311,9 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
   await enqueueScan(scan.id, parsed.data);
 
   res.type("html").send(`
-    <body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:32px">
-      <div style="max-width:760px;margin:auto;background:#fffaf3;border:1px solid #d2b88f;padding:28px">
-        <h1 style="font-family:Georgia,serif">Scan started</h1>
+    <body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
+      <div style="max-width:760px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:28px">
+        <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">Scan started</h1>
         <p>ID: <code>${scan.id}</code></p>
         <p><a href="/scan/${scan.id}">Open scan status page</a></p>
         <p>Refresh the page in 1-3 minutes.</p>
@@ -5387,6 +5413,7 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Submit your company profile and get a structured commercial intelligence report against UK public procurement data in minutes.">
 <title>Run a Scan &mdash; GovRevenue</title>
 <style>
 :root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;}
@@ -6695,7 +6722,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 
     const shareBlock = d.cachedAt ? `
       <div class="dl-share-section">
-        <div class="dl-share-lbl"><span>VALUE SHARE</span><span>${sharePct}%</span></div>
+        <div class="dl-share-lbl"><span>VALUE SHARE <span style="opacity:.55;font-size:9px;text-transform:none;letter-spacing:.03em">of all desk spend</span></span><span>${sharePct}%</span></div>
         <div class="dl-share-track"><div class="dl-share-fill" style="width:${sharePct}%"></div></div>
       </div>` : "";
 
@@ -7297,14 +7324,14 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
 
   function gradeColour(g: string) {
     const map: Record<string, string> = { A: "#1d6b4f", B: "#2a7a3b", C: "#a97932", D: "#c05c20", E: "#9b2d20" };
-    return map[g?.charAt(0).toUpperCase()] || "#24140f";
+    return map[g?.charAt(0).toUpperCase()] || "#0B0F14";
   }
   function row(label: string, cur: string, pri: string, changed: boolean) {
     return `<tr>
-      <td style="padding:10px 14px;font-size:13px;color:#6f5b50;border-bottom:1px solid #e8d9c4;font-family:monospace;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(label)}</td>
-      <td style="padding:10px 14px;font-size:15px;font-weight:600;border-bottom:1px solid #e8d9c4;color:${escapeHtml(gradeColour(cur))}">${escapeHtml(cur)}</td>
-      <td style="padding:10px 14px;font-size:15px;border-bottom:1px solid #e8d9c4;color:#8a6f5a">${escapeHtml(pri)}</td>
-      <td style="padding:10px 14px;border-bottom:1px solid #e8d9c4">${changed ? '<span style="background:#fdf0ee;color:#9b2d20;font-size:11px;font-family:monospace;padding:2px 7px">CHANGED</span>' : '<span style="font-size:11px;font-family:monospace;color:#b0a090">same</span>'}</td>
+      <td style="padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">${escapeHtml(label)}</td>
+      <td style="padding:10px 14px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);color:${escapeHtml(gradeColour(cur))}">${escapeHtml(cur)}</td>
+      <td style="padding:10px 14px;font-size:15px;border-bottom:1px solid var(--line);color:var(--muted)">${escapeHtml(pri)}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid var(--line)">${changed ? '<span style="background:#fdf0ee;color:#9b2d20;font-size:11px;font-family:var(--mono);padding:2px 7px">CHANGED</span>' : '<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">same</span>'}</td>
     </tr>`;
   }
   const ce = curEdp, pe = priEdp;
@@ -7324,23 +7351,24 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Compare &mdash; ${escapeHtml(current.company_name)} &mdash; GovRevenue</title>
 <style>
+:root{--ink:#0B0F14;--muted:#6f5b50;--paper:#FAF8F3;--cream:#F3EFE6;--line:#d2b88f;--gold:#a97932;--green:#1d6b4f;--red:#9b2d20;--serif:"Spectral","Iowan Old Style",Georgia,serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f3eadc;color:#24140f;font-family:Arial,sans-serif;padding:40px 24px}
+body{background:var(--cream);color:var(--ink);font-family:"Inter","Helvetica Neue",Arial,sans-serif;padding:40px 24px}
 .page{max-width:900px;margin:0 auto}
-.brand{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a6f5a;margin-bottom:8px}
-h1{font-family:Georgia,serif;font-size:28px;font-weight:600;margin-bottom:4px}
-.sub{font-size:13px;color:#8a6f5a;font-family:monospace;margin-bottom:32px}
-.back{font-size:12px;color:#8a6f5a;text-decoration:underline;font-family:monospace;display:inline-block;margin-bottom:24px}
-table{width:100%;border-collapse:collapse;background:#fffaf3;border:1px solid #d2b88f}
-thead tr{background:#f3eadc}
-th{padding:9px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600}
-.section-head{font-family:Georgia,serif;font-size:18px;font-weight:600;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid #d2b88f}
+.brand{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+h1{font-family:var(--serif);font-size:28px;font-weight:600;margin-bottom:4px}
+.sub{font-size:13px;color:var(--muted);font-family:var(--mono);margin-bottom:32px}
+.back{font-size:12px;color:var(--muted);text-decoration:underline;font-family:var(--mono);display:inline-block;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--line)}
+thead tr{background:var(--cream)}
+th{padding:9px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.section-head{font-family:var(--serif);font-size:18px;font-weight:600;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 .buyer-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.buyer{font-size:12px;font-family:monospace;padding:4px 10px;border-radius:2px}
-.buyer.new{background:#e8f5ee;color:#1d6b4f;border:1px solid #a8d4b8}
-.buyer.gone{background:#fdf0ee;color:#9b2d20;border:1px solid #e0a090}
-.none{font-size:13px;color:#8a6f5a;font-family:monospace}
-${prior ? "" : ".no-prior{background:#fffaf3;border:1px solid #d2b88f;padding:24px 28px;font-size:14px;color:#6f5b50}"}
+.buyer{font-size:12px;font-family:var(--mono);padding:4px 10px;border-radius:2px}
+.buyer.new{background:#e8f5ee;color:var(--green);border:1px solid #a8d4b8}
+.buyer.gone{background:#fdf0ee;color:var(--red);border:1px solid #e0a090}
+.none{font-size:13px;color:var(--muted);font-family:var(--mono)}
+${prior ? "" : ".no-prior{background:var(--paper);border:1px solid var(--line);padding:24px 28px;font-size:14px;color:var(--muted)}"}
 </style>
 </head>
 <body>
@@ -7491,8 +7519,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 
   res.type("html").send(`<!doctype html>
 <html>
-<body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:32px">
-<h1 style="font-family:Georgia,serif">GovRevenue Scans</h1>
+<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
+<h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">GovRevenue Scans</h1>
 <table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1120px">
 <tr><th>Created</th><th>Company</th><th>Status</th><th>Open</th><th>Data</th><th>Delete</th></tr>
 ${scans
@@ -7543,17 +7571,17 @@ app.post("/api/scans/:id/subscribe", asyncRoute(async (req, res) => {
 app.get("/unsubscribe/:id", asyncRoute(async (req, res) => {
   const sub = await getSubscription(req.params.id);
   if (!sub) {
-    res.status(404).type("html").send(`<body style="font-family:Arial;padding:40px"><p>Subscription not found.</p></body>`);
+    res.status(404).type("html").send(`<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;padding:40px"><p>Subscription not found.</p></body>`);
     return;
   }
   await deactivateSubscription(sub.id);
   res.type("html").send(`<!doctype html>
 <html>
-<body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:40px">
-<div style="max-width:600px;margin:auto;background:#fffaf3;border:1px solid #d2b88f;padding:32px;border-radius:8px">
-  <h1 style="font-family:Georgia,serif;margin-top:0">Unsubscribed</h1>
+<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:40px">
+<div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
+  <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
   <p>Weekly alerts for <strong>${escapeHtml(sub.company_name)}</strong> have been cancelled.</p>
-  <p><a href="/" style="color:#1a4a2e">Back to GovRevenue</a></p>
+  <p><a href="/" style="color:#1d6b4f">Back to GovRevenue</a></p>
 </div>
 </body></html>`);
 }));
@@ -7563,8 +7591,8 @@ app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token || "");
   res.type("html").send(`<!doctype html>
 <html>
-<body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:32px">
-<h1 style="font-family:Georgia,serif">Weekly Alert Subscriptions</h1>
+<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
+<h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">Weekly Alert Subscriptions</h1>
 <p><a href="/admin/scans?token=${encodeURIComponent(token)}">← Back to scans</a></p>
 <table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1200px">
 <tr><th>Created</th><th>Company</th><th>Email</th><th>Active</th><th>Last Alerted</th><th>Tracked</th><th>Fire</th></tr>
