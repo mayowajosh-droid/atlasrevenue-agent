@@ -5792,7 +5792,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         <span class="dp-eyebrow">AWARDED DEMAND SIGNAL</span>
        </div>
        <p style="color:var(--slate);margin-top:16px;font-size:14px;line-height:1.7">${isCompiling ? "Demand data compiles on first request.<br>Refresh after ~90 seconds." : "This desk is coming soon."}</p>
-       ${isCompiling ? `<span class="chip chip-amber" style="margin-top:16px;display:inline-block">Compiling &mdash; data within the hour</span>` : ""}`;
+       ${isCompiling ? `<span class="chip chip-amber" style="margin-top:16px;display:inline-block">Compiling &mdash; refresh in ~90 seconds</span>` : ""}`;
 
   // Live opportunities panel — scored and bucketed
   const deskOppContext: DeskOpportunityContext = {
