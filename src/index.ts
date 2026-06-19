@@ -1118,6 +1118,24 @@ async function queryDeskSignals(categories: string[]): Promise<Map<string, Homep
   return out;
 }
 
+async function queryOpenDeskSignals(limit: number): Promise<HomepageSignal[]> {
+  if (pool) {
+    const r = await pool.query<HomepageSignal>(
+      `SELECT id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at
+       FROM homepage_signals
+       WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'
+       ORDER BY notice_date DESC NULLS LAST
+       LIMIT $1`,
+      [limit]
+    );
+    return r.rows;
+  }
+  return [...sigMemStore.values()]
+    .filter(s => /open|active/i.test(s.status || ""))
+    .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
+    .slice(0, limit);
+}
+
 type ChartDataPoint = { month: string; total_m: number };
 async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean }> {
   if (pool) {
@@ -4558,11 +4576,12 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
 }));
 
 app.get("/", asyncRoute(async (_req, res) => {
-  const [count24h, samplePdfUrl, deskSignals, chartResult] = await Promise.all([
+  const [count24h, samplePdfUrl, deskSignals, chartResult, openSignals] = await Promise.all([
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
     queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
-    queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true }))
+    queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true })),
+    queryOpenDeskSignals(6).catch(() => [] as HomepageSignal[]),
   ]);
 
   // Derive hero and ticker from current desk signals (sorted by most recently published)
@@ -4570,8 +4589,8 @@ app.get("/", asyncRoute(async (_req, res) => {
     .filter(s => s.notice_date)
     .sort((a, b) => new Date(b.notice_date!).getTime() - new Date(a.notice_date!).getTime());
 
-  // Build homepage teaser signals
-  const teaserSignals: HomepageTeaserSignal[] = signals.map(s => ({
+  // Build homepage teaser signals — use open notices specifically, not desk signals (which skew to awards)
+  const teaserSignals: HomepageTeaserSignal[] = openSignals.map(s => ({
     category: s.category,
     title: s.title,
     buyer: s.buyer,
