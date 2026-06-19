@@ -6037,7 +6037,7 @@ a{color:inherit;text-decoration:none}
 .btn-cta:hover{background:var(--accent)}
 /* Three panels */
 .dp-panels{border-bottom:1px solid var(--line-strong)}
-.dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr) minmax(0,3fr);border-left:1px solid var(--line-strong)}
+.dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-left:1px solid var(--line-strong)}
 .dp-panel{padding:64px 60px;border-right:1px solid var(--line-strong)}
 .dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate)}
