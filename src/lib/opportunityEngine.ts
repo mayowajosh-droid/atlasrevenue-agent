@@ -260,14 +260,22 @@ function scoreForScan(notice: NormalisedNotice, context: ScanOpportunityContext)
     reasons.push(`Keyword in description: ${kwDescMatches.slice(0, 2).join(", ")}`);
   }
 
-  const serviceTokens = context.services.toLowerCase().split(/[\s,;]+/).filter(t => t.length > 3);
+  // Generic tokens that appear in almost every procurement notice — exclude from service matching
+  // so "services", "management" etc. don't inflate scores for completely unrelated contracts.
+  const SVC_STOP = new Set(["services", "service", "management", "solutions", "support", "works",
+    "contract", "contracts", "national", "local", "general", "provision", "delivery",
+    "commercial", "industrial", "specialist", "professional", "technical"]);
+  const serviceTokens = context.services.toLowerCase().split(/[\s,;]+/)
+    .filter(t => t.length > 4 && !SVC_STOP.has(t));
   const svcMatches = serviceTokens.filter(t => text.includes(t));
   if (svcMatches.length > 0) {
     score += Math.min(20, svcMatches.length * 7);
     reasons.push(`Services match: ${svcMatches.slice(0, 2).join(", ")}`);
   }
 
-  if (context.sector && text.includes(context.sector.toLowerCase().split(" ")[0])) {
+  // context.sector holds the sector KEY (e.g. "cleaning", "facilities") — match directly
+  // rather than splitting the display label which produces weak first-word matches.
+  if (context.sector && text.includes(context.sector.toLowerCase())) {
     score += 8;
     reasons.push(`Sector match: ${context.sector}`);
   }

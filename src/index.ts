@@ -4519,7 +4519,7 @@ function reportPage(scan: ScanRecord) {
       const scanCtx: ScanOpportunityContext = {
         type: "scan",
         services: String(intake?.mainServices || intake?.secondaryServices || ""),
-        sector: resolveSectorFromScan(scan).label,
+        sector: resolveSectorFromScan(scan).key,
         regions: String(data.regions || intake?.areasServed || ""),
         idealBuyers: String(intake?.idealBuyers || ""),
         keywords: data.keywords || [],
