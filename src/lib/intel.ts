@@ -206,10 +206,52 @@ export const AGGREGATOR_FRAGMENTS = [
   // PROSPER — housing association procurement consortium (framework aggregator)
   " prosper ",
   // IN-TEND — e-tendering portal provider, appears as buyer on notices it manages
-  "in-tend limited", "intend limited"
+  "in-tend limited", "intend limited",
+  // Echelon Consultancy — private sector framework manager, appears as "buyer" on managed notices
+  "echelon consultancy",
+  // The Crescent Academy — appears with inflated data-error value; not a meaningful buyer signal
+  "the crescent academy",
+];
+
+// International development agencies that publish UK-funded notices on Contracts Finder
+// but are delivering work overseas — exclude from all UK desk filters and watchlists.
+export const INTL_DEV_FRAGMENTS = [
+  "chemonics", "dai global", " dai ", "adam smith international",
+  "crown agents", "oxford policy management", "palladium",
+  "mott macdonald development", "cardno", "tetra tech",
+  "nathan associates", "aecom development", "gfa consulting",
+  "kpmg development", "pwc development", "deloitte development",
+  "ukaid", "uk aid", "fcdo services", "british council",
+  "options consultancy", "haskoning development", "cowater",
 ];
 
 export function isAggregatorBuyer(buyer: string): boolean {
   const b = ` ${buyer.toLowerCase()} `;
   return AGGREGATOR_FRAGMENTS.some(f => b.includes(f));
+}
+
+export function isIntlDevBuyer(buyer: string): boolean {
+  const b = ` ${buyer.toLowerCase()} `;
+  return INTL_DEV_FRAGMENTS.some(f => b.includes(f));
+}
+
+// Returns true if a notice title looks like an overseas/non-UK procurement.
+// Used to exclude foreign-aid and international development contracts from UK desk pages.
+export function isOverseasNotice(title: string, buyer: string): boolean {
+  if (isIntlDevBuyer(buyer)) return true;
+  const t = title.toLowerCase();
+  // Common patterns in international development contract titles
+  const overseas = [
+    " nigeria", " kenya", " ethiopia", " ghana", " uganda", " tanzania",
+    " bangladesh", " pakistan", " myanmar", " cambodia", " vietnam",
+    " thailand", " indonesia", " philippines", " laos", " nepal",
+    " mozambique", " zimbabwe", " malawi", " zambia", " rwanda",
+    " sierra leone", " liberia", " somalia", " south sudan",
+    " bangkok", " nairobi", " addis ababa", " kampala",
+    " dar es salaam", " lusaka", " harare", " kigali",
+    " ukraine", " moldova", " georgia (country)",
+    "international development", "foreign aid", "overseas development",
+    "oda programme", "development assistance",
+  ];
+  return overseas.some(p => t.includes(p));
 }

@@ -22,7 +22,7 @@ import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFaile
 import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
-  validateReportConsistency, isAggregatorBuyer,
+  validateReportConsistency, isAggregatorBuyer, isOverseasNotice,
   type ParsedEdp
 } from "./lib/intel.js";
 import {
@@ -4765,7 +4765,7 @@ app.get("/", asyncRoute(async (_req, res) => {
 
   const sampleLink = samplePdfUrl
     ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
-    : `<span style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#7a8890;border:1px dashed #ffffff33;padding:8px 14px;cursor:default" title="Sample report available after first scan">Sample report — available after first scan</span>`;
+    : `<a class="btn-ghost" href="/pricing" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#aeb8c0;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#ffffff30">See pricing &rarr;</a>`;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -4881,6 +4881,16 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .desk-card:hover .dc-cta{text-decoration:underline}
 .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
 .reveal.in{opacity:1;transform:none}
+.scan-strip{background:var(--accent);color:#fff;padding:40px 0}
+.scan-strip .wrap{display:flex;align-items:center;justify-content:space-between;gap:40px}
+.scan-strip-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;opacity:.75;margin-bottom:8px}
+.scan-strip-hed{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1.1;margin-bottom:8px}
+.scan-strip-sub{font-size:14.5px;opacity:.85;max-width:38em;line-height:1.6}
+.scan-strip-right{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0}
+.scan-strip-btn{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;background:#fff;color:var(--accent);padding:14px 24px;white-space:nowrap;transition:.18s}
+.scan-strip-btn:hover{background:var(--ink);color:#fff}
+.scan-strip-price{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.75;text-decoration:underline;text-underline-offset:3px;text-align:right}
+.scan-strip-price:hover{opacity:1}
 .product{background:var(--ink);color:var(--paper);border-bottom:1px solid #000}
 .product .wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;padding:78px 32px;align-items:center}
 .product .eyebrow{color:#9aa6ae}
@@ -4913,6 +4923,8 @@ footer li{margin-bottom:9px}
 footer a:hover{color:var(--paper)}
 footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;padding-top:22px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#6b757d;flex-wrap:wrap;gap:10px}
 @media(max-width:880px){
+  .scan-strip .wrap{flex-direction:column;align-items:flex-start;gap:24px}
+  .scan-strip-right{align-items:flex-start}
   .hero .wrap,.chartband .wrap,.product .wrap{grid-template-columns:1fr;gap:36px}
   .hero h1{font-size:42px}
   #globe-canvas{opacity:.4}
@@ -4945,7 +4957,7 @@ ${oppCardCss()}
 <header class="mast"><div class="wrap">
   <div class="logo">Gov<b>Revenue</b></div>
   <nav class="primary">
-    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="#subscribe">Briefing</a>
+    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="#subscribe">Briefing</a>
   </nav>
   <a class="mast-cta" href="/scan">Run a scan</a>
 </div></header>
@@ -5018,6 +5030,19 @@ ${chaseNowHtml}
     </div>
   </div>
 </section>
+<section class="scan-strip">
+  <div class="wrap">
+    <div class="scan-strip-left">
+      <div class="scan-strip-eyebrow">Intelligence scan &middot; 2–4 minutes</div>
+      <div class="scan-strip-hed">Know if you fit before you bid.</div>
+      <div class="scan-strip-sub">Tell us your services and region. We scan the public record and return a sourced commercial verdict — buyer watchlist, route-to-revenue map, and bid readiness score.</div>
+    </div>
+    <div class="scan-strip-right">
+      <a class="scan-strip-btn" href="/scan">Run a revenue scan &rarr;</a>
+      <a class="scan-strip-price" href="/pricing">See pricing &rarr;</a>
+    </div>
+  </div>
+</section>
 <section class="product" id="product">
   <div class="wrap">
     <div>
@@ -5064,7 +5089,7 @@ ${chaseNowHtml}
 <footer><div class="wrap">
   <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">See all desks →</a></li></ul></div>
-  <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/desks">Intelligence Desks</a></li><li><a href="/scan">Run a scan &rarr;</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/desks">Intelligence Desks</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/scan">Run a scan &rarr;</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
@@ -5425,6 +5450,152 @@ app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
   }
   res.json({ input: scan.input_json ?? null, ...scan.procurement_json });
 }));
+
+app.get("/pricing", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pricing — GovRevenue</title>
+<style>
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{padding:0 32px;max-width:960px;margin:0 auto}
+header{border-bottom:1px solid var(--line-strong);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+.back{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate)}
+.back:hover{color:var(--ink)}
+.hero{padding:72px 0 56px;text-align:center}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px}
+.sub{font-size:17px;color:var(--slate);max-width:36em;margin:0 auto}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:0 0 80px}
+.plan{border:1px solid var(--line-strong);padding:36px 32px;background:#fff;position:relative}
+.plan.featured{border-color:var(--accent);border-width:2px}
+.plan-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;white-space:nowrap}
+.plan-name{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin-bottom:10px}
+.plan-price{font-family:var(--serif);font-size:42px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:6px}
+.plan-price sup{font-size:22px;vertical-align:top;margin-top:6px}
+.plan-period{font-family:var(--mono);font-size:12px;color:var(--slate);margin-bottom:24px}
+.plan-desc{font-size:14px;color:var(--slate);line-height:1.6;margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+.plan ul{list-style:none;margin-bottom:28px}
+.plan li{font-size:14px;padding:7px 0;border-bottom:1px dashed var(--line);display:flex;align-items:baseline;gap:8px}
+.plan li:last-child{border-bottom:none}
+.tick{color:var(--accent);font-size:12px;flex-shrink:0}
+.dash{color:#c5cdd3;font-size:12px;flex-shrink:0}
+.btn{display:block;text-align:center;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 20px;transition:.18s}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:var(--accent)}
+.btn-outline{border:1px solid var(--ink);color:var(--ink)}
+.btn-outline:hover{background:var(--ink);color:#fff}
+.faq{padding:0 0 80px}
+.faq h2{font-family:var(--serif);font-size:28px;font-weight:600;margin-bottom:32px}
+.faq-item{border-top:1px solid var(--line);padding:20px 0}
+.faq-item:last-child{border-bottom:1px solid var(--line)}
+.faq-q{font-weight:600;font-size:15px;margin-bottom:8px}
+.faq-a{font-size:14px;color:var(--slate);line-height:1.7}
+.caveat{padding:32px 0;border-top:1px solid var(--line);text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate)}
+@media(max-width:760px){.plans{grid-template-columns:1fr}.hero{padding:48px 0 40px}h1{font-size:30px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Gov<b>Revenue</b></a>
+  <a href="/" class="back">&larr; Back to home</a>
+</header>
+<main>
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Pricing</div>
+    <h1>One scan or a standing desk.</h1>
+    <p class="sub">Pay per scan or subscribe for continuous intelligence across every desk that matters to your firm.</p>
+  </div>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-name">Pay as you go</div>
+      <div class="plan-price"><sup>£</sup>29</div>
+      <div class="plan-period">per scan</div>
+      <div class="plan-desc">A single full scan. Get the 10-section report, buyer watchlist, and PDF — no subscription needed.</div>
+      <ul>
+        <li><span class="tick">&#10003;</span> Full 10-section intelligence report</li>
+        <li><span class="tick">&#10003;</span> Buyer watchlist &amp; route-to-revenue map</li>
+        <li><span class="tick">&#10003;</span> PDF export</li>
+        <li><span class="tick">&#10003;</span> Evidence grade &amp; verdict</li>
+        <li><span class="dash">–</span> Weekly opportunity alerts</li>
+        <li><span class="dash">–</span> All 24 intelligence desks</li>
+        <li><span class="dash">–</span> Multiple firm profiles</li>
+      </ul>
+      <a href="/scan" class="btn btn-outline">Run a scan &rarr;</a>
+    </div>
+    <div class="plan featured">
+      <div class="plan-badge">Most popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price"><sup>£</sup>79</div>
+      <div class="plan-period">per month &middot; cancel anytime</div>
+      <div class="plan-desc">Unlimited scans plus weekly alerts when new contracts land in your categories. Built for firms actively chasing public sector.</div>
+      <ul>
+        <li><span class="tick">&#10003;</span> Unlimited scans</li>
+        <li><span class="tick">&#10003;</span> Weekly opportunity alerts (email)</li>
+        <li><span class="tick">&#10003;</span> All 24 intelligence desks</li>
+        <li><span class="tick">&#10003;</span> Full reports &amp; PDF exports</li>
+        <li><span class="tick">&#10003;</span> Buyer watchlist monitoring</li>
+        <li><span class="dash">–</span> Multiple firm profiles</li>
+        <li><span class="dash">–</span> Team access</li>
+      </ul>
+      <a href="/scan" class="btn btn-primary">Get started &rarr;</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Agency</div>
+      <div class="plan-price"><sup>£</sup>249</div>
+      <div class="plan-period">per month</div>
+      <div class="plan-desc">For consultancies and bid writers managing multiple clients. Run scans across different firm profiles and desks.</div>
+      <ul>
+        <li><span class="tick">&#10003;</span> Everything in Pro</li>
+        <li><span class="tick">&#10003;</span> Up to 10 firm profiles</li>
+        <li><span class="tick">&#10003;</span> Team access (3 seats)</li>
+        <li><span class="tick">&#10003;</span> Client-ready PDF reports</li>
+        <li><span class="tick">&#10003;</span> Priority support</li>
+        <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
+        <li><span class="tick">&#10003;</span> Custom alert frequency</li>
+      </ul>
+      <a href="mailto:hello@govrevenue.co.uk" class="btn btn-outline">Contact us &rarr;</a>
+    </div>
+  </div>
+  <div class="faq">
+    <h2>Common questions</h2>
+    <div class="faq-item">
+      <div class="faq-q">What does a scan actually produce?</div>
+      <div class="faq-a">A 10-section commercial intelligence report covering: executive verdict, evidence grade, intelligence dashboard, source-backed evidence, money map (best revenue routes), buyer watchlist, bid readiness score, contracts to avoid, 30-day activation plan, and QA notes. Every claim is sourced to a public record.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Where does the data come from?</div>
+      <div class="faq-a">Contracts Finder, Find a Tender, and Local Authority transparency data — all UK public record. We do not use insider information or paid databases. Every figure in the report links back to a public notice.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">How long does a scan take?</div>
+      <div class="faq-a">Typically 2–4 minutes. The agent searches both procurement databases, scores route-to-revenue fit, and generates the full report. You get an HTML report immediately and a PDF download link.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What are the weekly alerts?</div>
+      <div class="faq-a">After your first scan, you can subscribe to alerts. Each week the agent re-checks the public record for new contracts matching your firm's profile and emails you only the new ones — no noise, no re-sending contracts you've already seen.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is this a guarantee I'll win contracts?</div>
+      <div class="faq-a">No. GovRevenue is intelligence, not certainty. We surface what the public record shows and give you a structured assessment of fit. Winning still depends on your bid quality, track record, and pricing. We help you stop chasing the wrong ones.</div>
+    </div>
+  </div>
+</div>
+</main>
+<footer style="border-top:1px solid var(--line-strong);padding:32px">
+  <div class="caveat">Public record only &middot; Intelligence, not certainty &middot; <a href="/" style="text-decoration:underline">GovRevenue</a></div>
+</footer>
+</body>
+</html>`);
+});
 
 app.get("/scan", (req, res) => {
   const deskParam = typeof req.query.desk === "string" ? req.query.desk.slice(0, 60) : "";
@@ -5800,6 +5971,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const allMatchingOpen = allOpen.filter(n => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
     if (t <= cutoff365) return false;
+    if (isOverseasNotice(n.title, n.buyer || "")) return false;
     const title = n.title.toLowerCase();
     return deskKeywords.some(kw => title.includes(kw));
   });
@@ -7180,7 +7352,7 @@ function noticesPage(
   const allOpen = dedupeNoticesSoft(
     (data?.contractsFinder.open || [])
       .concat(data?.findTender?.notices || [])
-      .filter(n => !isAggregatorBuyer(n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
+      .filter(n => !isAggregatorBuyer(n.buyer || "") && !isOverseasNotice(n.title, n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
   ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const allAwarded = (data?.contractsFinder.awarded || [])
