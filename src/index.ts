@@ -3871,13 +3871,14 @@ function waitingPage(scan: ScanRecord): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${escapeHtml(scan.company_name)} &mdash; Scanning &mdash; GovRevenue</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
   --accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;
+  --green:#1d6b4f;--red:#9b2d20;
   --serif:"Spectral","Iowan Old Style",Georgia,serif;
   --sans:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
@@ -3893,12 +3894,12 @@ h1 b{color:var(--ink)}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--line-strong);flex-shrink:0;transition:background .3s}
 .stage.active{color:var(--ink)}
 .stage.active .dot{background:var(--accent);box-shadow:0 0 0 4px #9B2C2C22}
-.stage.done{color:#1d6b4f}
-.stage.done .dot{background:#1d6b4f}
-.stage.fail{color:#9b2d20}
-.stage.fail .dot{background:#9b2d20}
+.stage.done{color:var(--green)}
+.stage.done .dot{background:var(--green)}
+.stage.fail{color:var(--red)}
+.stage.fail .dot{background:var(--red)}
 .eta{font-size:13px;color:var(--slate);font-family:var(--mono)}
-.err{margin-top:20px;padding:14px;background:#fdf0ee;border:1px solid #e0a090;font-size:13px;color:#9b2d20}
+.err{margin-top:20px;padding:14px;background:#fdf0ee;border:1px solid #e0a090;font-size:13px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -3978,8 +3979,9 @@ function reportPage(scan: ScanRecord) {
   return `<!doctype html>
 <html lang="en">
 <head>
+<meta charset="UTF-8">
   <title>${escapeHtml(scan.company_name)} &mdash; GovRevenue Scan</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <style>
     :root {
       --ink:#0B0F14;
@@ -4209,7 +4211,7 @@ function reportPage(scan: ScanRecord) {
     .score-track,
     .mini-bar-track {
       height:8px;
-      background:#eadcc6;
+      background:var(--gold-soft);
       overflow:hidden;
     }
 
@@ -4252,7 +4254,7 @@ function reportPage(scan: ScanRecord) {
       gap:10px;
       align-items:center;
       padding:10px 0;
-      border-top:1px solid #eadcc6;
+      border-top:1px solid var(--gold-soft);
     }
 
     .mini-bar-row:first-of-type {
@@ -4346,7 +4348,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .report-table td {
-      border:1px solid #e1cfb3;
+      border:1px solid var(--line);
       padding:10px;
       vertical-align:top;
       line-height:1.48;
@@ -4766,7 +4768,7 @@ app.get("/", asyncRoute(async (_req, res) => {
   --ink:#0B0F14; --paper:#FAF8F3; --paper-2:#F3EFE6;
   --accent:#9B2C2C; --accent-2:#C2553F; --slate:#5A6B7B;
   --line:#1f262e1a; --line-strong:#0F141926;
-  --serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
   --sans:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
 }
@@ -5408,7 +5410,7 @@ app.get("/scan", (req, res) => {
 <meta name="description" content="Submit your company profile and get a structured commercial intelligence report against UK public procurement data in minutes.">
 <title>Run a Scan &mdash; GovRevenue</title>
 <style>
-:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;}
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
@@ -5465,105 +5467,105 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
     <div class="section-label">Your firm</div>
 
     <div class="field">
-      <label>Company name <span>*</span></label>
-      <input name="companyName" required placeholder="e.g. Apex Facilities Ltd">
+      <label for="companyName">Company name <span>*</span></label>
+      <input id="companyName" name="companyName" required placeholder="e.g. Apex Facilities Ltd">
     </div>
     <div class="field">
-      <label>Website</label>
-      <input name="website" placeholder="e.g. https://apexfacilities.co.uk">
+      <label for="website">Website</label>
+      <input id="website" name="website" placeholder="e.g. https://apexfacilities.co.uk">
     </div>
     <div class="field">
-      <label>Location / base</label>
-      <input name="location" placeholder="e.g. Birmingham, West Midlands">
+      <label for="location">Location / base</label>
+      <input id="location" name="location" placeholder="e.g. Birmingham, West Midlands">
     </div>
     <div class="field">
-      <label>Team size</label>
-      <input name="teamSize" placeholder="e.g. 12 FTE">
+      <label for="teamSize">Team size</label>
+      <input id="teamSize" name="teamSize" placeholder="e.g. 12 FTE">
     </div>
 
     <div class="section-label">Services &amp; scope</div>
 
     <div class="field">
-      <label>Main services <span>*</span></label>
-      <textarea name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
+      <label for="mainServices">Main services <span>*</span></label>
+      <textarea id="mainServices" name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
       <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
     </div>
     <div class="field">
-      <label>Secondary services</label>
-      <textarea name="secondaryServices" placeholder="e.g. grounds maintenance, pest control"></textarea>
+      <label for="secondaryServices">Secondary services</label>
+      <textarea id="secondaryServices" name="secondaryServices" placeholder="e.g. grounds maintenance, pest control"></textarea>
     </div>
     <div class="field">
-      <label>Areas / regions served</label>
-      <textarea name="areasServed" placeholder="e.g. West Midlands, East Midlands, national frameworks"></textarea>
+      <label for="areasServed">Areas / regions served</label>
+      <textarea id="areasServed" name="areasServed" placeholder="e.g. West Midlands, East Midlands, national frameworks"></textarea>
     </div>
     <div class="field">
-      <label>Services you do NOT want</label>
-      <textarea name="excludedServices" placeholder="e.g. residential, defence, high-security sites"></textarea>
+      <label for="excludedServices">Services you do NOT want</label>
+      <textarea id="excludedServices" name="excludedServices" placeholder="e.g. residential, defence, high-security sites"></textarea>
     </div>
 
     <div class="section-label">Contract appetite</div>
 
     <div class="field">
-      <label>Ideal contract size</label>
-      <input name="idealContractSize" placeholder="e.g. £100k &ndash; £500k per year">
+      <label for="idealContractSize">Ideal contract size</label>
+      <input id="idealContractSize" name="idealContractSize" placeholder="e.g. £100k &ndash; £500k per year">
     </div>
     <div class="field">
-      <label>Maximum contract size</label>
-      <input name="maximumContractSize" placeholder="e.g. £2m">
+      <label for="maximumContractSize">Maximum contract size</label>
+      <input id="maximumContractSize" name="maximumContractSize" placeholder="e.g. £2m">
     </div>
     <div class="field">
-      <label>Ideal public-sector buyers</label>
-      <textarea name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
+      <label for="idealBuyers">Ideal public-sector buyers</label>
+      <textarea id="idealBuyers" name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
     </div>
     <div class="field">
-      <label>Regions to scan first</label>
-      <textarea name="regionsToScan" placeholder="e.g. West Midlands priority, then national frameworks"></textarea>
+      <label for="regionsToScan">Regions to scan first</label>
+      <textarea id="regionsToScan" name="regionsToScan" placeholder="e.g. West Midlands priority, then national frameworks"></textarea>
     </div>
 
     <div class="section-label">Track record &amp; credentials</div>
 
     <div class="field">
-      <label>Public-sector experience</label>
-      <input name="publicSectorExperience" placeholder="e.g. 3 years, 6 active public contracts">
+      <label for="publicSectorExperience">Public-sector experience</label>
+      <input id="publicSectorExperience" name="publicSectorExperience" placeholder="e.g. 3 years, 6 active public contracts">
     </div>
     <div class="field">
-      <label>Last public contract won</label>
-      <textarea name="lastPublicContract" placeholder="e.g. 2yr cleaning contract, Birmingham City Council, £180k/yr, ended 2024"></textarea>
+      <label for="lastPublicContract">Last public contract won</label>
+      <textarea id="lastPublicContract" name="lastPublicContract" placeholder="e.g. 2yr cleaning contract, Birmingham City Council, £180k/yr, ended 2024"></textarea>
       <div class="hint">Most recent win &mdash; buyer name, value, and date if known. Helps us assess your evidence grade.</div>
     </div>
     <div class="field">
-      <label>Case studies or proof</label>
-      <textarea name="caseStudies" placeholder="e.g. Delivered responsive repairs for housing association 2022&ndash;24, 94% satisfaction score"></textarea>
+      <label for="caseStudies">Case studies or proof</label>
+      <textarea id="caseStudies" name="caseStudies" placeholder="e.g. Delivered responsive repairs for housing association 2022&ndash;24, 94% satisfaction score"></textarea>
     </div>
     <div class="field">
-      <label>Certifications / accreditations</label>
-      <textarea name="certifications" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
+      <label for="certifications">Certifications / accreditations</label>
+      <textarea id="certifications" name="certifications" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
     </div>
     <div class="field">
-      <label>Framework access</label>
-      <textarea name="frameworkStatus" placeholder="e.g. On Crown Commercial Service RM6187, YPO cleaning framework — or none yet"></textarea>
+      <label for="frameworkStatus">Framework access</label>
+      <textarea id="frameworkStatus" name="frameworkStatus" placeholder="e.g. On Crown Commercial Service RM6187, YPO cleaning framework — or none yet"></textarea>
       <div class="hint">Framework memberships unlock fast-track contract routes. List any you hold or are applying for.</div>
     </div>
 
     <div class="section-label">Goals &amp; context</div>
 
     <div class="field">
-      <label>Main business goal</label>
-      <textarea name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
+      <label for="mainGoal">Main business goal</label>
+      <textarea id="mainGoal" name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
     </div>
     <div class="field">
-      <label>Preferred output</label>
-      <textarea name="preferredOutput" placeholder="e.g. Focus on frameworks we can get on now, not long tender processes"></textarea>
+      <label for="preferredOutput">Preferred output</label>
+      <textarea id="preferredOutput" name="preferredOutput" placeholder="e.g. Focus on frameworks we can get on now, not long tender processes"></textarea>
       <div class="hint">Tell us what kind of results matter most &mdash; this shapes the report focus.</div>
     </div>
     <div class="field">
-      <label>Biggest concern</label>
-      <textarea name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
+      <label for="biggestConcern">Biggest concern</label>
+      <textarea id="biggestConcern" name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
     </div>
 
     <div class="submit-row">
       <button type="submit" class="btn-submit">Run GovRevenue Scan &rarr;</button>
-      <span class="submit-note">Takes 2&ndash;4 minutes &middot; sourced PDF report returned</span>
+      <span class="submit-note">Takes 2&ndash;4 minutes &middot; HTML &amp; PDF report</span>
     </div>
   </form>
 </main>
@@ -6013,6 +6015,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
   --accent:#9B2C2C;--slate:#5A6B7B;
   --line:#1f262e1a;--line-strong:#0F141926;
+  --green:#1d6b4f;--gold:#a97932;
   --serif:"Spectral","Iowan Old Style",Georgia,serif;
   --sans:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
@@ -6022,8 +6025,8 @@ html{scroll-behavior:smooth}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .chip{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:6px 12px;border:1px solid var(--line-strong);background:var(--paper-2)}
-.chip-green{border-color:#1d6b4f44;color:#1d6b4f}
-.chip-amber{border-color:#a9793244;color:#a97932}
+.chip-green{border-color:#1d6b4f44;color:var(--green)}
+.chip-amber{border-color:#a9793244;color:var(--gold)}
 /* Global header */
 .gh{background:var(--ink);color:var(--paper)}
 .gh-inner{padding:0 56px}
@@ -6236,10 +6239,10 @@ ${deskOpportunityCss()}
     <span class="dm-sources-left">Public record. No insider information. Always verify on the source.</span>
     <div class="dm-sources-right">
       <span class="dm-src-label">SOURCES</span>
-      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener">Contracts Finder &#8599;</a>
-      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener">Find a Tender &#8599;</a>
-      <a class="dm-src-link" href="https://www.localspend.co.uk" target="_blank" rel="noopener">Local Authority Transparency &#8599;</a>
-      <a class="dm-src-link" href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener">Companies House &#8599;</a>
+      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener noreferrer">Contracts Finder &#8599;</a>
+      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender &#8599;</a>
+      <a class="dm-src-link" href="https://www.localspend.co.uk" target="_blank" rel="noopener noreferrer">Local Authority Transparency &#8599;</a>
+      <a class="dm-src-link" href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House &#8599;</a>
     </div>
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
@@ -6352,6 +6355,7 @@ function subPage(
   --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
   --accent:#9B2C2C;--slate:#5A6B7B;
   --line:#1f262e1a;--line-strong:#0F141926;
+  --green:#1d6b4f;
   --serif:"Spectral","Iowan Old Style",Georgia,serif;
   --sans:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
@@ -6399,7 +6403,7 @@ a{color:inherit;text-decoration:none}
 .sub-empty{font-size:14px;color:var(--slate);padding:28px 0;font-family:var(--mono)}
 .sub-cta-row{display:flex;align-items:center;gap:28px;padding:36px;border:1px solid var(--line-strong);background:var(--paper-2)}
 .sub-cta-text{font-family:var(--serif);font-size:17px;line-height:1.5;flex:1}
-.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;animation:ldpulse 2.4s ease-in-out infinite}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;animation:ldpulse 2.4s ease-in-out infinite}
 @keyframes ldpulse{0%{box-shadow:0 0 0 0 #1d6b4f55}70%{box-shadow:0 0 0 6px #1d6b4f00}100%{box-shadow:0 0 0 0 #1d6b4f00}}
 .ls-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
 .ls-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 12px 0;border-bottom:1px solid var(--line-strong)}
@@ -6418,7 +6422,7 @@ a{color:inherit;text-decoration:none}
 .bw-info{flex:1;min-width:0}
 .bw-name{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block;margin-bottom:5px}
-.bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.bw-tag-health{background:#e8f5f0;color:var(--green);border:1px solid #1d6b4f33}
 .bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
 .bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
 .bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
@@ -6567,8 +6571,8 @@ a{color:inherit;text-decoration:none}
     <span class="dm-sources-left">Public record. No insider information. Always verify on the source.</span>
     <div class="dm-sources-right">
       <span class="dm-src-label">SOURCES</span>
-      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener">Contracts Finder &#8599;</a>
-      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener">Find a Tender &#8599;</a>
+      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener noreferrer">Contracts Finder &#8599;</a>
+      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender &#8599;</a>
     </div>
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
@@ -6583,7 +6587,7 @@ a{color:inherit;text-decoration:none}
 
 function pageShellCss(): string {
   return `
-:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--green:#1d6b4f;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
@@ -6618,7 +6622,7 @@ a{color:inherit;text-decoration:none}
 .pg-body{padding:48px 0 64px}
 .pg-body-inner{padding:0 56px}
 .bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block}
-.bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.bw-tag-health{background:#e8f5f0;color:var(--green);border:1px solid #1d6b4f33}
 .bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
 .bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
 .bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
@@ -6652,7 +6656,7 @@ function pageShellHeader(profile: DeskProfile | null): string {
         <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
-      <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
+      <div class="gh-badge"><span>CF &middot; public record</span><span>Public record only</span></div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
   </div>
@@ -6772,7 +6776,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>All Intelligence Desks — GovRevenue</title>
 <meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.length} industry desks. Live data from Contracts Finder and Find a Tender.">
 <style>
@@ -6843,7 +6847,7 @@ ${pageShellCss()}
         <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
-      <div class="gh-badge"><span>CF &middot; public record</span><span>Built for public trust</span></div>
+      <div class="gh-badge"><span>CF &middot; public record</span><span>Public record only</span></div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
   </div>
@@ -7227,7 +7231,7 @@ ${pageShellCss()}
 .bi-spend{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink)}
 .bi-spend-label{font-size:11px}
 .bi-sep{color:var(--line-strong);margin:0 2px}
-.bi-open{color:#1d6b4f;font-weight:600}
+.bi-open{color:var(--green);font-weight:600}
 .bi-card-right{flex-shrink:0;align-self:center}
 .bi-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44;white-space:nowrap}
 .bi-cta:hover{text-decoration-color:var(--accent)}
@@ -7316,7 +7320,7 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
   const droppedBuyers = [...priBuyers].filter(b => !curBuyers.has(b)).slice(0, 8);
 
   function gradeColour(g: string) {
-    const map: Record<string, string> = { A: "#1d6b4f", B: "#2a7a3b", C: "#a97932", D: "#c05c20", E: "#9b2d20" };
+    const map: Record<string, string> = { A: "#1d6b4f", B: "#1d6b4f", C: "#a97932", D: "#a97932", E: "#9b2d20" };
     return map[g?.charAt(0).toUpperCase()] || "#0B0F14";
   }
   function row(label: string, cur: string, pri: string, changed: boolean) {
@@ -7324,7 +7328,7 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
       <td style="padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">${escapeHtml(label)}</td>
       <td style="padding:10px 14px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);color:${escapeHtml(gradeColour(cur))}">${escapeHtml(cur)}</td>
       <td style="padding:10px 14px;font-size:15px;border-bottom:1px solid var(--line);color:var(--muted)">${escapeHtml(pri)}</td>
-      <td style="padding:10px 14px;border-bottom:1px solid var(--line)">${changed ? '<span style="background:#fdf0ee;color:#9b2d20;font-size:11px;font-family:var(--mono);padding:2px 7px">CHANGED</span>' : '<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">same</span>'}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid var(--line)">${changed ? '<span style="background:#fdf0ee;color:var(--red);font-size:11px;font-family:var(--mono);padding:2px 7px">CHANGED</span>' : '<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">same</span>'}</td>
     </tr>`;
   }
   const ce = curEdp, pe = priEdp;
@@ -7341,7 +7345,7 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Compare &mdash; ${escapeHtml(current.company_name)} &mdash; GovRevenue</title>
 <style>
 :root{--ink:#0B0F14;--muted:#6f5b50;--paper:#FAF8F3;--cream:#F3EFE6;--line:#d2b88f;--gold:#a97932;--green:#1d6b4f;--red:#9b2d20;--serif:"Spectral","Iowan Old Style",Georgia,serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}

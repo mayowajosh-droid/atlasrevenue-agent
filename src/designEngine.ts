@@ -250,7 +250,7 @@ function sourceTable(records: TrustRecord[]) {
         <td><span class="apple-pill">${safe(record.trustStatus || "Not confirmed")}</span></td>
         <td>${safe(record.confidence || "—")}</td>
         <td>${safe(value)}</td>
-        <td><a href="${safe(url)}">${safe(record.recordId || "source")}</a></td>
+        <td><a href="${safe(url)}" target="_blank" rel="noopener noreferrer">${safe(record.recordId || "source")}</a></td>
       </tr>
     `;
   }).join("");
