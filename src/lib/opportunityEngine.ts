@@ -782,7 +782,7 @@ ${ignoreListHtml}
 </div>`;
 }
 
-// ─── Homepage teaser renderer ─────────────────────────────────────────────────
+// ─── Homepage "Contracts you can chase now" section ───────────────────────────
 
 export type HomepageTeaserSignal = {
   category: string;
@@ -793,96 +793,187 @@ export type HomepageTeaserSignal = {
   value_amount: number | null;
   status: string | null;
   notice_url?: string | null;
+  deadline_date?: string | null;
 };
 
-function teaserLabel(sig: HomepageTeaserSignal): string {
-  const s = (sig.status || "").toLowerCase();
-  if (sig.source === "Find a Tender") return "Framework route";
-  if (s === "open" || s === "active") return "Open now";
-  if (s === "awarded") return "Buyer watch";
-  return "Needs review";
-}
+export type ChaseStats = {
+  totalOpen: number;
+  avgValueK: number | null;
+  closingThisMonth: number;
+  byDesk: { category: string; count: number }[];
+};
 
-function teaserLabelClass(label: string): string {
-  if (label === "Open now") return "opp-fit-chip--chase_now";
-  if (label === "Framework route") return "opp-fit-chip--partner_route";
-  if (label === "Buyer watch") return "opp-fit-chip--watchlist";
-  return "opp-fit-chip--low_confidence";
-}
-
-function teaserValue(sig: HomepageTeaserSignal): string {
-  const v = sig.value_amount;
+function cncValue(v: number | null | undefined): string {
   if (!v || v <= 0) return "";
   if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`;
   if (v >= 1_000) return `£${Math.round(v / 1_000)}k`;
   return `£${Math.round(v)}`;
 }
 
-export function renderHomepageTeaserSection(signals: HomepageTeaserSignal[]): string {
-  if (signals.length === 0) return "";
+function cncDeskLabel(cat: string): string {
+  return cat.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()).slice(0, 16);
+}
+
+function cncDeadlineChip(deadline: string | null | undefined): string {
+  if (!deadline) return "";
+  const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return "";
+  if (days <= 7)  return `<span class="cnc-deadline cnc-deadline--red">Closes ${days}d</span>`;
+  if (days <= 30) return `<span class="cnc-deadline cnc-deadline--amber">Closes ${days}d</span>`;
+  const wk = Math.ceil(days / 7);
+  return `<span class="cnc-deadline cnc-deadline--ok">Closes ${wk}w</span>`;
+}
+
+function cncNoticeId(url: string | null | undefined): string {
+  if (!url) return "";
+  const m = url.match(/\/Notice\/([a-f0-9-]{36})/i);
+  return m ? m[1] : "";
+}
+
+function cncLabel(sig: HomepageTeaserSignal): string {
+  if (sig.source === "FTS" || sig.source === "Find a Tender") return "Framework";
+  return "Open now";
+}
+
+export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: ChaseStats): string {
+  if (signals.length === 0 && stats.totalOpen === 0) return "";
+
+  const maxVal = Math.max(...signals.map(s => s.value_amount ?? 0), 1);
 
   const cards = signals.slice(0, 6).map(sig => {
-    const label = teaserLabel(sig);
-    const labelClass = teaserLabelClass(label);
-    const val = teaserValue(sig);
-    const date = sig.notice_date
-      ? new Date(sig.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-      : "";
-    const categoryLabel = sig.category.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const label = cncLabel(sig);
+    const labelCls = label === "Framework" ? "cnc-chip--framework" : "cnc-chip--open";
+    const val = cncValue(sig.value_amount);
+    const barPct = sig.value_amount ? Math.max(4, Math.round((sig.value_amount / maxVal) * 100)) : 4;
+    const deskLabel = cncDeskLabel(sig.category);
+    const srcLabel = sig.source === "Find a Tender" || sig.source === "FTS" ? "FTS" : "CF";
+    const noticeId = cncNoticeId(sig.notice_url);
+    const scanUrl = `/scan?desk=${esc(sig.category)}${noticeId ? `&noticeId=${esc(noticeId)}` : ""}`;
+    const deskUrl = `/desk/${esc(sig.category)}/notices`;
+    const deadlineHtml = cncDeadlineChip(sig.deadline_date);
 
-    return `<article class="chase-teaser-card">
-  <div class="chase-teaser-head">
-    <span class="opp-fit-chip ${esc(labelClass)}">${esc(label)}</span>
-    <span class="chase-teaser-desk">${esc(categoryLabel)}</span>
+    return `<div class="cnc-card">
+  <a href="${deskUrl}" class="cnc-card-bg-link" aria-label="${esc(sig.title.slice(0,60))}"></a>
+  <div class="cnc-card-top">
+    <span class="cnc-chip ${esc(labelCls)}">${esc(label)}</span>
+    <span class="cnc-chip cnc-chip--desk">${esc(deskLabel)}</span>
+    <span class="cnc-chip cnc-chip--src">${esc(srcLabel)}</span>
   </div>
-  <h3 class="chase-teaser-title">${esc(sig.title.slice(0, 90))}</h3>
-  <div class="chase-teaser-buyer">${esc((sig.buyer || "Buyer not stated").slice(0, 55))}</div>
-  <div class="chase-teaser-meta">
-    ${val ? `<span>${esc(val)}</span>` : ""}
-    ${date ? `<span>${esc(date)}</span>` : ""}
-    <span class="opp-src-badge">${esc(sig.source === "Find a Tender" ? "FTS" : "CF")}</span>
+  <div class="cnc-card-title">${sig.notice_url
+    ? `<a href="${esc(sig.notice_url)}" target="_blank" rel="noopener noreferrer" class="cnc-inner-link">${esc(sig.title.slice(0, 88))}</a>`
+    : esc(sig.title.slice(0, 88))}</div>
+  <div class="cnc-card-buyer">${esc((sig.buyer || "Buyer not stated").slice(0, 55))}</div>
+  <div class="cnc-card-meta">
+    ${val ? `<span class="cnc-val">${esc(val)}</span>` : `<span class="cnc-val cnc-val--dim">Value TBC</span>`}
+    ${deadlineHtml}
   </div>
-  <div class="chase-teaser-cta"><a href="/scan">Run fit check &rarr;</a></div>
-</article>`;
+  <div class="cnc-val-bar"><div class="cnc-val-fill" style="width:${barPct}%"></div></div>
+  <div class="cnc-card-foot">
+    <a href="${scanUrl}" class="cnc-fit-cta cnc-inner-link">Run fit check &rarr;</a>
+    ${sig.notice_url ? `<a href="${esc(sig.notice_url)}" target="_blank" rel="noopener noreferrer" class="cnc-src-link cnc-inner-link">Source &nearr;</a>` : ""}
+  </div>
+</div>`;
   }).join("");
 
-  return `<section class="chase-opening-section">
-<div class="chase-opening-inner">
-  <div class="chase-opening-head">
-    <span class="chase-eyebrow-sm">CONTRACTS OPENING NOW</span>
-    <h2 class="chase-opening-title">Live public notices, grouped by desk</h2>
-    <p class="chase-opening-sub">Run a scan to see which ones your firm can realistically chase.</p>
+  const remaining = Math.max(0, stats.totalOpen - Math.min(signals.length, 6));
+  const seeAllCard = `<a class="cnc-card-see-all" href="/desks">
+  <div>
+    <div class="cnc-see-count">${remaining > 0 ? remaining : stats.totalOpen}</div>
+    <div class="cnc-see-label">more open contracts<br>across 24 desks</div>
   </div>
-  <div class="chase-teaser-grid">${cards}</div>
-  <div style="text-align:center;margin-top:24px">
-    <a href="/scan" class="chase-opening-btn">Run a fit check &rarr;</a>
-    <p style="font-size:12px;color:var(--slate-mid,#6b7b8a);margin-top:8px;font-family:var(--mono)">Public record only &middot; No insider information &middot; Verify on source before acting</p>
+  <div class="cnc-see-cta">Browse all open notices &rarr;</div>
+</a>`;
+
+  const maxDesk = Math.max(...stats.byDesk.map(d => d.count), 1);
+  const miniChart = stats.byDesk.length > 0
+    ? `<div class="cnc-mini-chart">
+  <span class="cnc-mini-label">Open notices by desk</span>
+  ${stats.byDesk.map(d => `<div class="cnc-bar-row">
+  <span class="cnc-bar-desk">${esc(cncDeskLabel(d.category))}</span>
+  <div class="cnc-bar-track"><div class="cnc-bar-fill" style="width:${Math.round((d.count/maxDesk)*100)}%"></div></div>
+  <span class="cnc-bar-count">${d.count}</span>
+</div>`).join("")}
+</div>` : "";
+
+  return `<section class="cnc-section">
+<div class="cnc-inner">
+  <div class="cnc-head">
+    <div class="cnc-eyebrow"><span class="cnc-dot"></span>Live public record &middot; Updated hourly</div>
+    <h2 class="cnc-title">Contracts you can chase now</h2>
+    <p class="cnc-sub">Open public tenders currently accepting bids. Run a fit check to find your matches.</p>
+  </div>
+  <div class="cnc-stat-bar">
+    <div class="cnc-stat"><span class="cnc-stat-label">Open now</span><span class="cnc-stat-val cnc-stat-val--green">${stats.totalOpen || "—"}</span></div>
+    <div class="cnc-stat"><span class="cnc-stat-label">Avg. contract size</span><span class="cnc-stat-val">${stats.avgValueK ? `£${stats.avgValueK}k` : "—"}</span></div>
+    <div class="cnc-stat"><span class="cnc-stat-label">Closing this month</span><span class="cnc-stat-val">${stats.closingThisMonth || "—"}</span></div>
+    ${miniChart}
+  </div>
+  <div class="cnc-grid">
+    ${cards}
+    ${seeAllCard}
   </div>
 </div>
 </section>`;
 }
 
-export function homepageTeaserCss(): string {
+export function chaseNowCss(): string {
   return `
-.chase-opening-section{padding:60px 0;border-top:1px solid var(--line-strong)}
-.chase-opening-inner{max-width:1140px;margin:0 auto;padding:0 32px}
-.chase-eyebrow-sm{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:10px}
-.chase-opening-head{text-align:center;margin-bottom:36px}
-.chase-opening-title{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.01em;margin:0 0 10px}
-.chase-opening-sub{font-size:15px;color:var(--slate);margin:0}
-.chase-teaser-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.chase-teaser-card{background:var(--paper);border:1px solid var(--line-strong);padding:16px 18px;transition:border-color .15s}
-.chase-teaser-card:hover{border-color:var(--ink)}
-.chase-teaser-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.chase-teaser-desk{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate)}
-.chase-teaser-title{font-family:var(--serif);font-size:14px;font-weight:600;line-height:1.35;margin:0 0 6px;color:var(--ink)}
-.chase-teaser-buyer{font-size:12px;color:var(--slate);margin-bottom:8px}
-.chase-teaser-meta{display:flex;gap:8px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--slate);flex-wrap:wrap;margin-bottom:10px}
-.chase-teaser-cta{font-family:var(--mono);font-size:10.5px}
-.chase-teaser-cta a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
-.chase-opening-btn{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 24px;background:var(--ink);color:var(--paper);text-decoration:none;transition:.15s}
-.chase-opening-btn:hover{background:var(--accent)}
-@media(max-width:600px){.chase-teaser-grid{grid-template-columns:1fr}.chase-opening-inner{padding:0 20px}}
+.cnc-section{padding:60px 0;border-top:1px solid var(--line-strong);background:var(--paper)}
+.cnc-inner{max-width:1140px;margin:0 auto;padding:0 32px}
+.cnc-head{margin-bottom:24px}
+.cnc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#1d6b4f;display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.cnc-dot{width:6px;height:6px;border-radius:50%;background:#1d6b4f;animation:cnc-pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes cnc-pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.cnc-title{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.015em;margin-bottom:8px}
+.cnc-sub{font-size:15px;color:var(--slate);max-width:38em}
+.cnc-stat-bar{display:flex;background:#fff;border:1px solid var(--line-strong);margin-bottom:24px;flex-wrap:wrap}
+.cnc-stat{flex:1;min-width:120px;padding:14px 20px;border-right:1px solid rgba(15,20,25,.1)}
+.cnc-stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:4px}
+.cnc-stat-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ink)}
+.cnc-stat-val--green{color:#1d6b4f}
+.cnc-mini-chart{flex:2;min-width:200px;padding:14px 20px;border-right:1px solid rgba(15,20,25,.1)}
+.cnc-mini-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:8px}
+.cnc-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.cnc-bar-desk{font-family:var(--mono);font-size:9px;color:var(--slate);width:76px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnc-bar-track{flex:1;height:6px;background:rgba(15,20,25,.07);position:relative}
+.cnc-bar-fill{position:absolute;left:0;top:0;bottom:0;background:#1d6b4f}
+.cnc-bar-count{font-family:var(--mono);font-size:9px;color:var(--ink);width:20px;text-align:right;flex-shrink:0}
+.cnc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cnc-card{background:#fff;border:1px solid var(--line-strong);padding:18px 20px 42px;transition:border-color .15s,box-shadow .15s;position:relative;overflow:hidden}
+.cnc-card:hover{border-color:var(--ink);box-shadow:0 6px 24px -8px rgba(11,15,20,.16)}
+.cnc-card-bg-link{position:absolute;inset:0;z-index:1}
+.cnc-inner-link{position:relative;z-index:2}
+.cnc-card-top{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.cnc-chip{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:2px;font-weight:600}
+.cnc-chip--open{background:#e8f5f0;color:#1d6b4f;border:1px solid rgba(29,107,79,.3)}
+.cnc-chip--framework{background:#f5f0ff;color:#6b3ab8;border:1px solid rgba(107,58,184,.3)}
+.cnc-chip--desk{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.cnc-chip--src{background:transparent;color:var(--slate);border:1px solid var(--line-strong)}
+.cnc-card-title{font-family:var(--serif);font-size:14.5px;font-weight:600;line-height:1.35;margin-bottom:6px;color:var(--ink)}
+.cnc-card-title a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-strong)}
+.cnc-card-title a:hover{color:var(--accent)}
+.cnc-card-buyer{font-size:12px;color:var(--slate);margin-bottom:10px}
+.cnc-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cnc-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink)}
+.cnc-val--dim{color:var(--slate)}
+.cnc-deadline{font-family:var(--mono);font-size:9.5px;padding:2px 8px;border-radius:2px}
+.cnc-deadline--red{background:#fff0f0;color:#c0392b;border:1px solid rgba(192,57,43,.3)}
+.cnc-deadline--amber{background:#fff8e6;color:#a07820;border:1px solid rgba(160,120,32,.3)}
+.cnc-deadline--ok{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.cnc-val-bar{height:2px;background:rgba(15,20,25,.07);position:absolute;bottom:40px;left:0;right:0}
+.cnc-val-fill{height:100%;background:#1d6b4f}
+.cnc-card-foot{position:absolute;bottom:0;left:0;right:0;padding:9px 20px;border-top:1px solid rgba(15,20,25,.08);display:flex;align-items:center;justify-content:space-between;background:#fff}
+.cnc-fit-cta{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.cnc-fit-cta:hover{color:var(--ink)}
+.cnc-src-link{font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:underline;text-underline-offset:3px}
+.cnc-card-see-all{background:var(--ink);border:1px solid var(--ink);padding:24px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;text-decoration:none;transition:background .15s,border-color .15s}
+.cnc-card-see-all:hover{background:var(--accent);border-color:var(--accent)}
+.cnc-see-count{font-family:var(--mono);font-size:40px;font-weight:700;color:#fff;line-height:1}
+.cnc-see-label{font-family:var(--serif);font-size:14px;color:rgba(255,255,255,.65);margin-top:6px;line-height:1.4}
+.cnc-see-cta{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:auto;padding-top:20px}
+.cnc-see-cta:hover{color:#fff}
+@media(max-width:960px){.cnc-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cnc-grid{grid-template-columns:1fr}.cnc-stat-bar{flex-direction:column}.cnc-mini-chart{border-right:none}.cnc-inner{padding:0 20px}}
 `;
 }
 

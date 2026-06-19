@@ -26,16 +26,17 @@ import {
   renderWinBriefHtml,
   renderOpportunityBoardContent,
   renderChaseNowPanel,
-  renderHomepageTeaserSection,
+  renderChaseNowSection,
   oppCardCss,
   winBriefCss,
   deskOpportunityCss,
   reportChaseNowCss,
-  homepageTeaserCss,
+  chaseNowCss,
   type ScoredOpportunity,
   type ScanOpportunityContext,
   type DeskOpportunityContext,
   type HomepageTeaserSignal,
+  type ChaseStats as OppChaseStats,
 } from "./lib/opportunityEngine.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
 type ScanRecord = {
@@ -130,6 +131,7 @@ type HomepageSignal = {
   source: string;      // 'CF' | 'FTS'
   source_url: string;
   notice_date: string | null;
+  deadline_date: string | null;
   value_amount: number | null;
   status: string;
   fetched_at: string;
@@ -1007,18 +1009,20 @@ async function initDb() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS homepage_signals (
-      id           TEXT PRIMARY KEY,
-      category     TEXT NOT NULL,
-      title        TEXT NOT NULL,
-      buyer        TEXT,
-      source       TEXT NOT NULL,
-      source_url   TEXT NOT NULL,
-      notice_date  TIMESTAMPTZ,
-      value_amount BIGINT,
-      status       TEXT NOT NULL,
-      fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+      id            TEXT PRIMARY KEY,
+      category      TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      buyer         TEXT,
+      source        TEXT NOT NULL,
+      source_url    TEXT NOT NULL,
+      notice_date   TIMESTAMPTZ,
+      deadline_date TIMESTAMPTZ,
+      value_amount  BIGINT,
+      status        TEXT NOT NULL,
+      fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await pool.query(`ALTER TABLE homepage_signals ADD COLUMN IF NOT EXISTS deadline_date TIMESTAMPTZ`);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_homepage_signals_cat_fetched
       ON homepage_signals (category, fetched_at DESC);
@@ -1050,11 +1054,15 @@ async function upsertSignals(signals: HomepageSignal[]): Promise<void> {
   if (pool) {
     for (const s of signals) {
       await pool.query(
-        `INSERT INTO homepage_signals (id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         ON CONFLICT (id) DO UPDATE SET fetched_at = EXCLUDED.fetched_at`,
+        `INSERT INTO homepage_signals (id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (id) DO UPDATE SET
+           deadline_date = EXCLUDED.deadline_date,
+           value_amount  = EXCLUDED.value_amount,
+           status        = EXCLUDED.status,
+           fetched_at    = EXCLUDED.fetched_at`,
         [s.id, s.category, s.title, s.buyer, s.source, s.source_url,
-         s.notice_date, s.value_amount, s.status, s.fetched_at]
+         s.notice_date, s.deadline_date ?? null, s.value_amount, s.status, s.fetched_at]
       );
     }
   } else {
@@ -1102,7 +1110,7 @@ async function queryDeskSignals(categories: string[]): Promise<Map<string, Homep
   const out = new Map<string, HomepageSignal>();
   if (pool) {
     const r = await pool.query<HomepageSignal>(
-      `SELECT DISTINCT ON (category) id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at
+      `SELECT DISTINCT ON (category) id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
        FROM homepage_signals WHERE category = ANY($1) ORDER BY category, notice_date DESC NULLS LAST`,
       [categories]
     );
@@ -1121,7 +1129,7 @@ async function queryDeskSignals(categories: string[]): Promise<Map<string, Homep
 async function queryOpenDeskSignals(limit: number): Promise<HomepageSignal[]> {
   if (pool) {
     const r = await pool.query<HomepageSignal>(
-      `SELECT id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at
+      `SELECT id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
        FROM homepage_signals
        WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'
        ORDER BY notice_date DESC NULLS LAST
@@ -1134,6 +1142,67 @@ async function queryOpenDeskSignals(limit: number): Promise<HomepageSignal[]> {
     .filter(s => /open|active/i.test(s.status || ""))
     .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
     .slice(0, limit);
+}
+
+async function queryChaseableSignals(limit: number): Promise<HomepageSignal[]> {
+  if (pool) {
+    const r = await pool.query<HomepageSignal>(
+      `SELECT id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
+       FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')
+       ORDER BY deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
+       LIMIT $1`,
+      [limit]
+    );
+    return r.rows;
+  }
+  return [...sigMemStore.values()]
+    .filter(s => /open|active/i.test(s.status || ""))
+    .sort((a, b) => {
+      if (a.deadline_date && b.deadline_date) return a.deadline_date.localeCompare(b.deadline_date);
+      if (a.deadline_date) return -1;
+      if (b.deadline_date) return 1;
+      return (b.notice_date || "").localeCompare(a.notice_date || "");
+    })
+    .slice(0, limit);
+}
+
+type ChaseStats = {
+  totalOpen: number;
+  avgValueK: number | null;
+  closingThisMonth: number;
+  byDesk: { category: string; count: number }[];
+};
+
+async function queryChaseableStats(): Promise<ChaseStats> {
+  if (!pool) return { totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] };
+  const [totals, byDesk, closing] = await Promise.all([
+    pool.query<{ total: string; avg_val: string | null }>(
+      `SELECT COUNT(*) AS total, AVG(value_amount)::numeric AS avg_val
+       FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')`
+    ),
+    pool.query<{ category: string; cnt: string }>(
+      `SELECT category, COUNT(*) AS cnt
+       FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')
+       GROUP BY category ORDER BY cnt DESC LIMIT 5`
+    ),
+    pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '30 days'`
+    ),
+  ]);
+  return {
+    totalOpen: parseInt(totals.rows[0]?.total || "0"),
+    avgValueK: totals.rows[0]?.avg_val ? Math.round(parseFloat(totals.rows[0].avg_val) / 1_000) : null,
+    closingThisMonth: parseInt(closing.rows[0]?.cnt || "0"),
+    byDesk: byDesk.rows.map(r => ({ category: r.category, count: parseInt(r.cnt) })),
+  };
 }
 
 type ChartDataPoint = { month: string; total_m: number };
@@ -3348,6 +3417,7 @@ async function refreshHomepageSignals(): Promise<void> {
         source: n.source === "Find a Tender" ? "FTS" : "CF",
         source_url: n.url,
         notice_date: n.publishedDate || n.awardedDate || null,
+        deadline_date: n.deadlineDate || null,
         value_amount: (() => { const v = n.valueHigh ?? n.valueLow ?? n.awardedValue; return v != null ? Math.round(v) : null; })(),
         status: n.status || "unknown",
         fetched_at: now
@@ -4576,12 +4646,13 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
 }));
 
 app.get("/", asyncRoute(async (_req, res) => {
-  const [count24h, samplePdfUrl, deskSignals, chartResult, openSignals] = await Promise.all([
+  const [count24h, samplePdfUrl, deskSignals, chartResult, chaseSignals, chaseStats] = await Promise.all([
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
     queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
     queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true })),
-    queryOpenDeskSignals(6).catch(() => [] as HomepageSignal[]),
+    queryChaseableSignals(6).catch(() => [] as HomepageSignal[]),
+    queryChaseableStats().catch(() => ({ totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] }) as ChaseStats),
   ]);
 
   // Derive hero and ticker from current desk signals (sorted by most recently published)
@@ -4589,18 +4660,19 @@ app.get("/", asyncRoute(async (_req, res) => {
     .filter(s => s.notice_date)
     .sort((a, b) => new Date(b.notice_date!).getTime() - new Date(a.notice_date!).getTime());
 
-  // Build homepage teaser signals — use open notices specifically, not desk signals (which skew to awards)
-  const teaserSignals: HomepageTeaserSignal[] = openSignals.map(s => ({
+  // Build chase-now teaser signals from genuine open notices sorted by soonest deadline
+  const teaserSignals: HomepageTeaserSignal[] = chaseSignals.map(s => ({
     category: s.category,
     title: s.title,
     buyer: s.buyer,
     source: s.source,
     notice_date: s.notice_date,
+    deadline_date: s.deadline_date || null,
     value_amount: s.value_amount,
     status: s.status,
     notice_url: s.source_url || null,
   }));
-  const homepageTeaserHtml = renderHomepageTeaserSection(teaserSignals);
+  const chaseNowHtml = renderChaseNowSection(teaserSignals, chaseStats as OppChaseStats);
 
   // Hero: most recently published signal from current desks only
   const heroSignal = signals[0] || null;
@@ -4801,7 +4873,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto}.reveal{opacity:1;transform:none}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-${homepageTeaserCss()}
+${chaseNowCss()}
 ${oppCardCss()}
 </style>
 </head>
@@ -4873,6 +4945,7 @@ ${oppCardCss()}
     </div>
   </div>
 </section>
+${chaseNowHtml}
 <section class="section" id="desks">
   <div class="wrap">
     <div class="section-head"><h2>The desks</h2><a href="/desks">All desks &rarr;</a></div>
@@ -4886,7 +4959,6 @@ ${oppCardCss()}
     </div>
   </div>
 </section>
-${homepageTeaserHtml}
 <section class="product" id="product">
   <div class="wrap">
     <div>
