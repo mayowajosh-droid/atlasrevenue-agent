@@ -2814,6 +2814,40 @@ ${JSON.stringify(input, null, 2)}
 
 ${trustLayerMarkdown(input, data)}
 
+---
+
+PARTNER VOICE — apply throughout the entire report:
+Write as a senior commercial partner addressing the managing director directly. "You" means the company. No passive voice where "you" works. Sound like someone who has read the data, drawn a conclusion, and is now telling the client what it means for their business — not summarising the output of a system. Confident where the data supports it. Honest where it does not.
+
+ZERO SELF-REFERENCE — hard constraint:
+Remove from your output any sentence that:
+- Names or references this scan, this report, this dashboard, or this analysis
+- Explains what the report is doing ("This section analyses...", "The following table shows...", "The goal of this report is...")
+- Describes how data was gathered ("We pulled X records from...", "The trust filter identified...", "GovRevenue indexed...")
+Every word must be commercial intelligence directed at the client. Not process description.
+
+LOAD-BEARING NUMBERS — hard constraint:
+Every figure above £50k must be followed immediately by: (1) where it sits — named buyer, region, or contract reference; (2) when it becomes live — renewal window, deadline, or urgency horizon; (3) what to do with it — the specific next action. A number without a direct line to action is dead weight. Connect it or cut it.
+
+OPENING THESIS — required before the EDP table:
+Section 1 must open with a direct paragraph BEFORE the table. It must:
+- Name the specific geography, sector, and the single biggest commercial opportunity or threat visible in the pulled data
+- State a specific urgency window (days or months, not "soon" or "in due course")
+- Name actual buyers or incumbents from pulled records where possible
+- End with the commercial consequence — what the client gains by moving, and what they concede by waiting
+If the evidence is too thin to support a specific thesis, write: "The evidence base for [Company] is limited. The clearest available move is [specific action from available data] — start there."
+
+VERDICT VOICE:
+The Verdict field must be a direct commercial sentence, not a label.
+BAD: "Bid Selectively"
+BAD: "Company shows moderate readiness"
+GOOD: "Move on [Buyer X] in the next 60 days — this is your clearest opening."
+GOOD: "Your [region] incumbency expires before a competitor notices. Contact [Buyer] this month."
+GOOD: "Not ready for a prime contract. Get on [Framework Y] first — that is your 18-month revenue route."
+The verdict must be specific to this company's actual situation.
+
+---
+
 Return clean Markdown only.
 
 Use this exact structure:
@@ -2821,7 +2855,7 @@ Use this exact structure:
 # GovRevenue Scan: [Company Name]
 
 ## 1. Executive Decision Panel
-Give a clear commercial decision panel with these exact fields:
+Open with the OPENING THESIS paragraph, then give the decision panel with these exact fields:
 
 | Field | Answer |
 |---|---|
@@ -2834,7 +2868,8 @@ Give a clear commercial decision panel with these exact fields:
 | Recommended route | |
 
 Rules:
-- The verdict must be commercially honest.
+- Write the thesis paragraph first — before the table.
+- The verdict must be a direct commercial sentence with a named action (see VERDICT VOICE rule above).
 - If verified evidence is weak, do not pretend they are bid-ready.
 - Evidence Grade must be A, B, C, D or E:
   - A = strong source-backed evidence and strong sector alignment
@@ -2867,13 +2902,13 @@ Rules:
 - Software/ICT reports must be framed as software, ICT and digital transformation, not generic professional services.
 - Training/enterprise support reports must be framed as training, skills, enterprise support and professional services.
 
-## 3. Intelligence Dashboard Summary
-Explain commercially what the dashboard means:
-- pulled records vs relevant records
-- verified vs inferred evidence
-- addressable value signal
-- why gross pulled value is not forecast revenue
-- compact value view, using £k / £m / £bn where useful
+## 3. Market Position Summary
+Write as if briefing the client on their market position, not summarising a tool's output. Cover:
+- What the evidence base shows about their real competitive position in this sector and region
+- Which buyers have money moving and which are dormant
+- What the addressable value signal means in practice — named buyers, named routes, specific amounts tied to specific actions
+- Where they sit relative to the identified incumbents
+Use compact value notation (£k / £m / £bn). No sentence may start with "The data shows..." or "This section..." — start every sentence with a commercial insight.
 
 ## 4. Source-Backed Evidence
 Only use pulled source records or clearly labelled client-provided evidence.
@@ -2921,6 +2956,25 @@ Rules:
 - The "Current incumbent" column must name the current holder where the pulled data includes an "Awarded supplier" field. Use the format "Incumbent: [name]" or "Not stated" if unknown. This is critical intelligence — do not leave it blank if an awarded supplier is in the data.
 - Where an incumbent appears in multiple awarded records, note the repeat win: "Incumbent: [name] (×3 awards)".
 
+## 6a. Incumbent Contract Timeline
+Map every contract in the pulled data where a supplier is named (incumbent or recently awarded) onto a 0-to-24-month renewal horizon.
+
+Build a table:
+Contract | Buyer | Incumbent / awarded supplier | Value | Published / awarded date | Est. contract end | Est. renewal window opens | Urgency
+
+Urgency:
+- **ACT NOW** — renewal process likely already underway or opening within 6 months
+- **POSITION** — renewal window opens 6-12 months out; start building buyer relationship
+- **WATCH** — 12-24 months; log and track; seek informal contact
+- **HORIZON** — beyond 24 months or dates unconfirmable
+
+After the table, write a direct paragraph (no preamble, no self-reference):
+Name the single most valuable incumbent position approaching renewal, state the estimated window date, and give one specific action — who to contact, what to say, and why waiting past [specific month] forfeits the advantage.
+
+If no incumbents are named in the pulled records, write: "No named incumbents in pulled records. The Buyer Watchlist above identifies who to approach before contracts are formally re-tendered."
+
+Date estimation guidance: if no end date is given, estimate from published/awarded date + typical sector contract length. Cleaning/FM: 3-5 years. IT: 2-4 years. Consultancy: 1-3 years. Construction: 1-3 years. Training: 1-2 years.
+
 ## 7. Bid Readiness Score
 Give:
 - Overall score /100
@@ -2955,21 +3009,23 @@ Give honest negative guidance. Include unsuitable or premature routes such as:
 - tenders demanding proof the company does not yet have
 
 ## 9. 30-Day Activation Pack
-Include:
-- Week 1: evidence and access verification
-- Week 2: capability statement and bid pack
-- Week 3: buyer outreach and route qualification
-- Week 4: selective bid / partner activation
+Write this section as direct instructions addressed to the company: "Week 1, you need to..." — not "The company should...".
+
+Weekly actions:
+- Week 1: specific evidence-gathering and access actions tied to the named buyers and routes in sections 4-6
+- Week 2: capability statement drafting and bid pack — with specific section headings drawn from this company's actual services and evidence
+- Week 3: buyer outreach — name specific buyers from the watchlist, with timing and opening angle
+- Week 4: bid / partner activation — specify which route, which buyer, and what the entry point looks like
 
 Then include:
-- Documents needed before bidding
-- Capability statement bullets
-- Buyer outreach email
-- Partner outreach email
-- LinkedIn message
-- Bid/no-bid checklist
+- Documents needed before bidding (sector-specific — list exact certifications, insurances, case study formats)
+- Capability statement bullets (pull from the company's stated services and the verified/inferred evidence)
+- Buyer outreach email (named buyer from watchlist; open with a specific hook from the pulled records, not a generic intro)
+- Partner outreach email (named sector; reference the route identified in the Money Map)
+- LinkedIn message (short; reference a specific notice or buyer activity)
+- Bid/no-bid checklist (specific to the top-scoring route in section 5)
 
-Make every item sector-specific. Avoid generic filler.
+Every item must be specific to this company's actual situation. No sentence that could apply to any other company is allowed.
 
 ## 10. QA Notes / Integrity Checks
 Create a final table:
@@ -4292,11 +4348,12 @@ function reportPage(scan: ScanRecord) {
     @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 
     :root {
-      --base:#ECE7DA; --surface:#FBF9F3; --surface-2:#F6F2E8; --surface-3:#EFEADD;
-      --brand:#B4924E; --brand-hot:#C4933F; --brand-dim:rgba(180,146,78,.12);
-      --info:#1d4ed8; --green:#1d6b4f; --gold:#B4924E; --red:#9b2d20;
-      --text:#1B1E19; --text-mid:#3A3E36; --muted:#86897E; --faint:#9AA093;
-      --border:rgba(27,30,25,.10); --border-2:rgba(27,30,25,.16); --border-3:rgba(27,30,25,.22);
+      --base:#05070B; --surface:#0C111A; --surface-2:#101820; --surface-3:#141E2A;
+      --brand:#B4924E; --brand-hot:#C4933F; --brand-dim:rgba(180,146,78,.14);
+      --info:#60A5FA; --green:#22C55E; --green-dim:#166534; --gold:#B4924E; --red:#F87171;
+      --text:#ECE6D6; --text-mid:#C8C0AE; --muted:#9AA093; --faint:#6B7280;
+      --border:rgba(255,255,255,.06); --border-2:rgba(255,255,255,.10); --border-3:rgba(255,255,255,.16);
+      --glass:rgba(255,255,255,.04); --gbdr:rgba(255,255,255,.08);
       --sans:"Libre Franklin",system-ui,-apple-system,sans-serif;
       --mono:"Spline Sans Mono",ui-monospace,monospace;
       --serif:"Newsreader",Georgia,serif;
@@ -4313,7 +4370,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .page {
-      max-width:1120px;
+      max-width:1160px;
       margin:0 auto;
       padding:36px 24px 80px;
     }
@@ -4325,6 +4382,9 @@ function reportPage(scan: ScanRecord) {
       gap:16px;
       margin-bottom:22px;
       flex-wrap:wrap;
+      padding:14px 20px;
+      background:var(--surface);
+      border:1px solid var(--border-2);
     }
 
     .brand {
@@ -4347,106 +4407,142 @@ function reportPage(scan: ScanRecord) {
     }
 
     .btn {
-      border:1px solid #102A1E;
-      background:#102A1E;
-      color:#F3EFE6;
-      padding:10px 16px;
+      border:1px solid rgba(180,146,78,.4);
+      background:rgba(180,146,78,.12);
+      color:var(--brand);
+      padding:9px 16px;
       font-weight:600;
       cursor:pointer;
       text-decoration:none;
-      font-size:13px;
-      font-family:var(--sans);
+      font-size:12px;
+      font-family:var(--mono);
+      letter-spacing:.06em;
+      text-transform:uppercase;
     }
+
+    .btn:hover { background:rgba(180,146,78,.22); }
 
     .btn.secondary {
       background:transparent;
-      color:var(--text-mid);
+      color:var(--muted);
       border-color:var(--border-3);
     }
 
+    .btn.secondary:hover { background:var(--glass); color:var(--text); }
+
     .cover {
-      background:var(--surface);
+      background:linear-gradient(160deg,#0B1420 0%,#0E1A2A 60%,#102A1E 100%);
       border:1px solid var(--border-2);
-      padding:40px;
+      border-top:2px solid var(--brand);
+      padding:48px;
       break-after:auto;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .cover::before {
+      content:'';
+      position:absolute;
+      top:-80px;right:-80px;
+      width:360px;height:360px;
+      background:radial-gradient(circle,rgba(180,146,78,.10) 0%,transparent 70%);
+      pointer-events:none;
     }
 
     .cover-label {
       font-family:var(--mono);
-      font-size:11px;
-      letter-spacing:0.18em;
+      font-size:10px;
+      letter-spacing:0.22em;
       text-transform:uppercase;
       color:var(--brand);
-      margin-bottom:18px;
+      margin-bottom:20px;
+      opacity:.8;
     }
 
     .cover h1 {
       font-family:var(--serif);
-      font-size:clamp(36px,4vw,52px);
+      font-size:clamp(32px,3.8vw,50px);
       font-weight:400;
       line-height:1.05;
-      margin:0 0 14px;
+      margin:0 0 8px;
       letter-spacing:-0.02em;
       color:var(--text);
     }
 
+    .cover-edp-label {
+      font-family:var(--mono);
+      font-size:11px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:22px;
+    }
+
     .subtitle {
       color:var(--muted);
-      font-size:16px;
+      font-size:14px;
+      font-family:var(--mono);
+      letter-spacing:.04em;
       max-width:820px;
       line-height:1.6;
+      margin-bottom:0;
     }
 
     .meta {
       display:grid;
       grid-template-columns:repeat(4, 1fr);
-      gap:12px;
-      margin:30px 0;
+      gap:10px;
+      margin:28px 0 0;
     }
 
     .metric {
       border:1px solid var(--border-2);
-      background:var(--surface-2);
-      padding:16px;
-      min-height:94px;
+      border-top:2px solid rgba(180,146,78,.35);
+      background:rgba(255,255,255,.04);
+      padding:18px 16px 16px;
+      min-height:100px;
+      backdrop-filter:blur(4px);
     }
 
     .metric b {
       display:block;
       font-family:var(--mono);
-      font-size:11px;
+      font-size:10px;
       color:var(--muted);
       text-transform:uppercase;
-      letter-spacing:0.12em;
-      margin-bottom:10px;
+      letter-spacing:0.15em;
+      margin-bottom:12px;
     }
 
     .metric span {
       font-family:var(--serif);
-      font-size:24px;
+      font-size:22px;
       font-weight:500;
       color:var(--text);
+      line-height:1.2;
     }
 
     .metric small {
       display:block;
-      margin-top:6px;
-      color:var(--muted);
+      margin-top:8px;
+      color:var(--faint);
       line-height:1.35;
-      font-size:12.5px;
+      font-size:11.5px;
+      font-family:var(--mono);
     }
 
     .data-strip {
-      border-left:3px solid var(--brand);
-      background:var(--surface-2);
-      padding:18px;
+      border-left:2px solid var(--brand);
+      background:rgba(180,146,78,.06);
+      padding:16px 18px;
       margin:20px 0 0;
     }
 
     .data-strip p {
-      margin:6px 0;
+      margin:5px 0;
       color:var(--muted);
-      font-size:14px;
+      font-size:13px;
+      font-family:var(--mono);
     }
 
     .section-kicker,
@@ -4476,37 +4572,45 @@ function reportPage(scan: ScanRecord) {
     }
 
     .report {
-      margin-top:24px;
+      margin-top:16px;
       background:var(--surface);
       border:1px solid var(--border-2);
-      padding:36px;
+      padding:40px;
     }
 
     .report h1 {
-      font-family:var(--serif);
-      font-size:30px;
-      font-weight:400;
-      margin:0 0 14px;
-      padding-bottom:16px;
-      border-bottom:1px solid var(--border-2);
-      text-align:left;
-      color:var(--text);
+      font-family:var(--mono);
+      font-size:11px;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+      color:var(--brand);
+      font-weight:500;
+      margin:0 0 8px;
+      padding-bottom:0;
+      border-bottom:none;
     }
 
     .report h2 {
       font-family:var(--serif);
-      font-size:22px;
+      font-size:21px;
       font-weight:500;
-      margin:36px 0 14px;
+      margin:40px 0 14px;
+      padding-top:18px;
+      border-top:1px solid var(--border-2);
       color:var(--text);
       text-align:left;
       break-after:avoid;
     }
 
+    .report h2:first-of-type { margin-top:16px; }
+
     .report h3 {
-      font-size:16px;
+      font-family:var(--mono);
+      font-size:11px;
       font-weight:600;
-      margin:24px 0 10px;
+      letter-spacing:.15em;
+      text-transform:uppercase;
+      margin:28px 0 10px;
       color:var(--brand);
       text-align:left;
       break-after:avoid;
@@ -4515,7 +4619,7 @@ function reportPage(scan: ScanRecord) {
     .report p,
     .report li {
       font-size:15px;
-      line-height:1.72;
+      line-height:1.75;
       text-align:left;
       hyphens:auto;
       overflow-wrap:break-word;
@@ -4524,7 +4628,7 @@ function reportPage(scan: ScanRecord) {
 
     .report ul,
     .report ol {
-      padding-left:24px;
+      padding-left:22px;
     }
 
     .report li {
@@ -4539,7 +4643,7 @@ function reportPage(scan: ScanRecord) {
     .report-table {
       width:100%;
       border-collapse:collapse;
-      margin:18px 0 30px;
+      margin:16px 0 28px;
       font-size:13px;
       table-layout:fixed;
       page-break-inside:auto;
@@ -4547,9 +4651,9 @@ function reportPage(scan: ScanRecord) {
 
     .report-table td {
       border:1px solid var(--border-2);
-      padding:10px;
+      padding:10px 12px;
       vertical-align:top;
-      line-height:1.48;
+      line-height:1.5;
       word-break:normal;
       overflow-wrap:break-word;
       text-align:left;
@@ -4557,10 +4661,18 @@ function reportPage(scan: ScanRecord) {
     }
 
     .report-table tr:first-child td {
-      background:var(--surface-2);
-      color:var(--text);
-      font-weight:600;
-      text-align:left;
+      background:#102A1E;
+      color:#ECE6D6;
+      font-family:var(--mono);
+      font-size:10.5px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-weight:500;
+      border-color:rgba(255,255,255,.1);
+    }
+
+    .report-table tr:nth-child(even) td {
+      background:rgba(255,255,255,.02);
     }
 
     .report-table tr {
@@ -4575,9 +4687,10 @@ function reportPage(scan: ScanRecord) {
     }
 
     .marketing-close {
-      margin-top:24px;
+      margin-top:16px;
       background:var(--surface);
       border:1px solid var(--border-2);
+      border-top:2px solid var(--brand);
       color:var(--text);
       padding:36px;
       break-inside:avoid;
@@ -4586,23 +4699,23 @@ function reportPage(scan: ScanRecord) {
     .close-grid {
       display:grid;
       grid-template-columns:repeat(3, 1fr);
-      gap:12px;
+      gap:10px;
       margin:22px 0;
     }
 
     .close-grid div {
       border:1px solid var(--border-2);
-      padding:16px;
-      background:var(--surface-2);
+      padding:18px;
+      background:rgba(255,255,255,.03);
     }
 
     .close-grid b {
       display:block;
       font-family:var(--mono);
-      font-size:11px;
+      font-size:10px;
       color:var(--muted);
       text-transform:uppercase;
-      letter-spacing:0.1em;
+      letter-spacing:0.14em;
       margin-bottom:8px;
     }
 
@@ -4611,6 +4724,7 @@ function reportPage(scan: ScanRecord) {
       line-height:1.45;
       font-weight:600;
       color:var(--text);
+      font-size:15px;
     }
 
     .close-note {
@@ -4620,9 +4734,10 @@ function reportPage(scan: ScanRecord) {
 
     .footer {
       color:var(--faint);
-      font-size:12px;
+      font-size:11.5px;
       margin-top:18px;
       font-family:var(--mono);
+      letter-spacing:.04em;
     }
 
     @media (max-width:900px) {
@@ -4640,42 +4755,47 @@ function reportPage(scan: ScanRecord) {
         print-color-adjust:exact !important;
       }
 
+      :root {
+        --base:#fff; --surface:#fff; --surface-2:#F9F7F2; --surface-3:#F0EDE5;
+        --text:#1B1E19; --text-mid:#2B2E27; --muted:#5C6157; --faint:#86897E;
+        --border:rgba(27,30,25,.10); --border-2:#ddd5c5; --border-3:#c8bfae;
+        --glass:#fff; --brand:#B4924E; --green:#1d6b4f;
+      }
+
       body { background:#fff; color:#1B1E19; }
 
       .page { max-width:none; padding:0; }
 
-      .topbar, .actions { display:none !important; }
+      .topbar, .actions, .action-tools { display:none !important; }
 
       .cover {
         padding:10mm;
         break-after:page;
-        background:#fffaf3;
-        border-color:#ddd5c5;
+        background:linear-gradient(160deg,#0B1420 0%,#0E1A2A 60%,#102A1E 100%) !important;
+        border-color:#2A3A4A !important;
+        border-top:2px solid #B4924E !important;
       }
-      .cover h1 { color:#1B1E19; }
-      .subtitle { color:#5C6157; }
+      .cover h1 { color:#ECE6D6 !important; }
+      .cover-label, .cover-edp-label { color:#B4924E !important; }
+      .subtitle { color:#9AA093 !important; }
+      .metric { background:rgba(255,255,255,.06) !important; border-color:rgba(255,255,255,.12) !important; border-top:1px solid rgba(180,146,78,.4) !important; }
+      .metric b, .metric small { color:#9AA093 !important; }
+      .metric span { color:#ECE6D6 !important; }
 
-      .metric {
-        background:#fff;
-        border-color:#ddd5c5;
-      }
-      .metric b, .metric small { color:#5C6157; }
-      .metric span { color:#1B1E19; font-size:22px; }
-
-      .data-strip { background:#fff8f0; border-left-color:#B4924E; }
-      .data-strip p { color:#5C6157; }
+      .data-strip { background:rgba(180,146,78,.08) !important; border-left-color:#B4924E !important; }
+      .data-strip p { color:#9AA093 !important; }
 
       .report {
         padding:8mm;
         background:#fff;
         border-color:#ddd5c5;
       }
-      .report h1,
+      .report h1 { color:#B4924E; }
       .report h2 { color:#1B1E19; border-color:#ddd5c5; }
       .report h3 { color:#B4924E; }
       .report p,
       .report li {
-        font-size:13.2px;
+        font-size:13px;
         line-height:1.62;
         color:#2B2E27;
         text-align:justify;
@@ -4684,15 +4804,17 @@ function reportPage(scan: ScanRecord) {
         hyphens:auto;
       }
       .report li::marker { color:#B4924E; }
-      .report-table { font-size:11.6px; }
-      .report-table td { color:#2B2E27; border-color:#ddd5c5; }
-      .report-table tr:first-child td { background:#102A1E; color:#ECE6D6; }
+      .report-table { font-size:11.5px; }
+      .report-table td { color:#2B2E27; border-color:#ddd5c5; background:#fff; }
+      .report-table tr:first-child td { background:#102A1E !important; color:#ECE6D6 !important; border-color:#102A1E !important; }
+      .report-table tr:nth-child(even) td { background:#F9F7F2 !important; }
       .report a { color:#B4924E; text-decoration:none; }
 
       .marketing-close {
         padding:8mm;
         background:#f5f0e8;
         border-color:#ddd5c5;
+        border-top:2px solid #B4924E;
         color:#1B1E19;
       }
       .close-grid div { background:#fff; border-color:#ddd5c5; }
@@ -4719,34 +4841,33 @@ function reportPage(scan: ScanRecord) {
         <a class="btn secondary" href="/api/scans/${scan.id}/data.json">View Data</a>
         <a class="btn secondary" href="/scan/${scan.id}/compare" title="Compare with a previous scan">Compare &uarr;</a>
       </div>
-      ${scan.status === "completed" ? `<div class="action-tools" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border-2);padding-top:14px">
-        <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);align-self:center">Next steps →</span>
-        <a class="btn secondary" href="/scan/${scan.id}/capability-statement" style="font-size:13px">Capability statement</a>
-        <a class="btn secondary" href="/scan/${scan.id}/outreach-emails" style="font-size:13px">Outreach emails</a>
-        <a class="btn secondary" href="/scan/${scan.id}/frameworks" style="font-size:13px">Framework pre-qual</a>
-        <a class="btn secondary" href="/account" style="font-size:13px">My account</a>
+      ${scan.status === "completed" ? `<div class="action-tools" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-2);padding-top:12px">
+        <span style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);align-self:center">Next steps</span>
+        <a class="btn secondary" href="/scan/${scan.id}/capability-statement">Capability statement</a>
+        <a class="btn secondary" href="/scan/${scan.id}/outreach-emails">Outreach emails</a>
+        <a class="btn secondary" href="/scan/${scan.id}/frameworks">Framework pre-qual</a>
+        <a class="btn secondary" href="/account">My account</a>
       </div>` : ""}
     </div>
 
     <section class="cover">
-      <h1>Executive Decision Panel</h1>
-      <p class="subtitle">Commercial public-sector revenue intelligence for <strong>${escapeHtml(scan.company_name)}</strong>. Built from intake data, Contracts Finder records, verified web research and analyst scoring.</p>
+      <p class="cover-label">UK Public-Sector Revenue Intelligence</p>
+      <h1>${escapeHtml(scan.company_name)}</h1>
+      <p class="cover-edp-label">Executive Decision Panel</p>
+      <p class="subtitle">${escapeHtml(sectorLens)} &middot; ${escapeHtml(regions)} &middot; ${escapeHtml(formatDate(scan.updated_at))}</p>
 
       <div class="meta">
-        <div class="metric"><b>Verdict</b><span style="font-size:20px">${escapeHtml(edpVerdict || "Pending")}</span><small>Commercial recommendation</small></div>
-        <div class="metric"><b>Evidence Grade</b><span>${escapeHtml(edpGrade || "Pending")}</span><small>Source-backed evidence basis</small></div>
-        <div class="metric"><b>Can they win now?</b><span style="font-size:20px">${escapeHtml(edpCanWin || "Pending")}</span><small>Based on verified evidence</small></div>
-        <div class="metric"><b>Recommended route</b><span style="font-size:20px">${escapeHtml(edpRoute)}</span><small>Best first money route</small></div>
+        <div class="metric"><b>Verdict</b><span style="font-size:${(edpVerdict || "").length > 40 ? "14px" : "18px"};line-height:1.3">${escapeHtml(edpVerdict || "Pending")}</span><small>Commercial recommendation</small></div>
+        <div class="metric"><b>Evidence Grade</b><span style="font-size:32px">${escapeHtml(edpGrade || "—")}</span><small>Source-backed evidence basis</small></div>
+        <div class="metric"><b>Can they win now?</b><span style="font-size:${(edpCanWin || "").length > 30 ? "14px" : "18px"};line-height:1.3">${escapeHtml(edpCanWin || "Pending")}</span><small>Based on verified evidence</small></div>
+        <div class="metric"><b>Recommended route</b><span style="font-size:${(edpRoute || "").length > 30 ? "13px" : "16px"};line-height:1.35">${escapeHtml(edpRoute || "Pending")}</span><small>Best first money route</small></div>
       </div>
 
       <div class="data-strip">
-        <p><strong>Best first money route:</strong> ${escapeHtml(edpBestRoute)}</p>
-        ${edpFastestAction ? `<p><strong>Fastest action this week:</strong> ${escapeHtml(edpFastestAction)}</p>` : ""}
-        ${edpMainBlocker ? `<p><strong>Main blocker:</strong> ${escapeHtml(edpMainBlocker)}</p>` : ""}
-        <p><strong>Sector lens:</strong> ${escapeHtml(scores.sector)}</p>
-        <p><strong>Regions searched:</strong> ${escapeHtml(regions)}</p>
-        <p><strong>Generated:</strong> ${escapeHtml(formatDate(scan.updated_at))}</p>
-        <p><strong>Evidence note:</strong> ${escapeHtml(data?.quality?.warning || "Human verification required before bid decisions.")}</p>
+        ${edpBestRoute ? `<p><strong style="color:var(--brand)">First route:</strong> ${escapeHtml(edpBestRoute)}</p>` : ""}
+        ${edpFastestAction ? `<p><strong style="color:var(--brand)">This week:</strong> ${escapeHtml(edpFastestAction)}</p>` : ""}
+        ${edpMainBlocker ? `<p><strong style="color:var(--red)">Blocker:</strong> ${escapeHtml(edpMainBlocker)}</p>` : ""}
+        <p><strong style="color:var(--muted)">Sector:</strong> ${escapeHtml(scores.sector)} &middot; <strong style="color:var(--muted)">Open:</strong> ${openCount} &middot; <strong style="color:var(--muted)">Awarded:</strong> ${awardedCount}</p>
       </div>
     </section>
 
