@@ -209,8 +209,6 @@ export const AGGREGATOR_FRAGMENTS = [
   "in-tend limited", "intend limited",
   // Echelon Consultancy — private sector framework manager, appears as "buyer" on managed notices
   "echelon consultancy",
-  // The Crescent Academy — appears with inflated data-error value; not a meaningful buyer signal
-  "the crescent academy",
 ];
 
 // International development agencies that publish UK-funded notices on Contracts Finder
