@@ -7176,8 +7176,8 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
     <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:#fff;padding:12px 22px;white-space:nowrap;flex-shrink:0">Run a revenue scan →</a>
   </div>
   <div style="margin:0 0 28px;border:1px solid var(--line-strong)">
-    <iframe src="/charts" id="charts-frame" scrolling="no" frameborder="0"
-      style="width:100%;height:2600px;display:block;border:none"
+    <iframe src="/charts/embed" id="charts-frame" scrolling="no" frameborder="0"
+      style="width:100%;height:560px;display:block;border:none"
       onload="try{this.style.height=this.contentDocument.body.scrollHeight+'px'}catch(e){}"></iframe>
   </div>
   <form class="filter-bar" method="get" action="/signals">
