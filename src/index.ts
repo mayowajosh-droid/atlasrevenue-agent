@@ -5124,7 +5124,7 @@ ${oppCardCss()}
 <header class="mast"><div class="wrap">
   <div class="logo">Gov<b>Revenue</b></div>
   <nav class="primary">
-    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="#subscribe">Briefing</a>${homepageAuth ? `<a href="/account">Dashboard</a>` : `<a href="/login">Sign in</a>`}
+    <a href="/desks">Desks</a><a href="/signals">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="/articles">Articles</a>${homepageAuth ? `<a href="/account">Dashboard</a>` : `<a href="/login">Sign in</a>`}
   </nav>
   ${homepageAuth ? `<a class="mast-cta" href="/account">My dashboard</a>` : `<a class="mast-cta" href="/scan">Run a scan</a>`}
 </div></header>
@@ -6880,6 +6880,255 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
 
   res.type("html").send(reportPage(scan));
 }));
+
+app.get("/signals", asyncRoute(async (req, res) => {
+  const catFilter = typeof req.query.cat === "string" ? req.query.cat : null;
+  const statusFilter = typeof req.query.status === "string" ? req.query.status : "all";
+  let signals: HomepageSignal[] = [];
+  if (pool) {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    if (catFilter) { params.push(catFilter); conditions.push(`category = $${params.length}`); }
+    if (statusFilter === "open") conditions.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const r = await pool.query<HomepageSignal>(
+      `SELECT * FROM homepage_signals ${where} ORDER BY notice_date DESC NULLS LAST LIMIT 200`,
+      params
+    );
+    signals = r.rows;
+  } else {
+    signals = [...sigMemStore.values()]
+      .filter(s => !catFilter || s.category === catFilter)
+      .filter(s => statusFilter !== "open" || /open|active/i.test(s.status || ""))
+      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
+      .slice(0, 200);
+  }
+  const allCategories = [...new Set(DESK_PROFILES.filter(d => d.live).map(d => d.slug))];
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  const fmtVal = (v: number | null) => !v ? "—" : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : `£${Math.round(v / 1000)}k`;
+  const categoryLabel = (slug: string) => DESK_PROFILES.find(d => d.slug === slug)?.label || slug;
+  const rows = signals.map(s => {
+    const isOpen = /open|active/i.test(s.status || "");
+    return `<tr>
+      <td><span class="sig-cat">${escapeHtml(categoryLabel(s.category))}</span></td>
+      <td class="sig-title"><a href="${escapeHtml(s.source_url)}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a></td>
+      <td>${escapeHtml(s.buyer || "—")}</td>
+      <td>${fmtVal(s.value_amount)}</td>
+      <td><span class="sig-status ${isOpen ? "sig-open" : "sig-awarded"}">${escapeHtml(s.status || "—")}</span></td>
+      <td class="sig-date">${fmtDate(s.notice_date)}</td>
+      <td class="sig-src">${escapeHtml(s.source)}</td>
+    </tr>`;
+  }).join("");
+  const catOptions = allCategories.map(c =>
+    `<option value="${escapeHtml(c)}" ${catFilter === c ? "selected" : ""}>${escapeHtml(categoryLabel(c))}</option>`
+  ).join("");
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live Signals — GovRevenue</title>
+<style>
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{padding:0 32px;max-width:1200px;margin:0 auto}
+header{border-bottom:1px solid var(--line-strong);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+nav.hd-nav{display:flex;gap:28px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
+nav.hd-nav a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
+nav.hd-nav a:hover,nav.hd-nav a.active{color:var(--ink);border-color:var(--accent)}
+.page-head{padding:52px 0 40px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:12px}
+.sub{font-size:15px;color:var(--slate);max-width:42em}
+.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:24px 0;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);margin-bottom:0}
+.filters select,.filters button{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);padding:8px 14px;cursor:pointer}
+.filters select:focus{outline:none;border-color:var(--accent)}
+.filters button{background:var(--ink);color:#fff;border-color:var(--ink)}
+.filters button:hover{background:var(--accent);border-color:var(--accent)}
+.sig-count{font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--slate);margin-left:auto}
+table{width:100%;border-collapse:collapse}
+thead th{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);padding:12px 10px;border-bottom:2px solid var(--line-strong);text-align:left;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:hover{background:var(--paper-2)}
+td{padding:12px 10px;font-size:13px;vertical-align:middle}
+.sig-cat{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:rgba(155,44,44,.08);padding:3px 8px;white-space:nowrap}
+.sig-title a{color:var(--ink);text-decoration:none;font-weight:500;line-height:1.3}
+.sig-title a:hover{color:var(--accent);text-decoration:underline}
+.sig-title{max-width:340px}
+.sig-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;white-space:nowrap}
+.sig-open{color:#1a5c36;background:rgba(26,92,54,.1)}
+.sig-awarded{color:var(--slate);background:rgba(90,107,123,.1)}
+.sig-date,.sig-src{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap}
+.empty{padding:60px 0;text-align:center;color:var(--slate);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+footer{border-top:1px solid var(--line-strong);padding:32px 0;margin-top:64px;font-family:var(--mono);font-size:11px;color:var(--slate);display:flex;justify-content:space-between;align-items:center}
+footer a{color:var(--slate)}
+footer a:hover{color:var(--ink)}
+@media(max-width:860px){.sig-title{max-width:200px}nav.hd-nav{display:none}h1{font-size:28px}}
+@media(max-width:600px){table{display:block;overflow-x:auto}.sig-date,.sig-src{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Gov<b>Revenue</b></a>
+  <nav class="hd-nav">
+    <a href="/desks">Desks</a>
+    <a href="/signals" class="active">Signals</a>
+    <a href="/scan">The Scan</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/articles">Articles</a>
+  </nav>
+</header>
+<main>
+<div class="wrap">
+  <div class="page-head">
+    <div class="eyebrow">Live procurement signals</div>
+    <h1>The public record, in real time.</h1>
+    <p class="sub">Every contract notice tracked across Contracts Finder and Find a Tender — updated hourly across all 24 intelligence desks.</p>
+  </div>
+  <form class="filters" method="get" action="/signals">
+    <select name="cat">
+      <option value="">All desks</option>
+      ${catOptions}
+    </select>
+    <select name="status">
+      <option value="all" ${statusFilter === "all" ? "selected" : ""}>All statuses</option>
+      <option value="open" ${statusFilter === "open" ? "selected" : ""}>Open / active only</option>
+    </select>
+    <button type="submit">Filter</button>
+    ${catFilter || statusFilter !== "all" ? `<a href="/signals" style="font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);text-decoration:underline;padding:8px 0">Clear</a>` : ""}
+    <span class="sig-count">${signals.length} signal${signals.length !== 1 ? "s" : ""}</span>
+  </form>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Desk</th><th>Notice</th><th>Buyer</th><th>Value</th><th>Status</th><th>Date</th><th>Src</th>
+      </tr></thead>
+      <tbody>
+        ${rows || `<tr><td colspan="7" class="empty">No signals found</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+</div>
+</main>
+<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center;width:100%">
+  <a href="/">Gov<b style="color:var(--accent)">Revenue</b></a>
+  <span>Public record only &middot; Source: Contracts Finder + Find a Tender</span>
+  <a href="/scan">Run a scan &rarr;</a>
+</div></footer>
+</body>
+</html>`);
+}));
+
+app.get("/articles", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Articles — GovRevenue</title>
+<style>
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{padding:0 32px;max-width:960px;margin:0 auto}
+header{border-bottom:1px solid var(--line-strong);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+nav.hd-nav{display:flex;gap:28px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
+nav.hd-nav a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
+nav.hd-nav a:hover,nav.hd-nav a.active{color:var(--ink);border-color:var(--accent)}
+.page-head{padding:64px 0 48px;border-bottom:1px solid var(--line-strong)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:14px}
+.sub{font-size:16px;color:var(--slate);max-width:42em}
+.articles-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px;padding:48px 0 80px}
+.article-card{border:1px solid var(--line-strong);padding:32px;background:#fff;display:flex;flex-direction:column;gap:12px}
+.article-card:hover{border-color:var(--accent)}
+.art-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.art-title{font-family:var(--serif);font-size:22px;font-weight:600;line-height:1.2;letter-spacing:-.01em}
+.art-desc{font-size:14px;color:var(--slate);line-height:1.65;flex:1}
+.art-meta{font-family:var(--mono);font-size:11px;color:var(--slate);display:flex;gap:16px}
+.art-cta{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid currentColor;padding-bottom:1px;align-self:flex-start}
+.coming-banner{background:var(--paper-2);border:1px solid var(--line-strong);padding:48px 40px;text-align:center;margin:48px 0}
+.coming-banner h2{font-family:var(--serif);font-size:28px;margin-bottom:10px}
+.coming-banner p{font-size:15px;color:var(--slate);max-width:36em;margin:0 auto 28px}
+.sub-form{display:flex;gap:0;max-width:440px;margin:0 auto}
+.sub-form input{flex:1;font-family:var(--sans);font-size:14px;padding:12px 16px;border:1px solid var(--line-strong);border-right:none;background:#fff;outline:none}
+.sub-form input:focus{border-color:var(--accent)}
+.sub-form button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 20px;background:var(--ink);color:#fff;border:1px solid var(--ink);cursor:pointer}
+.sub-form button:hover{background:var(--accent);border-color:var(--accent)}
+footer{border-top:1px solid var(--line-strong);padding:32px 0;font-family:var(--mono);font-size:11px;color:var(--slate)}
+@media(max-width:700px){.articles-grid{grid-template-columns:1fr}nav.hd-nav{display:none}h1{font-size:30px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Gov<b>Revenue</b></a>
+  <nav class="hd-nav">
+    <a href="/desks">Desks</a>
+    <a href="/signals">Signals</a>
+    <a href="/scan">The Scan</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/articles" class="active">Articles</a>
+  </nav>
+</header>
+<main>
+<div class="wrap">
+  <div class="page-head">
+    <div class="eyebrow">Articles &amp; Guides</div>
+    <h1>Intelligence for the<br>public sector pipeline.</h1>
+    <p class="sub">Practical guides on procurement strategy, bid writing, and how to read the public record before your competitors do.</p>
+  </div>
+  <div class="articles-grid">
+    <div class="article-card">
+      <span class="art-tag">Strategy</span>
+      <div class="art-title">How to read a procurement record before the tender drops</div>
+      <div class="art-desc">Most firms wait for the ITT. The buyers who win consistently start six months earlier — and the public record tells you exactly when to move.</div>
+      <div class="art-meta"><span>Coming soon</span></div>
+    </div>
+    <div class="article-card">
+      <span class="art-tag">Bid writing</span>
+      <div class="art-title">Evidence grade: why your bid loses before the scoring starts</div>
+      <div class="art-desc">Evaluators can tell within two pages whether a supplier has done the homework. Here's what separates a Bronze bid from a Gold one.</div>
+      <div class="art-meta"><span>Coming soon</span></div>
+    </div>
+    <div class="article-card">
+      <span class="art-tag">Framework access</span>
+      <div class="art-title">The framework shortcut: pre-qualification without the open tender</div>
+      <div class="art-desc">Over 60% of public sector spend flows through frameworks. Most SMEs aren't on them — and most frameworks are easier to join than they look.</div>
+      <div class="art-meta"><span>Coming soon</span></div>
+    </div>
+    <div class="article-card">
+      <span class="art-tag">Buyer intelligence</span>
+      <div class="art-title">Mapping the buyer: who really controls the budget</div>
+      <div class="art-desc">The contracting authority on the notice is rarely the person you need to speak to. The procurement record tells you who's commissioned before.</div>
+      <div class="art-meta"><span>Coming soon</span></div>
+    </div>
+  </div>
+  <div class="coming-banner">
+    <h2>First articles publishing soon.</h2>
+    <p>Enter your email and we'll send you each piece as it goes live — plus a weekly digest of the open contracts most relevant to your sector.</p>
+    <form class="sub-form" action="/form-submit" method="post">
+      <input type="hidden" name="_type" value="briefing">
+      <input type="email" name="email" placeholder="your@email.com" required>
+      <button type="submit">Notify me</button>
+    </form>
+  </div>
+</div>
+</main>
+<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
+  <a href="/">Gov<b style="color:var(--accent)">Revenue</b></a>
+  <span>&copy; GovRevenue &middot; UK Public Procurement Intelligence</span>
+  <a href="/scan">Run a scan &rarr;</a>
+</div></footer>
+</body>
+</html>`);
+});
 
 app.get("/desks", asyncRoute(async (req, res) => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
