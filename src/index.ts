@@ -5598,19 +5598,21 @@ app.get("/register", (req, res) => {
   const user = getAuthUser(req);
   if (user) { res.redirect("/account"); return; }
   const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
+  const next = req.query.next ? String(req.query.next) : "";
+  const nextParam = next ? `?next=${encodeURIComponent(next)}` : "";
   res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create account — GovRevenue</title><style>${authCss}</style></head>
 <body>
-<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/login">Sign in</a></nav>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/login${nextParam}">Sign in</a></nav>
 <div class="auth-wrap"><div class="auth-card">
 <h1>Create your account</h1>
 <p class="sub">Get scan history, capability statements and buyer outreach tools.</p>
 ${err ? `<div class="err">${err}</div>` : ""}
-<form method="POST" action="/register">
+<form method="POST" action="/register${nextParam}">
 <div class="field"><label>Email address</label><input type="email" name="email" required autocomplete="email" placeholder="you@company.com"></div>
 <div class="field"><label>Password</label><input type="password" name="password" required autocomplete="new-password" placeholder="At least 8 characters" minlength="8"></div>
 <button class="btn-primary" type="submit">Create account</button>
 </form>
-<p class="auth-alt">Already have an account? <a href="/login">Sign in</a></p>
+<p class="auth-alt">Already have an account? <a href="/login${nextParam}">Sign in</a></p>
 </div></div></body></html>`);
 });
 
@@ -5624,7 +5626,8 @@ app.post("/register", asyncRoute(async (req, res) => {
   const user = await createUser(email, password);
   const token = signToken(user);
   res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
-  res.redirect("/account?welcome=1");
+  const nextUrl = String(req.query.next || "");
+  res.redirect(nextUrl.startsWith("/") ? nextUrl : "/account?welcome=1");
 }));
 
 app.get("/login", (req, res) => {
@@ -5677,98 +5680,300 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const upgraded = req.query.upgraded === "1";
 
   let userScans: ScanRecord[] = [];
+  let recentSignals: any[] = [];
+  let totalOpenSignals = 0;
+
   if (pool) {
-    const r = await pool.query<ScanRecord>(
-      `SELECT id, created_at, status, company_name, progress_stage FROM scans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
-      [user.id]
-    );
-    userScans = r.rows;
+    const [scansRes, signalsRes, countRes] = await Promise.all([
+      pool.query<ScanRecord>(
+        `SELECT id, created_at, status, company_name, input_json, progress_stage FROM scans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
+        [user.id]
+      ),
+      pool.query(
+        `SELECT id, category, title, buyer, source, source_url, value_amount, status FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%' ORDER BY fetched_at DESC LIMIT 8`
+      ).catch(() => ({ rows: [] as any[] })),
+      pool.query<{ n: string }>(
+        `SELECT COUNT(*) AS n FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'`
+      ).catch(() => ({ rows: [{ n: "0" }] }))
+    ]);
+    userScans = scansRes.rows;
+    recentSignals = signalsRes.rows;
+    totalOpenSignals = parseInt(countRes.rows[0]?.n || "0", 10);
   }
 
-  const tierBadge: Record<UserTier, string> = { free: "Free", pro: "Pro", agency: "Agency" };
-  const tierColour: Record<UserTier, string> = { free: "#6f5b50", pro: "#a97932", agency: "#1d6b4f" };
+  const completedCount = userScans.filter(s => s.status === "completed").length;
+  const memberSince = new Date(user.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  const tierLabel: Record<UserTier, string> = { free: "Free", pro: "Pro", agency: "Agency" };
 
-  const scanRows = userScans.length ? userScans.map(s => `
-    <tr>
-      <td><a href="/scan/${escapeHtml(s.id)}">${escapeHtml(s.company_name)}</a></td>
-      <td>${new Date(s.created_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" })}</td>
-      <td><span class="badge badge-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
-      <td><a href="/scan/${escapeHtml(s.id)}">View →</a></td>
-    </tr>`).join("") : `<tr><td colspan="4" class="empty">No scans yet. <a href="/scan">Run your first scan →</a></td></tr>`;
+  const signalTagClass = (cat: string): string => {
+    if (["social-care", "health", "pharmacy"].some(k => cat.includes(k))) return "bw-tag-health";
+    if (["housing", "planning"].some(k => cat.includes(k))) return "bw-tag-housing";
+    if (["education", "leisure", "arts"].some(k => cat.includes(k))) return "bw-tag-edu";
+    return "bw-tag-other";
+  };
 
-  res.type("html").send(`<!DOCTYPE html><html lang="en"><head>
+  const scanRows = userScans.length ? userScans.map(s => {
+    const isCompleted = s.status === "completed";
+    const isPaid = user.tier !== "free";
+    const sectors: string[] = s.input_json?.sectors ?? [];
+    const sectorTag = sectors[0]
+      ? `<span class="bw-tag bw-tag-other" style="margin-left:6px;vertical-align:middle">${escapeHtml(sectors[0])}</span>`
+      : "";
+    const actionLink = (path: string, label: string): string => {
+      if (!isCompleted) return `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">&#8212;</span>`;
+      if (!isPaid) return `<a href="/pricing" title="Upgrade to access" style="font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:none">&#128274; Pro</a>`;
+      return `<a href="/scan/${escapeHtml(s.id)}/${path}" style="font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--accent);text-decoration:none;text-transform:uppercase">${label}</a>`;
+    };
+    return `<tr>
+      <td style="font-weight:600;max-width:200px">
+        <a href="/scan/${escapeHtml(s.id)}" style="color:var(--ink);text-decoration:none">${escapeHtml(s.company_name)}</a>${sectorTag}
+      </td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap">${new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+      <td><span class="scan-badge scan-badge-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        ${isCompleted
+          ? `<a href="/scan/${escapeHtml(s.id)}" class="dash-btn">View &rarr;</a>`
+          : `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${escapeHtml(s.status)}</span>`}
+      </td>
+      <td>${actionLink("capability-statement", "Capability")}</td>
+      <td>${actionLink("outreach-emails", "Outreach")}</td>
+      <td>${actionLink("frameworks", "Frameworks")}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="7" class="dash-empty">No scans yet &#8212; <a href="/scan" style="color:var(--accent);text-decoration:underline">run your first intelligence scan</a></td></tr>`;
+
+  const signalItems = recentSignals.length
+    ? recentSignals.slice(0, 6).map((sig: any) => {
+        const deskProfile = DESK_PROFILES.find(d => d.slug === sig.category);
+        const tagCls = signalTagClass(String(sig.category || ""));
+        const titleStr = String(sig.title || "");
+        const buyerStr = sig.buyer ? String(sig.buyer) : null;
+        const valNum = sig.value_amount != null ? Number(sig.value_amount) : null;
+        const url = sig.source_url ? String(sig.source_url) : null;
+        return `<div style="padding:12px 0;border-bottom:1px solid var(--line-strong)">
+          <div style="margin-bottom:5px"><span class="bw-tag ${tagCls}">${escapeHtml(deskProfile?.label || sig.category)}</span></div>
+          ${url
+            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;line-height:1.35;display:block;margin-bottom:4px">${escapeHtml(titleStr.length > 80 ? titleStr.slice(0, 77) + "…" : titleStr)}</a>`
+            : `<span style="font-size:13px;font-weight:600;color:var(--ink);display:block;line-height:1.35;margin-bottom:4px">${escapeHtml(titleStr.length > 80 ? titleStr.slice(0, 77) + "…" : titleStr)}</span>`}
+          <div style="display:flex;gap:12px;align-items:center">
+            ${buyerStr ? `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${escapeHtml(buyerStr.length > 40 ? buyerStr.slice(0, 37) + "…" : buyerStr)}</span>` : ""}
+            ${valNum ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${fmtMoney(valNum)}</span>` : ""}
+          </div>
+        </div>`;
+      }).join("")
+    : `<div style="font-family:var(--mono);font-size:12px;color:var(--slate);padding:24px 0;text-align:center">Loading live signals&hellip;</div>`;
+
+  const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
+
+  const dashCss = `
+.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:40px;align-items:start}
+.dash-card{background:var(--paper);border:1px solid var(--line-strong);border-radius:2px;margin-bottom:24px}
+.dash-card-head{padding:14px 20px;border-bottom:1px solid var(--line-strong);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.dash-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)}
+.dash-card-body{padding:20px}
+.scan-table{width:100%;border-collapse:collapse;font-size:13px}
+.scan-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);padding:10px 8px 10px 0;border-bottom:1px solid var(--line-strong);text-align:left;white-space:nowrap}
+.scan-table td{padding:12px 8px 12px 0;border-bottom:1px solid var(--line);vertical-align:middle}
+.scan-table tr:last-child td{border-bottom:none}
+.scan-badge{display:inline-block;padding:2px 8px;border-radius:2px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.scan-badge-completed{background:#e8f5f0;color:var(--green);border:1px solid #1d6b4f33}
+.scan-badge-pending,.scan-badge-running{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
+.scan-badge-failed{background:#fdf0ee;color:#9b2d20;border:1px solid #9b2d2033}
+.dash-btn{display:inline-block;padding:5px 12px;border:1px solid var(--line-strong);border-radius:2px;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);text-decoration:none;background:transparent;cursor:pointer;transition:.15s}
+.dash-btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.dash-empty{padding:32px 0;font-family:var(--mono);font-size:12px;color:var(--slate);text-align:center}
+.tier-pill{display:inline-block;padding:2px 8px;border-radius:2px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.tier-free{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.tier-pro{background:#fef3e2;color:#a97932;border:1px solid #a9793233}
+.tier-agency{background:#e8f5f0;color:var(--green);border:1px solid #1d6b4f33}
+.flash-ok{background:#e8f5f0;border:1px solid #1d6b4f33;color:var(--green);border-radius:2px;padding:12px 16px;margin-bottom:24px;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tool-card{display:block;padding:12px;border:1px solid var(--line-strong);border-radius:2px;text-decoration:none;transition:.15s}
+.tool-card:hover{background:var(--paper-2);border-color:var(--ink)}
+.tool-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;display:block;margin-bottom:4px}
+.tool-card-desc{font-size:11px;color:var(--slate);display:block;line-height:1.4}
+.upgrade-box{background:var(--ink);color:var(--paper);border-radius:2px;padding:24px;margin-bottom:24px}
+.upgrade-box h3{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:8px}
+.upgrade-box p{font-size:12px;opacity:.7;margin-bottom:14px;line-height:1.55}
+.upgrade-box ul{list-style:none;margin-bottom:18px}
+.upgrade-box li{font-size:12px;opacity:.85;padding:4px 0 4px 16px;position:relative}
+.upgrade-box li::before{content:"\\2713";position:absolute;left:0;color:#a97932}
+.btn-upgrade{display:inline-block;background:#a97932;color:#fff;padding:9px 18px;border-radius:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;font-weight:700}
+.btn-upgrade:hover{background:#c4933f}
+.acct-meta{margin-bottom:14px}
+.acct-meta-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-bottom:3px}
+.acct-meta-val{font-size:13px;font-weight:600}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.scan-table th:nth-child(n+5),.scan-table td:nth-child(n+5){display:none}}
+`;
+
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My account — GovRevenue</title>
-<style>
-${authCss}
-body{display:block;background:var(--cream)}
-.dash-wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px}
-.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:16px}
-.dash-header h1{font-family:var(--serif);font-size:28px}
-.tier-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--cream);border:1px solid var(--line)}
-.section-head{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6f5b50;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
-.dash-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:24px;margin-bottom:24px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;padding:8px 0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6f5b50;border-bottom:1px solid var(--line)}
-td{padding:12px 8px 12px 0;border-bottom:1px solid #ede5d8;vertical-align:middle}
-td a{color:var(--gold);text-decoration:none;font-weight:600}
-td:first-child a{color:var(--ink)}
-.empty{color:#6f5b50;padding:24px 0;font-style:italic}
-.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.badge-completed{background:#edf7f2;color:#1d6b4f}
-.badge-pending,.badge-running{background:#fef9ec;color:#a97932}
-.badge-failed{background:#fdf0ee;color:#9b2d20}
-.billing-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.btn-upgrade{display:inline-block;background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;letter-spacing:.04em}
-.btn-portal{display:inline-block;background:transparent;color:var(--ink);padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--line)}
-.flash{border-radius:6px;padding:12px 16px;font-size:13px;margin-bottom:24px}
-.flash.ok{background:#edf7f2;border:1px solid #a8d5be;color:var(--green)}
-</style>
-</head><body>
-<nav class="auth-nav">
-  <a href="/">GovRevenue</a>
-  <div style="display:flex;gap:20px;align-items:center">
-    <a href="/scan">New scan</a>
-    <a href="/desks">Desks</a>
-    <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;opacity:.85;letter-spacing:.1em;text-transform:uppercase">Sign out</button></form>
-  </div>
-</nav>
-<div class="dash-wrap">
-${welcome ? `<div class="flash ok">Account created. Welcome to GovRevenue.</div>` : ""}
-${upgraded ? `<div class="flash ok">Subscription active. Your account has been upgraded.</div>` : ""}
-<div class="dash-header">
-  <h1>My account</h1>
-  <span class="tier-badge" style="color:${tierColour[user.tier]};border-color:${tierColour[user.tier]}">${tierBadge[user.tier]}</span>
-</div>
-
-<div class="dash-card">
-  <div class="section-head">Subscription</div>
-  <div class="billing-row">
-    <div>
-      <div style="font-size:15px;font-weight:600;margin-bottom:4px">${user.tier === "free" ? "Free plan" : user.tier === "pro" ? "Pro — £79/month" : "Agency — £249/month"}</div>
-      <div style="font-size:13px;color:#6f5b50">${user.tier === "free" ? "Upgrade to unlock capability statements, outreach emails and framework pre-qualification." : "Full access to all intelligence tools."}</div>
+<title>Intelligence Dashboard &#8212; GovRevenue</title>
+<style>${pageShellCss()}${dashCss}</style>
+</head>
+<body>
+<header class="gh">
+  <div class="gh-inner">
+    <div class="gh-top">
+      <div class="gh-brand">
+        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <span class="gh-tag">Public-sector revenue intelligence</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+        <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
+        <a href="/scan" style="font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;text-decoration:none;padding:5px 11px;border:1px solid rgba(255,255,255,.15);border-radius:2px">+ New scan</a>
+        <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#9aabb7;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:0">Sign out</button></form>
+      </div>
     </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      ${user.tier === "free" && stripe ? `<a class="btn-upgrade" href="/billing/checkout?plan=pro">Upgrade to Pro</a>` : ""}
-      ${user.tier !== "free" && user.stripe_customer_id ? `<form method="POST" action="/billing/portal" style="display:inline"><button type="submit" class="btn-portal">Manage billing</button></form>` : ""}
+    <nav class="gh-nav">${navLinks}</nav>
+  </div>
+</header>
+
+<div class="pg-mast">
+  <div class="pg-mast-inner">
+    <div class="pg-crumb">
+      <a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span>
+    </div>
+    <h1>Intelligence Dashboard</h1>
+    <div class="pg-stats">
+      <div class="pg-stat"><span class="pg-stat-val">${userScans.length}</span><span class="pg-stat-label">Scans run</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${completedCount}</span><span class="pg-stat-label">Reports complete</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${totalOpenSignals > 0 ? totalOpenSignals.toLocaleString("en-GB") : "&#8212;"}</span><span class="pg-stat-label">Live open signals</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${memberSince}</span><span class="pg-stat-label">Member since</span></div>
     </div>
   </div>
 </div>
 
-<div class="dash-card">
-  <div class="section-head">Your scans</div>
-  <table>
-    <thead><tr><th>Company</th><th>Date</th><th>Status</th><th></th></tr></thead>
-    <tbody>${scanRows}</tbody>
-  </table>
-  <div style="margin-top:20px"><a href="/scan" style="display:inline-block;background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none">+ New scan</a></div>
-</div>
+<div class="pg-body">
+<div class="pg-body-inner">
 
-<div class="dash-card">
-  <div class="section-head">Account</div>
-  <div style="font-size:14px;color:#6f5b50">${escapeHtml(user.email)}</div>
+${welcome ? `<div class="flash-ok">Account created &#8212; welcome to GovRevenue. Run your first intelligence scan to get started.</div>` : ""}
+${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite unlocked.</div>` : ""}
+
+<div class="dash-grid">
+
+  <div>
+    <div class="dash-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">Your intelligence scans</span>
+        <a href="/scan" class="dash-btn">+ New scan</a>
+      </div>
+      <div style="padding:0 20px">
+        <table class="scan-table">
+          <thead><tr>
+            <th>Company</th><th>Date</th><th>Status</th>
+            <th style="text-align:right">Report</th>
+            <th>Capability</th><th>Outreach</th><th>Frameworks</th>
+          </tr></thead>
+          <tbody>${scanRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-card-head"><span class="dash-card-title">What&rsquo;s in your intelligence suite</span></div>
+      <div class="dash-card-body">
+        <div class="tools-grid">
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Capability Statement</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">LLM-generated statement tailored to your company profile and sector. Ready for PQQ and framework applications.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+          </div>
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Buyer Outreach Emails</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">3 personalised emails to your top-ranked buyers. Introduce your firm and request pre-market engagement meetings.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+          </div>
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Framework Pre-Qualification</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">Identifies open frameworks in your sector, assesses your eligibility, and produces a prioritised application checklist.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+          </div>
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px;background:var(--paper-2)">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:6px">Scan Comparison</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">Compare two scans to track how verdict, evidence grade and buyer landscape have shifted over time. Available on all plans.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="dash-card">
+      <div class="dash-card-head"><span class="dash-card-title">Account</span></div>
+      <div class="dash-card-body">
+        <div class="acct-meta"><div class="acct-meta-label">Email</div><div class="acct-meta-val" style="word-break:break-all">${escapeHtml(user.email)}</div></div>
+        <div class="acct-meta">
+          <div class="acct-meta-label">Plan</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+            <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
+            <span style="font-size:12px;color:var(--slate)">${user.tier === "free" ? "Free" : user.tier === "pro" ? "&pound;79/month" : "&pound;249/month"}</span>
+          </div>
+        </div>
+        <div class="acct-meta"><div class="acct-meta-label">Member since</div><div class="acct-meta-val">${memberSince}</div></div>
+        ${user.tier !== "free" && user.stripe_customer_id ? `
+        <form method="POST" action="/billing/portal" style="margin-top:8px">
+          <button type="submit" class="dash-btn" style="width:100%;text-align:center">Manage billing &rarr;</button>
+        </form>` : ""}
+      </div>
+    </div>
+
+    ${user.tier === "free" && stripe ? `
+    <div class="upgrade-box">
+      <h3>Unlock the full suite</h3>
+      <p>Free accounts run scans and read reports. Pro turns every scan into action with three intelligence tools.</p>
+      <ul>
+        <li>Capability statement generator</li>
+        <li>Buyer outreach email kit</li>
+        <li>Framework pre-qualification checker</li>
+        <li>Unlimited scan history</li>
+        <li>Weekly opportunity alerts</li>
+      </ul>
+      <a href="/billing/checkout?plan=pro" class="btn-upgrade">Upgrade to Pro &mdash; &pound;79/month</a>
+    </div>
+    ` : ""}
+
+    <div class="dash-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">Live market signals</span>
+        ${totalOpenSignals > 0 ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600">${totalOpenSignals.toLocaleString("en-GB")} open</span>` : ""}
+      </div>
+      <div style="padding:0 20px">
+        ${signalItems}
+        <div style="padding:14px 0 6px"><a href="/desks" class="dash-btn">Browse all 24 desks &rarr;</a></div>
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-card-head"><span class="dash-card-title">Quick navigation</span></div>
+      <div class="dash-card-body">
+        <div class="tools-grid">
+          <a href="/scan" class="tool-card">
+            <span class="tool-card-title">New scan</span>
+            <span class="tool-card-desc">Submit a company profile and run an intelligence scan</span>
+          </a>
+          <a href="/desks" class="tool-card">
+            <span class="tool-card-title">Sector desks</span>
+            <span class="tool-card-desc">Browse 24 desk pages with live procurement signals</span>
+          </a>
+          <a href="/pricing" class="tool-card">
+            <span class="tool-card-title">Pricing</span>
+            <span class="tool-card-desc">Compare Free, Pro and Agency plans</span>
+          </a>
+          <a href="/" class="tool-card">
+            <span class="tool-card-title">Home</span>
+            <span class="tool-card-desc">GovRevenue homepage with live market signals</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
-</div></body></html>`);
+</div>
+</div>
+${pageShellFoot()}
+</body>
+</html>`);
 }));
 
 // ── Stripe billing ────────────────────────────────────────────────────────────
@@ -6254,6 +6459,10 @@ h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em
 });
 
 app.get("/scan", (req, res) => {
+  if (!getAuthUser(req)) {
+    res.redirect(`/register?next=${encodeURIComponent(req.url)}`);
+    return;
+  }
   const deskParam = typeof req.query.desk === "string" ? req.query.desk.slice(0, 60) : "";
   const noticeIdParam = typeof req.query.noticeId === "string" ? req.query.noticeId.slice(0, 80) : "";
   const servicesParam = typeof req.query.services === "string" ? req.query.services.slice(0, 300) : "";
