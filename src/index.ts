@@ -4999,7 +4999,7 @@ app.get("/", asyncRoute(async (req, res) => {
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
   --base:#ECE7DA;--surface:#FBF9F3;--surface-2:#F6F2E8;--surface-3:#EFEADD;
-  --brand:#B4924E;--brand-hot:#C4933F;
+  --brand:#B4924E;--brand-hot:#C4933F;--hero-cta:#102A1E;
   --info:#1d4ed8;--green:#1d6b4f;--gold:#B4924E;
   --text:#1B1E19;--text-mid:#3A3E36;--muted:#86897E;--faint:#9AA093;
   --border:rgba(27,30,25,.10);--border-2:rgba(27,30,25,.16);
@@ -5007,6 +5007,29 @@ app.get("/", asyncRoute(async (req, res) => {
   --mono:"Spline Sans Mono","SF Mono",ui-monospace,monospace;
   --serif:"Newsreader",Georgia,serif;
 }
+/* ── global header (pageShellHeader uses these classes) ── */
+.gh{background:rgba(236,231,218,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);position:sticky;top:0;z-index:50}
+.gh-inner{padding:0 32px;max-width:1200px;margin:0 auto}
+.gh-top{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.gh-brand{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.gh-dot{width:10px;height:10px;background:var(--brand);border-radius:50%;flex-shrink:0}
+.gh-logo{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:-0.01em;color:var(--text)}
+.gh-logo b{color:var(--brand);font-weight:500}
+.gh-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border-2);padding-left:14px;margin-left:6px}
+.gh-live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--green)}
+.gh-live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:gh-pulse 2.2s infinite}
+@keyframes gh-pulse{0%{box-shadow:0 0 0 0 rgba(47,138,82,.4)}70%{box-shadow:0 0 0 5px rgba(47,138,82,0)}100%{box-shadow:0 0 0 0 rgba(47,138,82,0)}}
+.gh-nav{display:flex;gap:0;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--border)}
+.gh-nav::-webkit-scrollbar{display:none}
+.gh-nav a{font-size:13.5px;font-weight:500;color:var(--text-mid);padding:0 14px;height:38px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s}
+.gh-nav a:hover{color:var(--text)}
+.gh-nav a.dnav-active{color:var(--text);border-bottom-color:var(--brand)}
+.gh-auth{display:flex;align-items:center;gap:16px;flex-shrink:0}
+.gh-auth-name{font-family:var(--mono);font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh-auth-link{font-size:14px;font-weight:500;color:var(--text-mid);transition:color .15s}
+.gh-auth-link:hover{color:var(--text)}
+.gh-auth-cta{display:inline-flex;align-items:center;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:9px 16px;letter-spacing:.01em;transition:opacity .15s}
+.gh-auth-cta:hover{opacity:.85}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
