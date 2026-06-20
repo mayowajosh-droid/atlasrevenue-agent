@@ -7374,7 +7374,7 @@ app.get("/charts", asyncRoute(async (req, res) => {
                ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 1)::text AS total_val
         FROM homepage_signals
         WHERE notice_date > NOW() - INTERVAL '13 months' AND buyer IS NOT NULL AND buyer <> '' AND notice_date IS NOT NULL
-        GROUP BY buyer ORDER BY SUM(value_amount) NULLS LAST DESC LIMIT 5`),
+        GROUP BY buyer ORDER BY SUM(value_amount) DESC NULLS LAST LIMIT 5`),
       pool.query<SourceRow>(`
         SELECT source, COUNT(*)::text AS cnt
         FROM homepage_signals
