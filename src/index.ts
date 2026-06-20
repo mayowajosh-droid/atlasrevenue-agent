@@ -10453,6 +10453,21 @@ app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
   res.send(scan.report_markdown);
 }));
 
+// Admin timestamp cell: absolute date + time on line 1, relative ("3h ago") on line 2.
+function adminTime(ts: any): string {
+  if (!ts) return `<span style="color:var(--muted)">—</span>`;
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return `<span style="color:var(--muted)">—</span>`;
+  const diff = Date.now() - d.getTime();
+  const a = Math.abs(diff);
+  const m = Math.round(a / 60_000), h = Math.round(a / 3_600_000), dd = Math.round(a / 86_400_000);
+  const rel = a < 60_000 ? "just now" : m < 60 ? `${m}m` : h < 24 ? `${h}h` : dd < 30 ? `${dd}d` : `${Math.round(dd / 30)}mo`;
+  const ago = a < 60_000 ? rel : diff >= 0 ? `${rel} ago` : `in ${rel}`;
+  const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return `<div style="font-family:var(--mono);font-size:11px;color:var(--text);white-space:nowrap;line-height:1.35">${date} <span style="color:var(--muted)">${time}</span></div><div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:.04em">${ago}</div>`;
+}
+
 app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token || "");
   const reranMsg = req.query.reran ? Number(req.query.reran) : 0;
@@ -10621,7 +10636,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
           <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i + 1}</td>
           <td style="font-family:var(--mono);font-size:11px">${escapeHtml(ip.ip || "")}</td>
           <td style="font-family:var(--mono);font-size:12px;text-align:center;font-weight:500">${Number(ip.visits).toLocaleString()}</td>
-          <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml(String(ip.last_seen || "").slice(0, 10))}</td>
+          <td style="white-space:nowrap">${adminTime(ip.last_seen)}</td>
         </tr>`).join("")}</tbody>
       </table>`;
 
@@ -10645,7 +10660,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
         const contractRange = [s.ideal_contract, s.max_contract].filter(Boolean).join("–") || "—";
         return `<tr>
           <td style="padding:8px 10px"><input type="checkbox" class="row-chk" value="${escapeHtml(s.id)}"></td>
-          <td style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">${escapeHtml(String(s.created_at || "").slice(0, 10))}</td>
+          <td style="white-space:nowrap">${adminTime(s.created_at)}</td>
           <td style="font-weight:600;max-width:160px"><a href="/scan/${escapeHtml(s.id)}" target="_blank" style="color:var(--text);text-decoration:none" title="${escapeHtml(s.company_name)}">${escapeHtml(s.company_name.slice(0, 28))}</a></td>
           <td>${emailHtml}</td>
           <td style="text-align:center">${websiteHtml}</td>
@@ -10678,7 +10693,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     : users.map((u: any) => `<tr>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(u.email)}</td>
         <td><span class="pill pill-${escapeHtml(u.tier)}">${escapeHtml(u.tier)}</span></td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(u.created_at || "").slice(0, 10))}</td>
+        <td style="white-space:nowrap">${adminTime(u.created_at)}</td>
         <td style="font-family:var(--mono);font-size:12px;font-weight:600;text-align:center">${u.scan_count || 0}</td>
         <td>${u.stripe_subscription_status ? `<span class="pill ${u.stripe_subscription_status === "active" ? "pill-active" : "pill-inactive"}">${escapeHtml(u.stripe_subscription_status)}</span>` : `<span style="color:var(--muted)">—</span>`}</td>
         <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((u.stripe_customer_id || "").slice(0, 30)) || `<span style="opacity:.4">—</span>`}</td>
@@ -10692,8 +10707,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(s.email || "")}</td>
         <td><span class="pill ${s.active ? "pill-active" : "pill-inactive"}">${s.active ? "active" : "paused"}</span></td>
         <td style="font-family:var(--mono);font-size:12px;text-align:center;font-weight:600">${s.alerted_count || 0}</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.last_alerted_at ? String(s.last_alerted_at).slice(0, 10) : "—"}</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(s.created_at || "").slice(0, 10))}</td>
+        <td style="white-space:nowrap">${s.last_alerted_at ? adminTime(s.last_alerted_at) : `<span style="color:var(--muted)">—</span>`}</td>
+        <td style="white-space:nowrap">${adminTime(s.created_at)}</td>
         <td><a href="/admin/subscriptions?token=${encodeURIComponent(token)}" class="a-btn" style="font-size:9px">Manage</a></td>
       </tr>`).join("");
 
@@ -10704,7 +10719,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.email || "")}</td>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.source || "—")}</td>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.category || "All")}</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(b.created_at || "").slice(0, 10))}</td>
+        <td style="white-space:nowrap">${adminTime(b.created_at)}</td>
       </tr>`).join("");
 
   const totalUserCount = Number(us.total || 0) || 1;
@@ -10745,17 +10760,18 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GovRevenue — Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --accent:#9B3248;--slate:#5A6B7B;--green:#1d6b4f;--gold:#a97932;--blue:#2563ab;
-  --serif:"Spectral","Iowan Old Style",Georgia,serif;
-  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --accent:#A0522D;--accent-hot:#B8673A;--slate:#566273;--green:#22C55E;--gold:#F59E0B;--blue:#3B82F6;
+  --serif:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
-  --bg:#080C10;--surface:#111820;--surface-2:#162030;
-  --border:rgba(255,255,255,.07);--border-2:rgba(255,255,255,.12);
-  --muted:#6b8096;--text:#e8f0f5;
+  --bg:#06090F;--surface:#0B1018;--surface-2:#111A26;
+  --border:rgba(255,255,255,.06);--border-2:rgba(255,255,255,.1);
+  --muted:#8893A4;--text:#E9EEF5;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-decoration:none}
@@ -10764,13 +10780,13 @@ a:hover{text-decoration:underline}
 .sidebar{width:210px;flex-shrink:0;background:#060A0D;border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .sb-brand{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
-.sb-logo{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--text)}
+.sb-logo{font-family:var(--sans);font-size:19px;font-weight:800;letter-spacing:-.03em;color:var(--text)}
 .sb-logo b{color:var(--accent)}
 .sb-tag{font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:3px}
 .sb-nav{padding:10px 0;flex:1}
 .sb-link{display:flex;align-items:center;gap:8px;padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-decoration:none!important;transition:all .12s;border-left:2px solid transparent}
 .sb-link:hover{color:var(--text);background:rgba(255,255,255,.04);text-decoration:none}
-.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(155,44,44,.1)}
+.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(160,82,45,.14)}
 .sb-count{margin-left:auto;background:rgba(255,255,255,.08);font-size:9px;padding:1px 5px;border-radius:8px}
 .sb-div{height:1px;background:var(--border);margin:5px 16px}
 .sb-foot{padding:10px 12px;border-top:1px solid var(--border);margin-top:auto}
@@ -10785,12 +10801,12 @@ a:hover{text-decoration:underline}
 .section{padding:24px 24px 0}
 .s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 .s-eyebrow{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
-.s-title{font-family:var(--serif);font-size:20px;font-weight:600;line-height:1.1}
+.s-title{font-family:var(--sans);font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.05;color:#fff}
 .s-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
 .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px}
 .kpi{background:var(--surface);padding:16px 14px 12px}
 .kpi-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
-.kpi-val{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1;color:var(--text)}
+.kpi-val{font-family:var(--sans);font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;color:#fff}
 .kpi-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px}
 .kpi-green{color:#3ddc84}.kpi-red{color:#e87979}.kpi-gold{color:#f59e0b}.kpi-blue{color:#60a5fa}
 .stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:12px}
