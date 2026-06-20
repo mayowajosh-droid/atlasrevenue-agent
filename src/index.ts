@@ -6801,11 +6801,11 @@ app.get("/scan", (req, res) => {
   const deskProfile = deskParam ? DESK_PROFILES.find(d => d.slug === deskParam) : null;
 
   const contextBannerHtml = deskProfile
-    ? `<div style="background:var(--paper-2);border:1px solid var(--line-strong);padding:14px 18px;margin-bottom:28px;font-size:13.5px;line-height:1.6">
-        <strong style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">From the ${escapeHtml(deskProfile.label)} desk</strong>
+    ? `<div style="background:var(--surface-2);border:1px solid var(--border-2);padding:14px 18px;margin-bottom:28px;font-size:13.5px;line-height:1.6">
+        <strong style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">From the ${escapeHtml(deskProfile.label)} desk</strong>
         ${buyerParam ? `<br>Buyer context: <strong>${escapeHtml(buyerParam)}</strong>` : ""}
-        ${noticeIdParam ? `<br><span style="font-family:var(--mono);font-size:11px;color:var(--slate)">Notice ref: ${escapeHtml(noticeIdParam)}</span>` : ""}
-        <br><span style="font-size:12px;color:var(--slate)">Fill in your firm details below for a personalised fit check against this desk&rsquo;s opportunities.</span>
+        ${noticeIdParam ? `<br><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Notice ref: ${escapeHtml(noticeIdParam)}</span>` : ""}
+        <br><span style="font-size:12px;color:var(--muted)">Fill in your firm details below for a personalised fit check against this desk&rsquo;s opportunities.</span>
        </div>`
     : "";
 
@@ -7584,7 +7584,7 @@ strong{font-weight:700}
 .leg-dash{width:22px;height:0;border-bottom:2px dashed var(--green)}
 .chart-box{background:var(--surface-2);border:1px solid var(--border-2);overflow:hidden;position:relative}
 canvas#detailChart{display:block;width:100%}
-.chart-tip{position:absolute;background:var(--surface-3);color:var(--text);border:1px solid var(--border-2);padding:13px 16px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:226px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.chart-tip{position:absolute;background:var(--surface-3);color:var(--text);border:1px solid var(--border-2);padding:13px 16px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:226px;box-shadow:0 8px 24px rgba(27,30,25,.12)}
 .tip-label{font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
 .tip-row{display:flex;align-items:center;gap:7px;margin-top:4px}
 .tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -7907,26 +7907,26 @@ ${pageShellFoot()}
     for(let i=0;i<=yTicks;i++){
       const v=yMin+(yRange/yTicks)*i;
       const y=Y(v);
-      ctx.strokeStyle=i===0?'rgba(255,255,255,.15)':'rgba(255,255,255,.06)';
+      ctx.strokeStyle=i===0?'rgba(27,30,25,.15)':'rgba(27,30,25,.06)';
       ctx.lineWidth=i===0?1.5:1;
       ctx.setLineDash(i===0?[]:[3,3]);
       ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
       ctx.setLineDash([]);
-      ctx.font='10.5px IBM Plex Mono,monospace';
-      ctx.fillStyle='#8893A4';ctx.textAlign='right';
+      ctx.font='10.5px "Spline Sans Mono",monospace';
+      ctx.fillStyle='#86897E';ctx.textAlign='right';
       ctx.fillText(fmts(v),pad.l-10,y+4);
     }
 
     data.forEach((_,i)=>{
       const x=X(i);
-      ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(27,30,25,.04)';ctx.lineWidth=1;ctx.setLineDash([]);
       ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();
     });
 
-    ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1.5;
+    ctx.strokeStyle='rgba(27,30,25,.15)';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
 
-    ctx.font='10px IBM Plex Mono,monospace';ctx.fillStyle='#8893A4';
+    ctx.font='10px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';
     data.forEach((d,i)=>{
       const x=X(i);
       ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/4);
@@ -7935,12 +7935,12 @@ ${pageShellFoot()}
     });
 
     ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);
-    ctx.font='9.5px IBM Plex Mono,monospace';ctx.fillStyle='#566273';ctx.textAlign='center';
+    ctx.font='9.5px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';ctx.textAlign='center';
     ctx.fillText('AWARDED VALUE (£)',0,0);ctx.restore();
 
     const opData=data.filter(d=>d.open_m>0);
     if(opData.length>=2){
-      ctx.strokeStyle='#22C55E';ctx.lineWidth=1.8;ctx.setLineDash([5,4]);
+      ctx.strokeStyle='#1d6b4f';ctx.lineWidth=1.8;ctx.setLineDash([5,4]);
       ctx.beginPath();
       let pw=false;
       data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);pw?ctx.lineTo(x,y):ctx.moveTo(x,y);pw=true;}else{pw=false;}});
@@ -7970,11 +7970,11 @@ ${pageShellFoot()}
       if(isPeak){
         ctx.font='500 10px "Spline Sans Mono",monospace';ctx.fillStyle='#B4924E';ctx.textAlign='center';
         ctx.fillText(fmts(d.total_m)+'+',x,y-12);
-        ctx.font='bold 9px IBM Plex Mono,monospace';
+        ctx.font='bold 9px "Spline Sans Mono",monospace';
         ctx.fillText('▲ PEAK',x,y-24);
       }
       if(isTrough&&troughI!==peakI){
-        ctx.fillStyle='#8893A4';ctx.font='9px IBM Plex Mono,monospace';ctx.textAlign='center';
+        ctx.fillStyle='#86897E';ctx.font='9px "Spline Sans Mono",monospace';ctx.textAlign='center';
         ctx.fillText('▼ LOW',x,y+20);
       }
     });
@@ -7982,15 +7982,15 @@ ${pageShellFoot()}
     data.forEach((d,i)=>{
       if(d.open_m<=0)return;
       ctx.beginPath();ctx.arc(X(i),Y(d.open_m),3,0,7);
-      ctx.fillStyle='rgba(11,17,26,.8)';ctx.fill();
-      ctx.strokeStyle='#22C55E';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='rgba(251,249,243,.9)';ctx.fill();
+      ctx.strokeStyle='#1d6b4f';ctx.lineWidth=1.5;ctx.stroke();
     });
 
     if(mx!==null){
       const nearI=Math.round((mx-pad.l)/(cw||1)*(data.length-1));
       if(nearI>=0&&nearI<data.length){
         const hx=X(nearI);
-        ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+        ctx.strokeStyle='rgba(27,30,25,.25)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
         ctx.beginPath();ctx.moveTo(hx,pad.t);ctx.lineTo(hx,H-pad.b);ctx.stroke();
         ctx.setLineDash([]);
         const d=data[nearI];
@@ -8009,19 +8009,19 @@ ${pageShellFoot()}
           const short=dk.label.length>22?dk.label.slice(0,21)+'…':dk.label;
           return '<div style="margin-top:6px">'
             +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
-            +'<span style="font-size:9.5px;color:#b0bec8;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
-            +'<span style="font-size:9.5px;color:#dde5ec;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'+'+'</span>'
+            +'<span style="font-size:9.5px;color:#86897E;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
+            +'<span style="font-size:9.5px;color:#3A3E36;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'+'+'</span>'
             +'</div>'
-            +'<div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px">'
+            +'<div style="height:3px;background:rgba(27,30,25,.10);border-radius:2px">'
             +'<div style="width:'+pct+'%;height:100%;background:#B4924E;border-radius:2px;opacity:.85"></div>'
             +'</div></div>';
         }).join('');
         tip.innerHTML='<div class="tip-label">'+d.label+'</div>'
           +'<div class="tip-row"><span class="tip-dot" style="background:#B4924E"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'+'+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
-          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#22C55E"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'+'+'</b></div>':'')
+          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#1d6b4f"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'+'+'</b></div>':'')
           +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(236,230,214,.18);font-size:10px;color:#9AA093">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
           +(desks.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(236,230,214,.2)">'
-            +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e;margin-bottom:4px">Top 5 desks'+(totalDesks>5?' of '+totalDesks:'')+'</div>'
+            +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#86897E;margin-bottom:4px">Top 5 desks'+(totalDesks>5?' of '+totalDesks:'')+'</div>'
             +deskRows+'</div>':'');
       }
     }else{tip.style.display='none';}
