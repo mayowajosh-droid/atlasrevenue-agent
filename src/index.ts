@@ -5377,7 +5377,7 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!started){started=true;animate();
     const el=document.getElementById('chartTotalVal');let v=0;
     const cfv=${chartFinalVal},cst=${chartStep};
-    const ci=setInterval(()=>{v+=cst;if(v>=cfv){v=cfv;clearInterval(ci);}el.textContent='£'+v.toFixed(1)+'m';},22);
+    const ci=setInterval(()=>{v+=cst;if(v>=cfv){v=cfv;clearInterval(ci);}el.textContent=v>=1000?'£'+(v/1000).toFixed(2)+'bn':'£'+v.toFixed(1)+'m';},22);
   }}),{threshold:.4});
   io.observe(cv);
 })();
