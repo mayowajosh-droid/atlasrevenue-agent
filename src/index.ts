@@ -6659,7 +6659,7 @@ header{border-bottom:1px solid rgba(255,255,255,.07);padding:20px 32px;display:f
 h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px;color:#E8EEF5}
 .sub{font-size:17px;color:#8893A4;max-width:36em;margin:0 auto}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:0 0 80px}
-.plan{border:1px solid var(--gbdr);padding:36px 32px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-radius:14px;position:relative;overflow:hidden;transition:transform .26s ease,border-color .26s,box-shadow .26s}
+.plan{border:1px solid var(--gbdr);padding:36px 32px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-radius:14px;position:relative;overflow:hidden;transition:transform .26s ease,border-color .26s,box-shadow .26s;display:flex;flex-direction:column}
 .plan::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,transparent 55%);pointer-events:none}
 .plan:hover{transform:perspective(700px) translateY(-6px) rotateX(2.5deg);border-color:var(--gbdr-hi);box-shadow:0 24px 48px -16px rgba(0,0,0,.6)}
 .plan.featured{border-color:rgba(155,50,72,.5);box-shadow:0 0 40px -10px rgba(155,50,72,.15)}
@@ -6670,7 +6670,8 @@ h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em
 .plan-price sup{font-size:22px;vertical-align:top;margin-top:6px}
 .plan-period{font-family:var(--mono);font-size:12px;color:#8893A4;margin-bottom:24px}
 .plan-desc{font-size:14px;color:#8893A4;line-height:1.6;margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.07)}
-.plan ul{list-style:none;margin-bottom:28px}
+.plan ul{list-style:none;margin-bottom:28px;flex:1}
+.plan .btn{margin-top:auto}
 .plan li{font-size:14px;color:#BDC5CE;padding:7px 0;border-bottom:1px dashed rgba(255,255,255,.07);display:flex;align-items:baseline;gap:8px}
 .plan li:last-child{border-bottom:none}
 .tick{color:var(--accent);font-size:12px;flex-shrink:0}
@@ -6717,7 +6718,7 @@ h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em
         <li><span class="dash">–</span> All 24 intelligence desks</li>
         <li><span class="dash">–</span> Multiple firm profiles</li>
       </ul>
-      <a href="/scan" class="btn btn-outline">Run a scan &rarr;</a>
+      <a href="/register" class="btn btn-outline">Get started &rarr;</a>
     </div>
     <div class="plan featured">
       <div class="plan-badge">Most popular</div>
@@ -6734,7 +6735,7 @@ h1{font-family:var(--serif);font-size:44px;font-weight:600;letter-spacing:-.02em
         <li><span class="dash">–</span> Multiple firm profiles</li>
         <li><span class="dash">–</span> Team access</li>
       </ul>
-      <a href="/scan" class="btn btn-primary">Get started &rarr;</a>
+      <a href="/billing/checkout?plan=pro" class="btn btn-primary">Get started &rarr;</a>
     </div>
     <div class="plan">
       <div class="plan-name">Agency</div>
