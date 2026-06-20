@@ -7752,9 +7752,9 @@ ${deskBreak.length > 0 ? `
           <div class="brief-tag">Market Snapshot</div>
           <h3 class="brief-h">Here is where UK government money is going right now</h3>
           <div class="brief-body">
-            <p>The UK public sector awarded <strong>${fmtBn(totalAnnualM)}</strong> in contracts over the past 12 months, across ${totalNotices.toLocaleString()} procurement notices tracked in real time from Contracts Finder and Find a Tender. That works out to <strong>${fmtBnShort(avgMonthlyM)} every single month</strong> leaving government and flowing into businesses across every category from construction to digital services.</p>
+            <p>The UK public sector awarded <strong>${fmtBn(totalAnnualM)}</strong> in contracts over the past 12 months — ${totalNotices.toLocaleString()} procurement notices indexed and scored by GovRevenue (2026) in real time from Contracts Finder and Find a Tender. That works out to <strong>${fmtBnShort(avgMonthlyM)} every single month</strong> leaving government and flowing into businesses across every category from construction to digital services.</p>
             <div class="pull"><p>Right now, ${fmtBnShort(openPipelineM)} in contracts are open and accepting bids. These are not historic deals. They are live opportunities with deadlines this week and next month.</p></div>
-            <p>Across ${totalOpenCount.toLocaleString()} active tenders, the immediately addressable commercial opportunity in UK public sector procurement is concrete and measurable. If your firm is not tracking it systematically, someone else is.</p>
+            <p>Across ${totalOpenCount.toLocaleString()} active tenders, the immediately addressable commercial opportunity in UK public sector procurement is concrete and measurable. GovRevenue scores each notice by sector, value band, and buyer profile every hour — surfacing what matters before the deadline closes.</p>
           </div>
         </div>
       </div>
@@ -7815,7 +7815,7 @@ ${deskBreak.length > 0 ? `
 
     <div class="brief-refs">
       <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em;line-height:1.9">
-        Sources: Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
+        GovRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across 24 sector desks. Available at: govrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
       </p>
     </div>
   </div>
