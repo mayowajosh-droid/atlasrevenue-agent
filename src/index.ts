@@ -6899,14 +6899,20 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let totalFiltered = 0;
 
   if (pool) {
+    // Stats: deduplicate by source_url (id) so each notice counts once
     const [statsRow] = (await pool.query<SigStats>(`
+      WITH deduped AS (
+        SELECT DISTINCT ON (id) id, status, value_amount, deadline_date
+        FROM homepage_signals
+        ORDER BY id, notice_date DESC NULLS LAST
+      )
       SELECT
         COUNT(*)::text AS total,
         COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::text AS open_cnt,
         COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0), 0)::text AS total_val,
         COUNT(*) FILTER (WHERE deadline_date IS NOT NULL AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '14 days')::text AS closing14,
         COUNT(*) FILTER (WHERE deadline_date IS NOT NULL AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '7 days')::text AS closing7
-      FROM homepage_signals
+      FROM deduped
     `)).rows;
     if (statsRow) stats = statsRow;
 
@@ -6915,28 +6921,38 @@ app.get("/signals", asyncRoute(async (req, res) => {
     if (catFilter) { params.push(catFilter); conds.push(`category = $${params.length}`); }
     if (statusFilter === "open") conds.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
     if (srcFilter) { params.push(srcFilter); conds.push(`source = $${params.length}`); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const innerWhere = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
-    const countRow = await pool.query<{ n: string }>(`SELECT COUNT(*)::text AS n FROM homepage_signals ${where}`, params);
+    // Deduplicate: each notice (by id/source_url) appears once. When cat filter is active keep that category label; otherwise take the first alphabetically.
+    const countRow = await pool.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM (SELECT DISTINCT ON (id) id FROM homepage_signals ${innerWhere} ORDER BY id) sub`,
+      params
+    );
     totalFiltered = parseInt(countRow.rows[0]?.n || "0", 10);
 
     const pageParams = [...params, PER_PAGE, offset];
     const r = await pool.query<HomepageSignal>(
-      `SELECT * FROM homepage_signals ${where} ORDER BY notice_date DESC NULLS LAST LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+      `SELECT * FROM (
+         SELECT DISTINCT ON (id) * FROM homepage_signals ${innerWhere} ORDER BY id, notice_date DESC NULLS LAST
+       ) deduped
+       ORDER BY notice_date DESC NULLS LAST
+       LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
       pageParams
     );
     signals = r.rows;
   } else {
+    const seen = new Set<string>();
     const all = [...sigMemStore.values()]
       .filter(s => !catFilter || s.category === catFilter)
       .filter(s => statusFilter !== "open" || /open|active/i.test(s.status || ""))
       .filter(s => !srcFilter || s.source === srcFilter)
-      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""));
+      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
+      .filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
     totalFiltered = all.length;
     signals = all.slice(offset, offset + PER_PAGE);
-    const allSigs = [...sigMemStore.values()];
-    stats.total = String(allSigs.length);
-    stats.open_cnt = String(allSigs.filter(s => /open|active/i.test(s.status || "")).length);
+    const allUniq = new Map<string, HomepageSignal>(); [...sigMemStore.values()].forEach(s => { if (!allUniq.has(s.id)) allUniq.set(s.id, s); });
+    stats.total = String(allUniq.size);
+    stats.open_cnt = String([...allUniq.values()].filter(s => /open|active/i.test(s.status || "")).length);
   }
 
   const totalPages = Math.ceil(totalFiltered / PER_PAGE);
