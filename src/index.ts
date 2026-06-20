@@ -220,7 +220,7 @@ const pool = process.env.DATABASE_URL
 const memoryStore = new Map<string, ScanRecord>();
 const subMemStore = new Map<string, SubscriptionRecord>();
 const sigMemStore = new Map<string, HomepageSignal>();
-const briefMemStore = new Map<string, { id: string; email: string; category: string | null; created_at: string }>();
+const briefMemStore = new Map<string, { id: string; email: string; category: string | null; source: string | null; created_at: string }>();
 const deskCacheMemStore = new Map<string, { data: ProcurementData; cached_at: string }>();
 const compilingDesks = new Set<string>();
 const scanEvents = new EventEmitter();
@@ -1106,10 +1106,13 @@ async function initDb() {
       id          TEXT PRIMARY KEY,
       email       TEXT NOT NULL,
       category    TEXT,
+      source      TEXT,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE (email)
     );
   `);
+  // Backfill for tables created before the source column existed.
+  await pool.query(`ALTER TABLE briefing_subscribers ADD COLUMN IF NOT EXISTS source TEXT`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS desk_cache (
@@ -4810,15 +4813,15 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
   const email = raw;
   if (pool) {
     const r = await pool.query(
-      `INSERT INTO briefing_subscribers (id, email, category, created_at)
-       VALUES ($1, $2, NULL, NOW()) ON CONFLICT (email) DO NOTHING`,
+      `INSERT INTO briefing_subscribers (id, email, category, source, created_at)
+       VALUES ($1, $2, NULL, 'homepage', NOW()) ON CONFLICT (email) DO NOTHING`,
       [makeId(), email]
     );
     res.json({ ok: true, alreadySubscribed: (r.rowCount ?? 0) === 0 });
     return;
   }
   const alreadySubscribed = briefMemStore.has(email);
-  if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, created_at: nowIso() });
+  if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, source: "homepage", created_at: nowIso() });
   res.json({ ok: true, alreadySubscribed });
 }));
 
@@ -5568,17 +5571,18 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
       res.status(400).type("html").send(briefingResultHtml("That email doesn’t look right", "Head back and try again with a valid work email.", false));
       return;
     }
+    const source = (String(req.body?._source || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || "newsletter").slice(0, 32);
     let alreadySubscribed = false;
     if (pool) {
       const r = await pool.query(
-        `INSERT INTO briefing_subscribers (id, email, category, created_at)
-         VALUES ($1, $2, NULL, NOW()) ON CONFLICT (email) DO NOTHING`,
-        [makeId(), email]
+        `INSERT INTO briefing_subscribers (id, email, category, source, created_at)
+         VALUES ($1, $2, NULL, $3, NOW()) ON CONFLICT (email) DO NOTHING`,
+        [makeId(), email, source]
       );
       alreadySubscribed = (r.rowCount ?? 0) === 0;
     } else {
       alreadySubscribed = briefMemStore.has(email);
-      if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, created_at: nowIso() });
+      if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, source, created_at: nowIso() });
     }
     res.type("html").send(briefingResultHtml(
       alreadySubscribed ? "You’re already on the list" : "You’re on the list",
@@ -7362,6 +7366,7 @@ footer{border-top:1px solid var(--line-strong);padding:32px 0;font-family:var(--
     <p>Enter your email and we'll send you each piece as it goes live — plus a weekly digest of the open contracts most relevant to your sector.</p>
     <form class="sub-form" action="/form-submit" method="post">
       <input type="hidden" name="_type" value="briefing">
+      <input type="hidden" name="_source" value="articles">
       <input type="email" name="email" placeholder="your@email.com" required>
       <button type="submit">Notify me</button>
     </form>
@@ -7878,6 +7883,7 @@ ${deskBreak.length > 0 ? `
       <p class="nl-sub">Every week: the contracts opening in your sector, the buyers spending the most, and the frameworks closing soon. Free. No noise.</p>
       <form class="nl-form" action="/form-submit" method="post" aria-label="Newsletter sign-up">
         <input type="hidden" name="_type" value="briefing">
+        <input type="hidden" name="_source" value="charts">
         <input class="nl-in" type="email" name="email" placeholder="your@email.com" required autocomplete="email" aria-label="Email address">
         <button type="submit" class="nl-btn">Get the brief</button>
       </form>
@@ -10661,9 +10667,10 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 
   // Briefing rows
   const briefRowsHtml = briefing.length === 0
-    ? `<tr><td colspan="3" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No briefing subscribers yet</td></tr>`
+    ? `<tr><td colspan="4" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No briefing subscribers yet</td></tr>`
     : briefing.map((b: any) => `<tr>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.email || "")}</td>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.source || "—")}</td>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.category || "All")}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(b.created_at || "").slice(0, 10))}</td>
       </tr>`).join("");
@@ -10993,7 +11000,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
   </div>
   <div class="tbl-wrap">
     <table class="a-tbl">
-      <thead><tr><th>Email</th><th>Sector</th><th>Joined</th></tr></thead>
+      <thead><tr><th>Email</th><th>Source</th><th>Sector</th><th>Joined</th></tr></thead>
       <tbody>${briefRowsHtml}</tbody>
     </table>
   </div>
