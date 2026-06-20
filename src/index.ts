@@ -7851,7 +7851,9 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
         const tipLeft=hx>W*0.65?hx-222:hx+12;
         tip.style.left=tipLeft+'px';tip.style.top=pad.t+'px';
         const deskMap=cur===MD?MDK:WDK;
-        const desks=(deskMap[d.label]||[]).slice(0,5);
+        const allDesks=deskMap[d.label]||[];
+        const desks=allDesks.slice(0,5);
+        const totalDesks=allDesks.length;
         const maxDm=desks.length?desks[0].total_m:1;
         const deskRows=desks.map(dk=>{
           const pct=Math.round((dk.total_m/maxDm)*100);
@@ -7870,7 +7872,10 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
           +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
           +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
           +(desks.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">'
-            +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e;margin-bottom:2px">By desk</div>'
+            +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">'
+            +'<span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e">Top 5 desks'+(totalDesks>5?' of '+totalDesks:'')+'</span>'
+            +'<a href="/signals" style="font-size:9px;color:#9B2C2C;text-decoration:none;letter-spacing:.05em">See all &rarr;</a>'
+            +'</div>'
             +deskRows+'</div>':'');
       }
     }else{tip.style.display='none';}
