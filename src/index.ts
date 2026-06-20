@@ -7187,22 +7187,22 @@ app.get("/signals", asyncRoute(async (req, res) => {
 <title>Live Signals — GovRevenue</title>
 <style>${pageShellCss()}
 /* ── signals page ── */
-.stats-strip{background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:0}
-.stat-block{flex:1;padding:20px 24px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
-.stat-block:last-child{border-right:none}
-.stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.stat-value{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--text);line-height:1}
-.stat-sub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:2px}
-.stat-block.accent-block .stat-value{color:#f87171}
-.stat-block.green-block .stat-value{color:#4ade80}
-.stat-block.warn-block .stat-value{color:#fbbf24}
+.sig-band{display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;margin-bottom:24px}
+.sig-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sc{background:var(--surface);border:1px solid var(--border-2);padding:18px 16px;display:flex;flex-direction:column;gap:4px}
+.sc-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--text);line-height:1;margin:6px 0 2px}
+.sc-sub{font-family:var(--mono);font-size:9px;color:var(--faint);line-height:1.35}
+.sc.sc-green .sc-val{color:var(--green)}
+.sc.sc-brand .sc-val{color:var(--brand)}
+.sc.sc-warn .sc-val{color:#b45309}
 /* page head */
 .page-head{padding:36px 0 28px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
 h1.sig-h1{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin-bottom:6px;color:var(--text)}
 .sub{font-size:13.5px;color:var(--muted)}
 /* chart frame */
-.chart-frame-wrap{margin:0 0 24px;border:1px solid var(--border-2);background:var(--surface);max-width:900px}
+.chart-frame-wrap{border:1px solid var(--border-2);background:var(--surface)}
 /* filters */
 .filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:0}
 .filter-bar select{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);padding:8px 32px 8px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238893A4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
@@ -7212,7 +7212,7 @@ h1.sig-h1{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:
 .filter-clear{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:underline;padding:4px 0}
 .sig-count{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-left:auto;white-space:nowrap}
 /* wrap constraint */
-.wrap{max-width:960px;margin:0 auto;padding:0 32px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 32px}
 /* table */
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;min-width:780px}
@@ -7254,34 +7254,12 @@ td{padding:11px 10px;font-size:13px;vertical-align:top}
 .pg-dis{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--border);padding:8px 16px;pointer-events:none}
 .pg-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 auto}
 .empty{padding:72px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-@media(max-width:900px){.stat-block{padding:14px 16px}.stat-value{font-size:20px}h1.sig-h1{font-size:22px}.page-head{flex-direction:column;align-items:flex-start}}
-@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.wrap{padding:0 16px}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}}
+@media(max-width:900px){h1.sig-h1{font-size:22px}.page-head{flex-direction:column;align-items:flex-start}.sig-band{grid-template-columns:1fr}.sig-stats{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:600px){.wrap{padding:0 16px}.sig-stats{grid-template-columns:1fr 1fr}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}}
 </style>
 </head>
 <body>
 ${pageShellHeader(null, null)}
-<div class="stats-strip">
-  <div class="stat-block">
-    <span class="stat-label">Signals tracked</span>
-    <span class="stat-value">${parseInt(stats.total).toLocaleString()}</span>
-    <span class="stat-sub">Across all 24 desks</span>
-  </div>
-  <div class="stat-block green-block">
-    <span class="stat-label">Open / live</span>
-    <span class="stat-value">${parseInt(stats.open_cnt).toLocaleString()}</span>
-    <span class="stat-sub">Active tenders &amp; opportunities</span>
-  </div>
-  <div class="stat-block accent-block">
-    <span class="stat-label">Total value tracked</span>
-    <span class="stat-value">${fmtBigVal(totalVal)}</span>
-    <span class="stat-sub">Public spend indexed</span>
-  </div>
-  <div class="stat-block warn-block">
-    <span class="stat-label">Closing within 7 days</span>
-    <span class="stat-value">${parseInt(stats.closing7).toLocaleString()}</span>
-    <span class="stat-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</span>
-  </div>
-</div>
 <main>
 <div class="wrap">
   <div class="page-head">
@@ -7292,9 +7270,33 @@ ${pageShellHeader(null, null)}
     </div>
     <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--brand);color:#fff;padding:12px 20px;white-space:nowrap;flex-shrink:0;border-radius:2px">Run a scan &rarr;</a>
   </div>
-  <div class="chart-frame-wrap">
-    <iframe src="/charts/embed" id="charts-frame" scrolling="no" frameborder="0"
-      style="width:100%;height:360px;display:block;border:none"></iframe>
+  <div class="sig-band">
+    <div class="chart-frame-wrap">
+      <iframe src="/charts/embed" id="charts-frame" scrolling="no" frameborder="0"
+        style="width:100%;height:360px;display:block;border:none"></iframe>
+    </div>
+    <div class="sig-stats">
+      <div class="sc">
+        <span class="sc-lbl">Signals tracked</span>
+        <span class="sc-val">${parseInt(stats.total).toLocaleString()}</span>
+        <span class="sc-sub">Across all 24 desks</span>
+      </div>
+      <div class="sc sc-green">
+        <span class="sc-lbl">Open / live</span>
+        <span class="sc-val">${parseInt(stats.open_cnt).toLocaleString()}</span>
+        <span class="sc-sub">Active tenders &amp; opportunities</span>
+      </div>
+      <div class="sc sc-brand">
+        <span class="sc-lbl">Total value tracked</span>
+        <span class="sc-val">${fmtBigVal(totalVal)}</span>
+        <span class="sc-sub">Public spend indexed</span>
+      </div>
+      <div class="sc sc-warn">
+        <span class="sc-lbl">Closing within 7 days</span>
+        <span class="sc-val">${parseInt(stats.closing7).toLocaleString()}</span>
+        <span class="sc-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</span>
+      </div>
+    </div>
   </div>
   <form class="filter-bar" method="get" action="/signals">
     <select name="cat">
