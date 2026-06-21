@@ -5081,9 +5081,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </body></html>`;
 }
 
-function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
-  const featured = articles[0] ?? null;
-  const rest = articles.slice(1);
+function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null, page = 1, totalPages = 1): string {
+  const featured = page === 1 ? (articles[0] ?? null) : null;
+  const rest = page === 1 ? articles.slice(1) : articles;
 
   const featuredHtml = featured ? (() => {
     const date = featured.published_at
@@ -5161,6 +5161,11 @@ ${pageShellCss()}
   .ai-row{grid-template-columns:1fr;gap:6px}
   .ai-meta{text-align:left}
 }
+.ai-pager{display:flex;align-items:center;justify-content:center;gap:6px;padding:40px 0 0;flex-wrap:wrap}
+.ai-pg-btn{font-family:var(--mono);font-size:12px;letter-spacing:.07em;padding:8px 14px;border:1px solid var(--border-2);color:var(--text);text-decoration:none;transition:border-color .15s,background .15s}
+.ai-pg-btn:hover{border-color:var(--brand);background:var(--brand-dim)}
+.ai-pg-active{background:var(--brand);color:#fff;border-color:var(--brand);pointer-events:none}
+.ai-pg-disabled{font-family:var(--mono);font-size:12px;letter-spacing:.07em;padding:8px 14px;border:1px solid var(--border);color:var(--muted);cursor:default}
 </style>
 </head>
 <body>
@@ -5177,9 +5182,25 @@ ${pageShellHeader(null, authCtx)}
 ${featuredHtml}
 
 <section style="max-width:1160px;margin:0 auto;padding:${featured ? "48px" : "40px"} 32px 80px">
-  ${rest.length > 0 ? `<div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:20px">Latest articles</div>` : ""}
+  ${rest.length > 0 ? `<div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:20px">${page === 1 ? "Latest articles" : `Page ${page} of ${totalPages}`}</div>` : ""}
   ${emptyHtml}
   ${rest.length > 0 ? `<div style="border:1px solid var(--border-2);background:var(--base)">${listRows}</div>` : ""}
+  ${totalPages > 1 ? (() => {
+    const prev = page > 1 ? `<a class="ai-pg-btn" href="/articles?page=${page - 1}">&larr; Prev</a>` : `<span class="ai-pg-disabled">&larr; Prev</span>`;
+    const next = page < totalPages ? `<a class="ai-pg-btn" href="/articles?page=${page + 1}">Next &rarr;</a>` : `<span class="ai-pg-disabled">Next &rarr;</span>`;
+    const nums = Array.from({ length: totalPages }, (_, i) => i + 1)
+      .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+      .reduce<(number | "…")[]>((acc, n, i, arr) => {
+        if (i > 0 && n - (arr[i - 1] as number) > 1) acc.push("…");
+        acc.push(n);
+        return acc;
+      }, [])
+      .map(n => n === "…"
+        ? `<span class="ai-pg-disabled">…</span>`
+        : `<a class="${n === page ? "ai-pg-btn ai-pg-active" : "ai-pg-btn"}" href="/articles?page=${n}">${n}</a>`)
+      .join("");
+    return `<div class="ai-pager">${prev}${nums}${next}</div>`;
+  })() : ""}
 </section>
 
 <section style="background:radial-gradient(120% 140% at 20% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6">
@@ -13531,10 +13552,21 @@ app.post("/admin/subscriptions/:id/fire", requireAdmin, asyncRoute(async (req, r
 
 app.get("/articles", asyncRoute(async (req, res) => {
   const authCtx = getAuthUser(req);
-  const articles: ArticleRow[] = pool
-    ? (await pool.query<ArticleRow>(`SELECT * FROM articles WHERE status='published' ORDER BY published_at DESC LIMIT 50`)).rows
-    : [];
-  res.send(articlesIndexPage(articles, authCtx));
+  const PER_PAGE = 10;
+  const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
+  const offset = (page - 1) * PER_PAGE;
+  let articles: ArticleRow[] = [];
+  let totalPages = 1;
+  if (pool) {
+    const [countRes, rowsRes] = await Promise.all([
+      pool.query<{ n: string }>(`SELECT COUNT(*) AS n FROM articles WHERE status='published'`),
+      pool.query<ArticleRow>(`SELECT * FROM articles WHERE status='published' ORDER BY published_at DESC LIMIT $1 OFFSET $2`, [PER_PAGE, offset]),
+    ]);
+    const total = parseInt(countRes.rows[0]?.n || "0", 10);
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    articles = rowsRes.rows;
+  }
+  res.send(articlesIndexPage(articles, authCtx, page, totalPages));
 }));
 
 app.get("/articles/:slug", asyncRoute(async (req, res) => {
