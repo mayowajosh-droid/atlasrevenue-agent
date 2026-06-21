@@ -7188,7 +7188,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 </head>
 <body>
 <header>
-  <a href="/" class="logo"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
   <a href="/" class="back">&larr; Back to home</a>
 </header>
 <main>
@@ -7370,7 +7370,7 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 </head>
 <body>
 <header>
-  <a href="/" class="logo"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
   <a href="/pricing" class="back">&larr; Plans</a>
 </header>
 <div class="page">
@@ -7468,7 +7468,7 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 </head>
 <body>
 <header>
-  <a href="/" class="logo"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
   <a href="/pricing" class="back">&larr; Pricing</a>
 </header>
 <div class="ribbon">
