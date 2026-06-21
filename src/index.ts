@@ -2068,26 +2068,27 @@ async function renderArticleImages(articleId: string): Promise<void> {
       // Skip if already rendered with same prompt
       if (existing.rows[0]?.prompt_hash === hash && existing.rows[0]?.image_url) continue;
 
-      const dalleSize = item.ratio === "1:1" ? "1024x1024" : item.ratio === "4:5" ? "1024x1792" : "1792x1024";
+      // gpt-image-1 sizes: 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait)
+      const imgSize = item.ratio === "1:1" ? "1024x1024" : item.ratio === "4:5" ? "1024x1536" : "1536x1024";
 
-      console.log(`[article-images] generating ${item.posKey} for article ${articleId} (${dalleSize})`);
+      console.log(`[article-images] generating ${item.posKey} for article ${articleId} (${imgSize})`);
 
-      const response = await openai.images.generate({
-        model: "dall-e-3",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response = await (openai.images.generate as any)({
+        model: "gpt-image-1",
         prompt: item.prompt,
         n: 1,
-        size: dalleSize as "1024x1024" | "1792x1024" | "1024x1792",
-        quality: "standard",
-      });
+        size: imgSize,
+        quality: "medium",
+      }) as { data?: { b64_json?: string }[] };
 
-      const tempUrl = response.data?.[0]?.url;
-      if (!tempUrl) { console.warn(`[article-images] no URL returned for ${item.posKey}`); continue; }
+      const b64 = response.data?.[0]?.b64_json;
+      if (!b64) { console.warn(`[article-images] no b64_json returned for ${item.posKey}`); continue; }
 
-      // Download immediately — DALL-E URLs expire in ~1 hour
-      let finalUrl = tempUrl;
+      const imgBuf = Buffer.from(b64, "base64");
+
+      let finalUrl: string | null = null;
       if (isPdfStorageConfigured()) {
-        const imgRes = await fetch(tempUrl);
-        const imgBuf = Buffer.from(await imgRes.arrayBuffer());
         const stored = await storeObject({
           key: `articles/${articleId}/${item.posKey}.png`,
           body: imgBuf,
@@ -2095,6 +2096,7 @@ async function renderArticleImages(articleId: string): Promise<void> {
         });
         if (stored?.publicUrl) finalUrl = stored.publicUrl;
       }
+      if (!finalUrl) { console.warn(`[article-images] storage not configured, skipping ${item.posKey}`); continue; }
 
       const now = new Date().toISOString();
       if (existing.rows[0]) {
@@ -2121,7 +2123,7 @@ async function renderArticleImages(articleId: string): Promise<void> {
 
       console.log(`[article-images] ✓ rendered ${item.posKey}: ${finalUrl}`);
 
-      // Pace between calls — DALL-E 3 rate limit is 5 img/min on standard tier
+      // Pace between calls to stay within gpt-image-1 rate limits
       await new Promise(r => setTimeout(r, 13_000));
     } catch (err) {
       console.error(`[article-images] failed for ${item.posKey}`, err);
@@ -13339,11 +13341,13 @@ app.get("/admin/articles", requireAdmin, asyncRoute(async (req, res) => {
 
 app.get("/admin/articles/test-dalle", requireAdmin, asyncRoute(async (_req, res) => {
   try {
-    const r = await openai.images.generate({
-      model: "dall-e-3", prompt: "A simple red circle on a white background.", n: 1,
-      size: "1024x1024", quality: "standard",
-    });
-    res.json({ ok: true, url: r.data?.[0]?.url ?? null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await (openai.images.generate as any)({
+      model: "gpt-image-1", prompt: "A simple red circle on a white background.", n: 1,
+      size: "1024x1024", quality: "medium",
+    }) as { data?: { b64_json?: string }[] };
+    const b64 = r.data?.[0]?.b64_json;
+    res.json({ ok: !!b64, b64_bytes: b64?.length ?? 0 });
   } catch (err: any) {
     res.json({ ok: false, error: err?.message ?? String(err), status: err?.status, code: err?.code });
   }
