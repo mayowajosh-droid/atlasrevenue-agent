@@ -5530,7 +5530,40 @@ ${featuredHtml}
   </div>
 </section>
 
-${pageShellFoot()}
+<section class="subscribe" id="subscribe">
+  <div class="wrap">
+    <div class="eyebrow">New articles</div>
+    <h2>Be first to know.</h2>
+    <p>One note when new procurement intelligence publishes in your sector. No daily emails — just signal.</p>
+    <form class="subform" id="ai-briefing-form">
+      <input type="email" id="ai-briefing-email" placeholder="you@firm.co.uk" aria-label="Email address" required>
+      <button type="submit">Get new articles</button>
+    </form>
+    <div class="subnote" id="ai-briefing-note">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
+    <script>
+    document.getElementById('ai-briefing-form').addEventListener('submit',function(e){
+      e.preventDefault();
+      var email=document.getElementById('ai-briefing-email').value;
+      var note=document.getElementById('ai-briefing-note');
+      fetch('/api/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          document.getElementById('ai-briefing-form').style.display='none';
+          note.textContent=d.alreadySubscribed?"You're already on the list.":"Done. We'll write when new intelligence drops.";
+          note.style.color='#1d6b4f';note.style.fontWeight='600';
+        })
+        .catch(function(){note.textContent='Something went wrong — try again.';note.style.color='#9b2d20';});
+    });
+    </script>
+  </div>
+</section>
+<footer class="hp-foot"><div class="wrap">
+  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">Bloomberg Terminal for UK public-sector revenue. We turn fragmented procurement data into one sourced commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
+  <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
+  <div class="legal"><span>&copy; ${new Date().getFullYear()} GovRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
+</div></footer>
 </body></html>`;
 }
 
