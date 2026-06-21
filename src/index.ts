@@ -9880,11 +9880,11 @@ html{scroll-behavior:smooth}
   .awards-inner{padding:24px 12px}
 }
 ${oppCardCss()}
-/* Scoped overrides: opp-cards on dark panel surface */
-.dp-panel .opp-card{background:var(--surface-2);border:1px solid var(--border-2);box-shadow:0 2px 16px rgba(0,0,0,.38),0 1px 4px rgba(0,0,0,.22);transition:box-shadow .18s,transform .18s}
-.dp-panel .opp-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.48);transform:translateY(-2px);border-color:var(--brand)}
-.dp-panel .opp-card--low_confidence{opacity:.75;box-shadow:0 1px 8px rgba(0,0,0,.2)}
-.dp-panel .opp-cold{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--muted)}
+/* Scoped overrides: opp-cards on light panel surface */
+.dp-panel .opp-card{background:#fff;border:1px solid var(--border-2);box-shadow:0 1px 6px rgba(0,0,0,.06);transition:box-shadow .18s,transform .18s}
+.dp-panel .opp-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.1);transform:translateY(-2px);border-color:var(--brand)}
+.dp-panel .opp-card--low_confidence{opacity:.75}
+.dp-panel .opp-cold{background:var(--surface-2);border:1px solid var(--border-2);color:var(--muted)}
 .dp-panel .opp-cold strong{color:var(--text)}
 .dp-panel .ls-foot{color:var(--faint)}
 .dp-panel .opp-cards{gap:14px}
