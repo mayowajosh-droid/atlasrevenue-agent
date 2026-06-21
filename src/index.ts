@@ -4820,7 +4820,7 @@ a{color:inherit;text-decoration:none}
 .art-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#102A1E;text-transform:uppercase;white-space:nowrap}
 .art-eyebrow-rule{height:1px;width:46px;background:#C9BFA6;flex-shrink:0}
 .art-eyebrow-num{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted)}
-.art-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;font-weight:500;color:#16301F;margin:0 0 28px}
+.art-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;font-weight:500;color:#1a5c38;margin:0 0 28px}
 .art-dek{font-family:var(--serif);font-size:23px;line-height:1.5;color:var(--text-mid);font-style:italic;margin:0 0 36px;max-width:760px}
 .art-meta-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding-top:24px;border-top:1px solid var(--border-2)}
 .art-author{display:flex;align-items:center;gap:16px}
@@ -9639,7 +9639,6 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let signals: HomepageSignal[] = [];
   let totalFiltered = 0;
   let chartPoints: Array<{ label: string; total_bn: number }> = [];
-  let topDesks: Array<{ category: string; total: number; open_count: number; total_value: string }> = [];
 
   if (pool) {
     const conds: string[] = [];
@@ -9707,15 +9706,6 @@ app.get("/signals", asyncRoute(async (req, res) => {
       LIMIT 12
     `);
     chartPoints = chartR.rows;
-    const topDesksR = await pool.query<{ category: string; total: number; open_count: number; total_value: string }>(`
-      SELECT category,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER(WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count,
-        COALESCE(SUM(value_amount) FILTER(WHERE value_amount > 0 AND value_amount < 2000000000),0)::bigint AS total_value
-      FROM homepage_signals
-      GROUP BY category ORDER BY total DESC LIMIT 8
-    `);
-    topDesks = topDesksR.rows;
   } else {
     const seen = new Set<string>();
     let all = [...sigMemStore.values()]
@@ -9873,17 +9863,6 @@ app.get("/signals", asyncRoute(async (req, res) => {
 .stat-red{color:var(--red)}
 .stat-sub{font-size:13px;color:var(--muted);margin-top:8px}
 .stat-feature .stat-sub{color:#8FA193}
-.desk-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-2);border:1px solid var(--border-2);margin-bottom:20px;overflow:hidden}
-.desk-kpi{background:var(--surface);padding:18px 20px 16px;position:relative;transition:background .12s}
-.desk-kpi:hover{background:var(--surface-2)}
-.desk-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--brand);opacity:.5}
-.desk-kpi-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.desk-kpi-val{font-family:var(--serif);font-size:28px;font-weight:500;letter-spacing:-.02em;line-height:1;color:var(--text);margin-bottom:6px}
-.desk-kpi-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.desk-kpi-open{font-family:var(--mono);font-size:10px;color:var(--green);font-weight:600}
-.desk-kpi-val-sub{font-family:var(--mono);font-size:10px;color:var(--muted)}
-.desk-kpi-bar{height:2px;background:var(--border);margin-top:10px;border-radius:1px;overflow:hidden}
-.desk-kpi-bar-fill{height:100%;background:var(--brand);opacity:.6;border-radius:1px}
 .chart-panel{background:var(--surface);border:1px solid var(--border-2);padding:26px 28px;margin-bottom:20px}
 .chart-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:18px}
 .chart-hed-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
@@ -9947,8 +9926,8 @@ td{padding:14px;font-size:14px;vertical-align:top}
 .pg-dis{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--border);padding:9px 18px;pointer-events:none}
 .pg-info{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 auto}
 .empty{padding:64px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-@media(max-width:980px){.sig-outer{padding:0 26px}.stat-row{grid-template-columns:1fr 1fr}.desk-kpi-grid{grid-template-columns:repeat(2,1fr)!important}.sig-hero{flex-direction:column;align-items:flex-start;gap:20px}.chart-top{flex-direction:column;gap:12px}.chart-latest-val,.chart-latest-lbl{text-align:left}}
-@media(max-width:600px){.sig-outer{padding:0 16px}.stat-row{grid-template-columns:1fr 1fr}.desk-kpi-grid{grid-template-columns:repeat(2,1fr)!important}.desk-kpi-val{font-size:22px}.sig-h1{font-size:28px}.sig-buyer,.sig-dl{display:none}thead th:nth-child(3),thead th:nth-child(7){display:none}.ctrl-bar{gap:8px}.ctrl-search-wrap{flex:1 1 100%}.pager{flex-wrap:wrap;gap:8px;padding:16px 0 32px}.pg-info{order:3;width:100%;text-align:center;margin:0}}
+@media(max-width:980px){.sig-outer{padding:0 26px}.stat-row{grid-template-columns:1fr 1fr}.sig-hero{flex-direction:column;align-items:flex-start;gap:20px}.chart-top{flex-direction:column;gap:12px}.chart-latest-val,.chart-latest-lbl{text-align:left}}
+@media(max-width:600px){.sig-outer{padding:0 16px}.stat-row{grid-template-columns:1fr 1fr}.sig-h1{font-size:28px}.sig-buyer,.sig-dl{display:none}thead th:nth-child(3),thead th:nth-child(7){display:none}.ctrl-bar{gap:8px}.ctrl-search-wrap{flex:1 1 100%}.pager{flex-wrap:wrap;gap:8px;padding:16px 0 32px}.pg-info{order:3;width:100%;text-align:center;margin:0}}
 </style>
 </head>
 <body>
@@ -9989,26 +9968,6 @@ ${pageShellHeader(null, null)}
       <div class="stat-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</div>
     </div>
   </div>
-
-  <!-- TOP DESKS KPI -->
-  ${topDesks.length > 0 ? (() => {
-    const maxTotal = Math.max(...topDesks.map(d => d.total), 1);
-    const fmtV = (v: string | number) => {
-      const n = Number(v);
-      return n >= 1_000_000_000 ? `£${(n/1_000_000_000).toFixed(1)}bn` : n >= 1_000_000 ? `£${(n/1_000_000).toFixed(0)}m` : n >= 1000 ? `£${Math.round(n/1000)}k` : n > 0 ? `£${n}` : "—";
-    };
-    return `<div class="desk-kpi-grid" style="grid-template-columns:repeat(${Math.min(topDesks.length,4)},1fr)">
-      ${topDesks.map(d => `<a href="/desk/${escapeHtml(d.category)}" class="desk-kpi" style="text-decoration:none">
-        <div class="desk-kpi-label">${escapeHtml(categoryLabel(d.category))}</div>
-        <div class="desk-kpi-val">${Number(d.total).toLocaleString()}</div>
-        <div class="desk-kpi-meta">
-          <span class="desk-kpi-open">${Number(d.open_count).toLocaleString()} open</span>
-          <span class="desk-kpi-val-sub">${fmtV(d.total_value)}</span>
-        </div>
-        <div class="desk-kpi-bar"><div class="desk-kpi-bar-fill" style="width:${Math.round((d.total/maxTotal)*100)}%"></div></div>
-      </a>`).join("")}
-    </div>`;
-  })() : ""}
 
   <!-- CHART PANEL -->
   <div class="chart-panel">
