@@ -5009,7 +5009,6 @@ function showReply(id) {
 }
 
 function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
-  const accent = "#B4924E";
   const featured = articles[0] ?? null;
   const rest = articles.slice(1);
 
@@ -5018,23 +5017,23 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
       ? new Date(featured.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }).toUpperCase()
       : "";
     const rightPanel = featured.hero_image_url
-      ? `<div style="background-image:url('${escapeHtml(featured.hero_image_url)}');background-size:cover;background-position:center;border-left:1px solid rgba(236,230,214,.14);min-height:300px"></div>`
-      : `<div style="background:#0C1F15;border-left:1px solid rgba(236,230,214,.14);padding:40px 36px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-           ${featured.dek ? `<p style="font-family:'Newsreader',serif;font-size:19px;font-style:italic;color:#C5C9BC;line-height:1.55;margin:0">"${escapeHtml(featured.dek)}"</p>` : ""}
-           <span style="font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9AA093;margin-top:12px">${escapeHtml(featured.eyebrow || featured.desk || "Briefing")}</span>
+      ? `<div style="background-image:url('${escapeHtml(featured.hero_image_url)}');background-size:cover;background-position:center;border-left:1px solid rgba(236,230,214,.14)"></div>`
+      : `<div style="background:#0C1F15;border-left:1px solid rgba(236,230,214,.14);padding:32px 32px;display:flex;flex-direction:column;justify-content:center;gap:10px">
+           ${featured.dek ? `<p style="font-family:var(--serif);font-size:17px;font-style:italic;color:#C5C9BC;line-height:1.55;margin:0">"${escapeHtml(featured.dek)}"</p>` : ""}
+           <span style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9AA093;margin-top:10px">${escapeHtml(featured.eyebrow || featured.desk || "Article")}</span>
          </div>`;
     return `
-<section style="max-width:1160px;margin:0 auto;padding:48px 32px 0">
-  <a href="/articles/${escapeHtml(featured.slug)}" style="display:grid;grid-template-columns:1.15fr 0.85fr;border:1px solid rgba(27,30,25,.14);background:#102A1E;color:#ECE6D6;overflow:hidden;text-decoration:none">
-    <div style="padding:40px 44px;display:flex;flex-direction:column;justify-content:space-between;min-height:300px">
+<section style="max-width:1160px;margin:0 auto;padding:40px 32px 0">
+  <a href="/articles/${escapeHtml(featured.slug)}" style="display:grid;grid-template-columns:1.15fr 0.85fr;border:1px solid var(--border-2);background:#102A1E;color:#ECE6D6;overflow:hidden;text-decoration:none">
+    <div style="padding:32px 38px;display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
       <div style="display:flex;gap:12px;align-items:center">
-        <span style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;background:${accent};color:#10110D;padding:5px 10px;font-weight:600">Latest brief</span>
-        ${date ? `<span style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:#9AA093">${date} · ${featured.reading_time} MIN</span>` : ""}
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;background:var(--brand);color:#10110D;padding:4px 9px;font-weight:600">Latest article</span>
+        ${date ? `<span style="font-family:var(--mono);font-size:10.5px;color:#9AA093">${date} · ${featured.reading_time} MIN</span>` : ""}
       </div>
       <div>
-        <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:clamp(26px,3vw,38px);letter-spacing:-.01em;line-height:1.06;margin:24px 0 0;color:#ECE6D6">${escapeHtml(featured.title)}</h2>
-        ${featured.dek ? `<p style="font-size:16px;line-height:1.6;color:#C5C9BC;margin:16px 0 0;max-width:480px">${escapeHtml(featured.dek)}</p>` : ""}
-        <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:${accent};margin-top:22px">Read the brief →</span>
+        <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(22px,2.6vw,32px);letter-spacing:-.01em;line-height:1.08;margin:20px 0 0;color:#ECE6D6">${escapeHtml(featured.title)}</h2>
+        ${featured.dek ? `<p style="font-size:15px;line-height:1.58;color:#C5C9BC;margin:12px 0 0;max-width:440px">${escapeHtml(featured.dek)}</p>` : ""}
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--brand);margin-top:18px">Read the article →</span>
       </div>
     </div>
     ${rightPanel}
@@ -5049,7 +5048,7 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
     const tag = escapeHtml(a.eyebrow || a.desk || "");
     return `<a href="/articles/${escapeHtml(a.slug)}" class="ai-row">
   <span class="ai-tag">${tag}</span>
-  <div class="ai-body">
+  <div>
     <div class="ai-title">${escapeHtml(a.title)}</div>
     ${a.dek ? `<div class="ai-dek">${escapeHtml(a.dek)}</div>` : ""}
   </div>
@@ -5058,106 +5057,61 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
   }).join("");
 
   const emptyHtml = articles.length === 0
-    ? `<div style="padding:56px 32px;font-family:'Spline Sans Mono',monospace;font-size:13px;color:#86897E">No briefings published yet.</div>`
+    ? `<div style="padding:56px 0;font-family:var(--mono);font-size:13px;color:var(--muted)">No articles published yet.</div>`
     : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Briefings — GovRevenue</title>
+<title>Articles — GovRevenue</title>
 <meta name="description" content="Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{background:#ECE7DA;color:#1B1E19;font-family:'Libre Franklin',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-a{color:inherit;text-decoration:none}
-/* nav */
-.ai-nav{position:sticky;top:0;z-index:50;background:rgba(236,231,218,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(27,30,25,.12);height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 32px}
-.ai-nav-left{display:flex;align-items:center;gap:26px}
-.ai-logo{display:flex;align-items:center;gap:9px;font-family:'Newsreader',serif;font-size:20px;font-weight:500;color:#1B1E19}
-.ai-logo-dot{width:10px;height:10px;background:${accent};border-radius:50%}
-.ai-logo span{color:${accent}}
-.ai-nav-links{display:flex;gap:22px;font-size:13.5px;font-weight:500;color:#3A3E36}
-.ai-nav-links a:hover{color:#1B1E19}
-.ai-nav-active{color:#102A1E!important;border-bottom:2px solid ${accent};padding-bottom:2px}
-.ai-nav-right{display:flex;align-items:center;gap:16px}
-.ai-nav-signin{font-size:13.5px;font-weight:500;color:#3A3E36}
-.ai-nav-cta{display:flex;align-items:center;background:#102A1E;color:#F3EFE6;font-size:13px;font-weight:600;padding:9px 16px}
-.ai-nav-cta:hover{opacity:.88}
-/* row list */
-.ai-row{display:grid;grid-template-columns:120px 1fr 110px;gap:28px;align-items:center;padding:24px 26px;border-bottom:1px solid rgba(27,30,25,.1);transition:background .12s;color:inherit;text-decoration:none}
-.ai-row:hover{background:#FBF9F3}
+${pageShellCss()}
+.ai-row{display:grid;grid-template-columns:120px 1fr 110px;gap:28px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
+.ai-row:hover{background:var(--surface)}
 .ai-row:last-child{border-bottom:none}
-.ai-tag{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:${accent}}
-.ai-title{font-family:'Newsreader',serif;font-size:22px;font-weight:500;letter-spacing:-.01em;line-height:1.2;color:#1B1E19}
-.ai-dek{font-size:14px;line-height:1.5;color:#5C6157;margin-top:6px;max-width:640px}
-.ai-meta{text-align:right;font-family:'Spline Sans Mono',monospace;font-size:11px;color:#86897E}
-.ai-read{margin-top:4px;color:#A4A89D}
+.ai-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+.ai-title{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.01em;line-height:1.2;color:var(--text)}
+.ai-dek{font-size:14px;line-height:1.5;color:var(--muted);margin-top:5px;max-width:640px}
+.ai-meta{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.ai-read{margin-top:4px;color:var(--faint)}
 @media(max-width:700px){
-  .ai-nav-links{display:none}
-  .ai-row{grid-template-columns:1fr;gap:8px}
+  .ai-row{grid-template-columns:1fr;gap:6px}
   .ai-meta{text-align:left}
 }
 </style>
 </head>
 <body>
+${pageShellHeader(null, authCtx)}
 
-<header class="ai-nav">
-  <div class="ai-nav-left">
-    <a href="/" class="ai-logo"><div class="ai-logo-dot"></div>Gov<span>Revenue</span></a>
-    <nav class="ai-nav-links">
-      <a href="/desks">Desks</a>
-      <a href="/signals">Signals</a>
-      <a href="/charts">Intelligence</a>
-      <a href="/scan">The Scan</a>
-      <a href="/articles" class="ai-nav-active">Briefings</a>
-    </nav>
-  </div>
-  <div class="ai-nav-right">
-    ${authCtx ? `<a href="/account" class="ai-nav-signin">${escapeHtml(authCtx.email)}</a>` : `<a href="/login" class="ai-nav-signin">Sign in</a>`}
-    <a href="/scan" class="ai-nav-cta">Run a scan</a>
-  </div>
-</header>
-
-<section style="background:#F3EFE6;border-bottom:1px solid rgba(27,30,25,.1)">
-  <div style="max-width:1160px;margin:0 auto;padding:56px 32px 48px">
-    <div style="font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:${accent}">Briefings · field notes from the public record</div>
-    <h1 style="font-family:'Newsreader',serif;font-weight:400;font-size:clamp(38px,5vw,66px);letter-spacing:-.02em;line-height:.98;margin:16px 0 0;max-width:840px">How the public market actually <em style="font-style:italic;color:${accent}">works</em> — written for people who bid.</h1>
-    <p style="max-width:540px;font-size:17px;line-height:1.6;color:#43473F;margin:20px 0 0">Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.</p>
+<section style="background:var(--surface);border-bottom:1px solid var(--border-2)">
+  <div style="max-width:1160px;margin:0 auto;padding:48px 32px 40px">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand)">Articles · field notes from the public record</div>
+    <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(34px,5vw,60px);letter-spacing:-.02em;line-height:1;margin:14px 0 0;max-width:800px">How the public market actually <em style="font-style:italic;color:var(--brand)">works</em> — written for people who bid.</h1>
+    <p style="max-width:520px;font-size:16px;line-height:1.6;color:var(--text-mid);margin:18px 0 0">Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.</p>
   </div>
 </section>
 
 ${featuredHtml}
 
-<section style="max-width:1160px;margin:0 auto;padding:${featured ? "56px" : "48px"} 32px 90px">
-  ${articles.length > 1 || !featured ? `<div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:24px">
-    <div style="font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#5C6157">Latest briefings</div>
-  </div>` : ""}
+<section style="max-width:1160px;margin:0 auto;padding:${featured ? "48px" : "40px"} 32px 80px">
+  ${rest.length > 0 ? `<div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:20px">Latest articles</div>` : ""}
   ${emptyHtml}
-  ${rest.length > 0 ? `<div style="border:1px solid rgba(27,30,25,.14);background:#ECE7DA">${listRows}</div>` : ""}
+  ${rest.length > 0 ? `<div style="border:1px solid var(--border-2);background:var(--base)">${listRows}</div>` : ""}
 </section>
 
 <section style="background:radial-gradient(120% 140% at 20% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6">
-  <div style="max-width:1160px;margin:0 auto;padding:64px 32px;display:flex;align-items:center;justify-content:space-between;gap:40px;flex-wrap:wrap">
+  <div style="max-width:1160px;margin:0 auto;padding:56px 32px;display:flex;align-items:center;justify-content:space-between;gap:40px;flex-wrap:wrap">
     <div>
-      <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:clamp(28px,3vw,40px);letter-spacing:-.02em;line-height:1.05;margin:0">Reading about it is good. Scanning is better.</h2>
-      <p style="font-size:16px;line-height:1.6;color:#C5C9BC;margin:14px 0 0;max-width:440px">Turn the theory into a sourced verdict for your own firm — in two minutes.</p>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3vw,38px);letter-spacing:-.02em;line-height:1.05;margin:0">Reading about it is good. Scanning is better.</h2>
+      <p style="font-size:15px;line-height:1.6;color:#C5C9BC;margin:12px 0 0;max-width:420px">Turn the theory into a sourced verdict for your own firm — in two minutes.</p>
     </div>
-    <a href="/scan" style="display:inline-flex;align-items:center;gap:8px;background:${accent};color:#10110D;font-size:15px;font-weight:600;padding:16px 28px;flex-shrink:0">Run a revenue scan →</a>
+    <a href="/scan" style="display:inline-flex;align-items:center;background:var(--brand);color:#10110D;font-size:14px;font-weight:600;padding:14px 26px;flex-shrink:0">Run a revenue scan →</a>
   </div>
 </section>
 
-<footer style="background:#081710;color:#9AA093">
-  <div style="max-width:1160px;margin:0 auto;padding:30px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.06em">
-    <a href="/" style="font-family:'Newsreader',serif;font-size:17px;color:#ECE6D6;letter-spacing:0">Gov<span style="color:${accent}">Revenue</span></a>
-    <span>PUBLIC RECORD ONLY · INTELLIGENCE, NOT CERTAINTY</span>
-    <a href="/scan" style="color:${accent}">Run a scan →</a>
-  </div>
-</footer>
-
+${pageShellFoot()}
 </body></html>`;
 }
 
