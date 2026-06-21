@@ -13182,17 +13182,57 @@ input[type=checkbox]{accent-color:var(--burg);width:13px;height:13px;cursor:poin
 .insight-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:5px}
 .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px}
 .insight-cell{background:var(--surface-2);padding:16px 18px}
+/* ——— MOBILE SIDEBAR DRAWER ——— */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(26,16,12,.45);z-index:199;backdrop-filter:blur(2px)}
+.sb-overlay.open{display:block}
+.hb-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--text);flex-shrink:0;font-size:18px;line-height:1}
+/* ——— RESPONSIVE ——— */
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:0;height:100vh;z-index:200;width:260px;transform:translateX(-100%);transition:transform .24s cubic-bezier(.4,0,.2,1);box-shadow:none}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.14)}
+  .sidebar.open #sb-close{display:block!important}
+  .hb-btn{display:flex}
+  .topbar{padding:12px 16px;gap:10px}
+  .topbar-title{font-size:16px}
+  .topbar-crumb{display:none}
+  .clock-chip{display:none}
+  .tb-btn.hide-mob{display:none}
+  .section{padding:20px 16px 0}
+  .s-title{font-size:20px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .kpi-val{font-size:26px}
+  .three-col{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .stat-row[style*="repeat(6"]{grid-template-columns:repeat(3,1fr)!important}
+  .stat-row[style*="repeat(5"]{grid-template-columns:repeat(3,1fr)!important}
+  .gap{height:20px}
+  #sel-bar{padding:9px 16px;top:58px}
+  .insight-num{font-size:24px}
+}
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .kpi-val{font-size:22px}
+  .stat-row[style*="repeat(6"]{grid-template-columns:repeat(2,1fr)!important}
+  .stat-row[style*="repeat(5"]{grid-template-columns:repeat(2,1fr)!important}
+  .stat-val{font-size:18px}
+  .section{padding:16px 14px 0}
+  .s-title{font-size:18px}
+  .topbar{padding:10px 14px}
+}
 </style>
 </head>
 <body>
+<div id="sb-overlay" class="sb-overlay" onclick="closeSidebar()"></div>
 <div class="shell">
 
 <!-- ===== SIDEBAR ===== -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="sb-brand">
     <div class="sb-logo-row">
       <div class="sb-dot"></div>
       <div class="sb-logo">Gov<span>Revenue</span></div>
+      <button onclick="closeSidebar()" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1;display:none" id="sb-close" aria-label="Close menu">✕</button>
     </div>
     <div class="sb-tag">Command Centre</div>
   </div>
@@ -13229,14 +13269,15 @@ input[type=checkbox]{accent-color:var(--burg);width:13px;height:13px;cursor:poin
 <main style="min-width:0;display:flex;flex-direction:column">
 
 <header class="topbar">
-  <div class="topbar-left">
+  <button class="hb-btn" onclick="openSidebar()" aria-label="Menu">&#9776;</button>
+  <div class="topbar-left" style="flex:1;min-width:0">
     <div class="topbar-crumb"><span>ADMIN</span><span>/</span><b>SCANS</b></div>
     <div class="topbar-title">Scan Intelligence</div>
   </div>
   <div class="topbar-right">
     <div class="clock-chip"><div class="live-dot"></div><span id="aclock" style="font-size:11px">${new Date().toISOString().slice(0,19).replace("T"," ")} UTC</span></div>
     <a href="/admin/scans?token=${encodeURIComponent(token)}" class="tb-btn">↻ Refresh</a>
-    <a href="/" target="_blank" class="tb-btn">↗ Live site</a>
+    <a href="/" target="_blank" class="tb-btn hide-mob">↗ Live site</a>
   </div>
 </header>
 
@@ -13560,6 +13601,14 @@ function bulkDeleteFailed(){
   document.getElementById('bulk-ids').innerHTML=rows.map(function(c){return'<input type="hidden" name="ids[]" value="'+c.value+'">';}).join('');
   form.submit();
 }
+// mobile sidebar
+var sidebar=document.getElementById('sidebar');
+var overlay=document.getElementById('sb-overlay');
+var sbClose=document.getElementById('sb-close');
+function openSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
+function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
+// close sidebar when nav link clicked on mobile
+sidebar.querySelectorAll('.sb-link[href^="#"]').forEach(function(l){l.addEventListener('click',function(){if(window.innerWidth<=900)closeSidebar();});});
 </script>
 </body>
 </html>`);
