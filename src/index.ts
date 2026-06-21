@@ -20,8 +20,9 @@ import { z } from "zod";
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
+import { createHash } from "node:crypto";
 import { renderWorldClassDashboard } from "./designEngine.js";
-import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
+import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject, storeObject } from "./lib/pdfStorage.js";
 import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail } from "./lib/emailNotifications.js";
 import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
@@ -96,6 +97,28 @@ type SubscriptionRecord = {
   active: boolean;
   created_at: string;
   last_alerted_at: string | null;
+};
+
+type ArticleStatus = "draft" | "scheduled" | "published";
+type CommentStatus = "pending" | "approved" | "spam" | "hidden";
+type ArticleRow = {
+  id: string; slug: string; title: string; dek: string | null;
+  eyebrow: string | null; hero_prompt: string | null; hero_image_url: string | null;
+  body_md: string; desk: string | null; status: ArticleStatus; author_id: string;
+  published_at: string | null; updated_at: string; views: number; reading_time: number;
+  og_image: string | null; seo_title: string | null; seo_description: string | null;
+};
+type ArticleAssetRow = {
+  id: string; article_id: string; kind: "still" | "gif";
+  prompt: string | null; prompt_hash: string | null;
+  image_url: string | null; caption: string | null;
+  position_key: string; rendered_at: string | null;
+};
+type CommentRow = {
+  id: string; article_id: string; user_id: string; parent_id: string | null;
+  body: string; status: CommentStatus; is_author_reply: boolean;
+  like_count: number; created_at: string;
+  author_email?: string; article_slug?: string; article_title?: string;
 };
 
 type ProcurementNotice = {
@@ -1186,6 +1209,72 @@ async function initDb() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS articles (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      dek TEXT,
+      eyebrow TEXT,
+      hero_prompt TEXT,
+      hero_image_url TEXT,
+      body_md TEXT NOT NULL DEFAULT '',
+      desk TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      author_id TEXT NOT NULL,
+      published_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      views INTEGER NOT NULL DEFAULT 0,
+      reading_time INTEGER NOT NULL DEFAULT 1,
+      og_image TEXT,
+      seo_title TEXT,
+      seo_description TEXT
+    );
+    CREATE TABLE IF NOT EXISTS article_revisions (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body_md TEXT NOT NULL,
+      editor_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS article_assets (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'still',
+      prompt TEXT,
+      prompt_hash TEXT,
+      image_url TEXT,
+      caption TEXT,
+      position_key TEXT NOT NULL,
+      rendered_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      parent_id TEXT REFERENCES comments(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      is_author_reply BOOLEAN NOT NULL DEFAULT false,
+      like_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS comment_likes (
+      id TEXT PRIMARY KEY,
+      comment_id TEXT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      is_author BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(comment_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS slug_redirects (
+      old_slug TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
   console.log("[db] ready");
 }
 
@@ -1758,6 +1847,290 @@ async function logAdminAudit(adminUserId: string, action: string, target: string
     `INSERT INTO admin_audit (admin_user_id, action, target, meta_json) VALUES ($1,$2,$3,$4)`,
     [adminUserId, action, target, meta ? JSON.stringify(meta) : null]
   );
+}
+
+// ── Articles helpers ─────────────────────────────────────────────────────────
+
+function computeReadingTime(bodyMd: string): number {
+  const words = bodyMd.replace(/:::[^]*?:::/gm, "").split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 225));
+}
+
+function articlePromptHash(prompt: string): string {
+  return createHash("sha256").update(prompt).digest("hex").slice(0, 16);
+}
+
+function inlineMd(raw: string): string {
+  let s = escapeHtml(raw);
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+  s = s.replace(/~~(.+?)~~/g, "<s>$1</s>");
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return s;
+}
+
+function renderMarkdown(md: string): string {
+  const lines = md.split("\n");
+  let html = "";
+  const paraLines: string[] = [];
+  const listLines: string[] = [];
+
+  const flushPara = () => {
+    const t = paraLines.splice(0).join(" ").trim();
+    if (t) html += `<p>${inlineMd(t)}</p>\n`;
+  };
+  const flushList = () => {
+    if (!listLines.length) return;
+    html += `<ul>${listLines.splice(0).map(l => `<li>${inlineMd(l)}</li>`).join("")}</ul>\n`;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith(":::")) { flushPara(); flushList(); continue; }
+    if (/^#{1,6}\s/.test(line)) {
+      flushPara(); flushList();
+      const lvl = line.match(/^(#+)/)![1].length;
+      const tag = lvl <= 2 ? "h2" : "h3";
+      html += `<${tag}>${inlineMd(line.replace(/^#+\s/, ""))}</${tag}>\n`;
+      continue;
+    }
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      flushPara();
+      listLines.push(line.slice(2));
+      continue;
+    }
+    if (/^[-*]{3,}$/.test(line.trim())) { flushPara(); flushList(); html += `<hr>\n`; continue; }
+    if (line.trim() === "") { flushPara(); flushList(); continue; }
+    if (listLines.length) flushList();
+    paraLines.push(line);
+  }
+  flushPara(); flushList();
+  return html;
+}
+
+function renderImageCard(src: string | null, prompt: string | null, caption: string, ratio: string): string {
+  const aspect = ratio === "1:1" ? "100%" : ratio === "4:5" ? "125%" : "56.25%";
+  const inner = src
+    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(caption)}" style="width:100%;height:100%;object-fit:cover;display:block">`
+    : `<div class="art-placeholder"><div class="art-ph-inner"><span class="art-ph-icon">◻</span><p class="art-ph-label">${escapeHtml(prompt || "Image pending")}</p></div></div>`;
+  return `<figure class="art-img-card">
+  <div class="art-img-wrap" style="padding-bottom:${aspect}">${inner}</div>
+  <figcaption class="art-caption">${inlineMd(caption)}</figcaption>
+</figure>\n`;
+}
+
+function renderGifCard(src: string, caption: string): string {
+  return `<figure class="art-img-card art-gif-card">
+  <img src="${escapeHtml(src)}" alt="${escapeHtml(caption)}" class="art-gif-img" loading="lazy">
+  <figcaption class="art-caption">${inlineMd(caption)}</figcaption>
+</figure>\n`;
+}
+
+function renderDataInterlude(content: string): string {
+  const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+  const sourceIdx = lines.findIndex(l => l.toLowerCase().startsWith("source:"));
+  const source = sourceIdx >= 0 ? lines.splice(sourceIdx, 1)[0] : null;
+  return `<div class="art-record">
+  <div class="art-record-head">ON THE RECORD</div>
+  <div class="art-record-body">${lines.map(l => `<p>${inlineMd(l)}</p>`).join("")}</div>
+  ${source ? `<div class="art-record-source">${inlineMd(source)}</div>` : ""}
+</div>\n`;
+}
+
+function renderPullQuote(content: string): string {
+  return `<blockquote class="art-pullquote"><p>${inlineMd(content.trim())}</p></blockquote>\n`;
+}
+
+function parseShortcodes(bodyMd: string, assets: ArticleAssetRow[] = []): string {
+  const assetMap = new Map(assets.map(a => [a.position_key, a]));
+  let result = "";
+  let remaining = bodyMd;
+  const re = /^:::(image|gif|record|quote)(\{[^}]*\})?[ \t]*\n([\s\S]*?)^:::[ \t]*$/m;
+
+  while (remaining.length > 0) {
+    const m = re.exec(remaining);
+    if (!m) { result += renderMarkdown(remaining); break; }
+
+    const before = remaining.slice(0, m.index);
+    if (before.trim()) result += renderMarkdown(before);
+
+    const type = m[1];
+    const attrsStr = m[2] || "";
+    const inner = m[3];
+
+    const attrs: Record<string, string> = {};
+    let am: RegExpExecArray | null;
+    const attrRe = /(\w+)="([^"]*)"/g;
+    while ((am = attrRe.exec(attrsStr)) !== null) attrs[am[1]] = am[2];
+
+    const captionLine = inner.trim();
+
+    if (type === "image") {
+      const posKey = attrs.key || `img-${m.index}`;
+      const asset = assetMap.get(posKey);
+      result += renderImageCard(
+        asset?.image_url ?? attrs.src ?? null,
+        attrs.prompt ?? null,
+        asset?.caption ?? captionLine,
+        attrs.ratio ?? "16:9"
+      );
+    } else if (type === "gif") {
+      result += renderGifCard(attrs.src ?? "", captionLine);
+    } else if (type === "record") {
+      result += renderDataInterlude(inner);
+    } else if (type === "quote") {
+      result += renderPullQuote(captionLine);
+    }
+
+    remaining = remaining.slice(m.index + m[0].length);
+  }
+  return result;
+}
+
+// ── Articles DB ───────────────────────────────────────────────────────────────
+
+async function getArticleBySlug(slug: string): Promise<ArticleRow | null> {
+  if (!pool) return null;
+  const r = await pool.query<ArticleRow>(`SELECT * FROM articles WHERE slug=$1`, [slug]);
+  return r.rows[0] ?? null;
+}
+
+async function getArticleById(id: string): Promise<ArticleRow | null> {
+  if (!pool) return null;
+  const r = await pool.query<ArticleRow>(`SELECT * FROM articles WHERE id=$1`, [id]);
+  return r.rows[0] ?? null;
+}
+
+async function getArticleAssets(articleId: string): Promise<ArticleAssetRow[]> {
+  if (!pool) return [];
+  const r = await pool.query<ArticleAssetRow>(`SELECT * FROM article_assets WHERE article_id=$1 ORDER BY position_key`, [articleId]);
+  return r.rows;
+}
+
+async function getArticleComments(articleId: string): Promise<CommentRow[]> {
+  if (!pool) return [];
+  const r = await pool.query<CommentRow>(
+    `SELECT c.*, u.email AS author_email FROM comments c
+     JOIN users u ON u.id=c.user_id
+     WHERE c.article_id=$1 AND c.status='approved'
+     ORDER BY c.created_at ASC`,
+    [articleId]
+  );
+  return r.rows;
+}
+
+async function incrementArticleViews(id: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(`UPDATE articles SET views=views+1 WHERE id=$1`, [id]);
+}
+
+async function saveArticleRevision(articleId: string, title: string, bodyMd: string, editorId: string): Promise<void> {
+  if (!pool) return;
+  const revId = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  await pool.query(
+    `INSERT INTO article_revisions (id, article_id, title, body_md, editor_id) VALUES ($1,$2,$3,$4,$5)`,
+    [revId, articleId, title, bodyMd, editorId]
+  );
+}
+
+async function renderArticleImages(articleId: string): Promise<void> {
+  if (!pool) return;
+  const article = await getArticleById(articleId);
+  if (!article) return;
+
+  // Collect all prompts: body shortcodes + hero
+  const toRender: Array<{ posKey: string; prompt: string; ratio: string; isHero: boolean }> = [];
+
+  const re = /:::image\{([^}]*)\}/gm;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+  while ((m = re.exec(article.body_md)) !== null) {
+    const attrs: Record<string, string> = {};
+    const attrRe = /(\w+)="([^"]*)"/g; let am: RegExpExecArray | null;
+    while ((am = attrRe.exec(m[1])) !== null) attrs[am[1]] = am[2];
+    if (attrs.prompt) {
+      toRender.push({ posKey: attrs.key ?? `img-${idx}`, prompt: attrs.prompt, ratio: attrs.ratio ?? "16:9", isHero: false });
+    }
+    idx++;
+  }
+
+  if (article.hero_prompt) {
+    toRender.push({ posKey: "hero", prompt: article.hero_prompt, ratio: "16:9", isHero: true });
+  }
+
+  for (const item of toRender) {
+    try {
+      const existing = await pool.query<{ prompt_hash: string; image_url: string | null }>(
+        `SELECT prompt_hash, image_url FROM article_assets WHERE article_id=$1 AND position_key=$2`,
+        [articleId, item.posKey]
+      );
+      const hash = articlePromptHash(item.prompt);
+      // Skip if already rendered with same prompt
+      if (existing.rows[0]?.prompt_hash === hash && existing.rows[0]?.image_url) continue;
+
+      const dalleSize = item.ratio === "1:1" ? "1024x1024" : item.ratio === "4:5" ? "1024x1792" : "1792x1024";
+
+      console.log(`[article-images] generating ${item.posKey} for article ${articleId} (${dalleSize})`);
+
+      const response = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: item.prompt,
+        n: 1,
+        size: dalleSize as "1024x1024" | "1792x1024" | "1024x1792",
+        quality: "standard",
+        response_format: "url",
+      });
+
+      const tempUrl = response.data?.[0]?.url;
+      if (!tempUrl) { console.warn(`[article-images] no URL returned for ${item.posKey}`); continue; }
+
+      // Download immediately — DALL-E URLs expire in ~1 hour
+      let finalUrl = tempUrl;
+      if (isPdfStorageConfigured()) {
+        const imgRes = await fetch(tempUrl);
+        const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+        const stored = await storeObject({
+          key: `articles/${articleId}/${item.posKey}.png`,
+          body: imgBuf,
+          contentType: "image/png",
+        });
+        if (stored?.publicUrl) finalUrl = stored.publicUrl;
+      }
+
+      const now = new Date().toISOString();
+      if (existing.rows[0]) {
+        await pool.query(
+          `UPDATE article_assets SET prompt_hash=$1, image_url=$2, rendered_at=$3 WHERE article_id=$4 AND position_key=$5`,
+          [hash, finalUrl, now, articleId, item.posKey]
+        );
+      } else {
+        const assetId = `ast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        await pool.query(
+          `INSERT INTO article_assets (id, article_id, kind, prompt, prompt_hash, image_url, position_key, rendered_at)
+           VALUES ($1,$2,'still',$3,$4,$5,$6,$7)`,
+          [assetId, articleId, item.prompt, hash, finalUrl, item.posKey, now]
+        );
+      }
+
+      // Update hero_image_url + og_image on the article row
+      if (item.isHero) {
+        await pool.query(
+          `UPDATE articles SET hero_image_url=$1, og_image=$1, updated_at=$2 WHERE id=$3`,
+          [finalUrl, now, articleId]
+        );
+      }
+
+      console.log(`[article-images] ✓ rendered ${item.posKey}: ${finalUrl}`);
+
+      // Pace between calls — DALL-E 3 rate limit is 5 img/min on standard tier
+      await new Promise(r => setTimeout(r, 13_000));
+    } catch (err) {
+      console.error(`[article-images] failed for ${item.posKey}`, err);
+      captureError(err, { articleImages: { articleId, posKey: item.posKey } });
+    }
+  }
+
+  console.log(`[article-images] done for article ${articleId}`);
 }
 
 async function updateScanCachedField(id: string, field: "capability_statement" | "outreach_emails" | "frameworks_assessment", value: string) {
@@ -4355,6 +4728,693 @@ function assessDataQuality(scan: ScanRecord) {
 
 function stripReportTitleFromMarkdown(markdown: string): string {
   return markdown.replace(/^#\s+GovRevenue\s+Scan:[^\n]*\n?/im, "");
+}
+
+// ── Article page ─────────────────────────────────────────────────────────────
+
+function articlePageCss(): string {
+  return `
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;--surface-3:#1E2A3A;
+  --brand:#A0522D;--brand-hot:#B8673A;--brand-dim:rgba(160,82,45,.15);
+  --green:#22C55E;--red:#EF4444;
+  --text:#D4DAE4;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
+  --border:#1E2A3A;--border-2:#222E40;--border-3:#2A3848;
+  --sans:"Libre Franklin",system-ui,-apple-system,sans-serif;
+  --mono:"Spline Sans Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+/* nav */
+.art-nav{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:56px}
+.art-nav-logo{font-family:var(--serif);font-size:19px;font-weight:500;color:var(--text)}
+.art-nav-logo b{color:var(--brand)}
+.art-nav-dot{width:8px;height:8px;background:var(--brand);border-radius:50%;margin-right:9px;display:inline-block}
+.art-nav-links{display:flex;gap:20px;align-items:center;font-size:13px;font-weight:500;color:var(--muted)}
+.art-nav-links a:hover{color:var(--text)}
+.art-nav-cta{background:var(--brand);color:#fff;font-size:12px;font-weight:600;padding:8px 14px;letter-spacing:.02em;transition:opacity .15s}
+.art-nav-cta:hover{opacity:.85}
+/* article shell */
+.art-shell{max-width:720px;margin:0 auto;padding:0 24px}
+/* title block */
+.art-titleblock{padding:56px 0 32px}
+.art-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.art-title{font-family:var(--serif);font-size:clamp(30px,5vw,48px);font-weight:500;letter-spacing:-.02em;line-height:1.1;color:#ECE6D6;margin-bottom:14px}
+.art-dek{font-family:var(--mono);font-size:14px;line-height:1.5;color:var(--brand);margin-bottom:24px;font-style:italic}
+.art-meta{display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);padding-bottom:24px;border-bottom:1px solid var(--border-2)}
+.art-meta-dot{color:var(--brand)}
+/* prose body */
+.art-body{padding:40px 0}
+.art-body p{font-size:19px;line-height:1.75;color:var(--text-mid);margin-bottom:1.4em}
+.art-body h2{font-family:var(--serif);font-size:24px;font-weight:500;color:#ECE6D6;margin:2.2em 0 .8em;letter-spacing:-.01em}
+.art-body h3{font-size:18px;font-weight:600;color:var(--text);margin:1.8em 0 .6em}
+.art-body ul{margin:0 0 1.4em 1.4em;color:var(--text-mid)}
+.art-body li{font-size:19px;line-height:1.75;margin-bottom:.4em}
+.art-body hr{border:none;border-top:1px solid var(--border-2);margin:2.4em 0}
+.art-body s{color:var(--muted);text-decoration:line-through}
+.art-body strong{color:var(--text);font-weight:600}
+.art-body a{color:var(--brand);text-decoration:underline;text-underline-offset:3px}
+/* image & gif cards */
+.art-img-card{margin:2.4em -20px;border:1px solid var(--border-2);border-radius:4px;overflow:hidden;background:var(--surface)}
+.art-img-wrap{position:relative;width:100%}
+.art-img-wrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.art-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-2)}
+.art-ph-inner{text-align:center;padding:20px}
+.art-ph-icon{font-size:28px;color:var(--brand);display:block;margin-bottom:10px}
+.art-ph-label{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5;max-width:300px}
+.art-gif-card{margin:2.4em -20px}
+.art-gif-img{width:100%;display:block;border-radius:4px}
+.art-caption{font-family:var(--mono);font-size:12px;font-style:italic;color:var(--brand);padding:10px 14px;background:var(--surface);border-top:1px solid var(--border-2)}
+/* data interlude */
+.art-record{margin:2.4em 0;border:1px solid var(--border-2);background:var(--surface);padding:20px 24px;font-family:var(--mono)}
+.art-record-head{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border-2)}
+.art-record-body p{font-size:16px;color:var(--text);line-height:1.6;margin-bottom:.6em}
+.art-record-source{font-size:10px;color:var(--muted);margin-top:14px;padding-top:10px;border-top:1px solid var(--border-2)}
+/* pull quote */
+.art-pullquote{margin:2.4em 0;padding:20px 24px;border-left:3px solid var(--brand);background:var(--surface)}
+.art-pullquote p{font-family:var(--serif);font-size:22px;font-weight:500;color:#ECE6D6;line-height:1.4;font-style:italic}
+/* CTA strip */
+.art-cta-strip{margin:3em 0;padding:24px;background:var(--surface);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.art-cta-text{font-size:16px;color:var(--text-mid);line-height:1.5}
+.art-cta-btn{background:var(--brand);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;padding:12px 20px;white-space:nowrap;flex-shrink:0;transition:opacity .15s}
+.art-cta-btn:hover{opacity:.85}
+/* alert subscribe */
+.art-subscribe{margin:2em 0;padding:24px;background:var(--surface-2);border:1px solid var(--border-2)}
+.art-subscribe-head{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.art-subscribe-sub{font-size:14px;color:var(--muted);margin-bottom:16px}
+.art-subscribe-form{display:flex;gap:10px;flex-wrap:wrap}
+.art-subscribe-form input{flex:1 1 220px;padding:11px 14px;background:var(--surface);border:1px solid var(--border-2);color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
+.art-subscribe-form input:focus{border-color:var(--brand)}
+.art-subscribe-form button{background:var(--brand);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 18px;border:none;cursor:pointer;transition:opacity .15s}
+.art-subscribe-form button:hover{opacity:.85}
+/* comments */
+.art-comments{padding:40px 0 64px;border-top:1px solid var(--border-2)}
+.art-comments-head{font-family:var(--serif);font-size:22px;font-weight:500;color:#ECE6D6;margin-bottom:8px}
+.art-comments-meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:32px}
+.art-comment{margin-bottom:24px}
+.art-comment-body{background:var(--surface);border:1px solid var(--border-2);padding:16px 20px}
+.art-comment-meta{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.art-comment-badge{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;background:var(--brand);color:#fff}
+.art-comment-author{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.art-comment-time{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.art-comment-text{font-size:15px;line-height:1.65;color:var(--text-mid)}
+.art-comment-actions{display:flex;gap:16px;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.art-comment-like{cursor:pointer;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:11px;padding:0;cursor:pointer}
+.art-comment-like:hover{color:var(--brand)}
+.art-comment-author-heart{color:var(--brand)}
+.art-replies{margin-left:24px;margin-top:8px;border-left:2px solid var(--border-2);padding-left:16px}
+.art-comment-form{margin-top:32px;padding:20px;background:var(--surface);border:1px solid var(--border-2)}
+.art-comment-form-head{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.art-comment-form textarea{width:100%;min-height:90px;padding:12px 14px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;resize:vertical;outline:none;font:inherit}
+.art-comment-form textarea:focus{border-color:var(--brand)}
+.art-comment-form button{margin-top:10px;background:var(--brand);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;padding:10px 18px;border:none;cursor:pointer;transition:opacity .15s}
+.art-comment-form button:hover{opacity:.85}
+.art-sign-in-prompt{font-family:var(--mono);font-size:12px;color:var(--muted);padding:16px 0}
+.art-sign-in-prompt a{color:var(--brand);text-decoration:underline}
+/* foot */
+.art-foot{background:var(--surface);border-top:1px solid var(--border-2);padding:20px 40px;font-family:var(--mono);font-size:10px;color:var(--faint);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.art-foot a{color:var(--muted)}.art-foot a:hover{color:var(--text)}
+@media(max-width:720px){
+  .art-nav{padding:0 16px}
+  .art-shell{padding:0 16px}
+  .art-titleblock{padding:36px 0 24px}
+  .art-body p,.art-body li{font-size:17px}
+  .art-img-card,.art-gif-card{margin-left:-16px;margin-right:-16px}
+  .art-nav-links{gap:12px;font-size:12px}
+}`;
+}
+
+function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: CommentRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
+  const bodyHtml = parseShortcodes(article.body_md, assets);
+  const heroHtml = article.hero_image_url
+    ? `<div class="art-hero-img" style="width:100%;max-height:480px;overflow:hidden;border:1px solid var(--border-2);border-radius:4px;margin-bottom:32px"><img src="${escapeHtml(article.hero_image_url)}" alt="${escapeHtml(article.title)}" style="width:100%;height:480px;object-fit:cover;display:block"></div>`
+    : article.hero_prompt
+      ? `<div class="art-hero-img" style="width:100%;height:280px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:4px;margin-bottom:32px;display:flex;align-items:center;justify-content:center"><div style="text-align:center;padding:20px"><div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--brand);text-transform:uppercase;margin-bottom:8px">Image rendering pending</div><p style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:400px;line-height:1.5">${escapeHtml(article.hero_prompt)}</p></div></div>`
+      : "";
+
+  const pubDate = article.published_at ? new Date(article.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+
+  // Build threaded comment tree (one level deep)
+  const topLevel = comments.filter(c => !c.parent_id);
+  const replies = new Map<string, CommentRow[]>();
+  for (const c of comments) {
+    if (c.parent_id) {
+      const r = replies.get(c.parent_id) ?? [];
+      r.push(c);
+      replies.set(c.parent_id, r);
+    }
+  }
+
+  const renderComment = (c: CommentRow, isReply = false): string => {
+    const reps = !isReply ? (replies.get(c.id) ?? []) : [];
+    const authorLabel = c.is_author_reply
+      ? `<span class="art-comment-badge">GovRevenue</span>`
+      : `<span class="art-comment-author">${escapeHtml((c.author_email ?? "").split("@")[0])}</span>`;
+    const likeHtml = c.is_author_reply
+      ? `<span class="art-comment-author-heart">♥ ${c.like_count}</span>`
+      : `<button class="art-comment-like" onclick="likeComment('${escapeHtml(c.id)}',this)">♥ ${c.like_count}</button>`;
+    const timeStr = new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return `<div class="art-comment" id="c-${escapeHtml(c.id)}">
+  <div class="art-comment-body">
+    <div class="art-comment-meta">${authorLabel}<span class="art-comment-time">${timeStr}</span></div>
+    <div class="art-comment-text">${escapeHtml(c.body)}</div>
+    <div class="art-comment-actions">${likeHtml}${!isReply && authCtx ? `<button class="art-comment-like" onclick="showReply('${escapeHtml(c.id)}')">Reply</button>` : ""}</div>
+    ${!isReply && authCtx ? `<div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px"><form method="POST" action="/articles/${escapeHtml(article.slug)}/comments"><input type="hidden" name="parent_id" value="${escapeHtml(c.id)}"><textarea name="body" placeholder="Your reply..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;outline:none"></textarea><br><button type="submit" style="margin-top:6px;background:var(--brand);color:#fff;border:none;padding:8px 14px;font-size:12px;cursor:pointer">Post reply</button></form></div>` : ""}
+  </div>
+  ${reps.length > 0 ? `<div class="art-replies">${reps.map(r => renderComment(r, true)).join("")}</div>` : ""}
+</div>`;
+  };
+
+  const commentsHtml = topLevel.length > 0
+    ? topLevel.map(c => renderComment(c)).join("")
+    : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted)">No comments yet. Be the first.</p>`;
+
+  const commentFormHtml = authCtx
+    ? `<div class="art-comment-form">
+  <div class="art-comment-form-head">&gt;_ Leave a comment</div>
+  <form method="POST" action="/articles/${escapeHtml(article.slug)}/comments">
+    <textarea name="body" placeholder="Your comment..." required></textarea><br>
+    <button type="submit">Post comment</button>
+  </form>
+</div>`
+    : `<p class="art-sign-in-prompt"><a href="/login">Sign in</a> to leave a comment.</p>`;
+
+  const canonical = `https://govrevenue-agent-production.up.railway.app/articles/${escapeHtml(article.slug)}`;
+  const ogImg = article.og_image || article.hero_image_url || "";
+  const seoTitle = article.seo_title || `${article.title} — GovRevenue`;
+  const seoDesc = article.seo_description || article.dek || "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(seoTitle)}</title>
+<meta name="description" content="${escapeHtml(seoDesc)}">
+<link rel="canonical" href="${canonical}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${escapeHtml(seoTitle)}">
+<meta property="og:description" content="${escapeHtml(seoDesc)}">
+${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
+<meta property="article:published_time" content="${escapeHtml(article.published_at ?? "")}">
+<meta property="article:modified_time" content="${escapeHtml(article.updated_at)}">
+<style>${articlePageCss()}</style>
+</head>
+<body>
+<nav class="art-nav">
+  <div style="display:flex;align-items:center">
+    <span class="art-nav-dot"></span>
+    <a href="/" class="art-nav-logo">Gov<b>Revenue</b></a>
+  </div>
+  <div class="art-nav-links">
+    <a href="/desks">Desks</a>
+    <a href="/articles">Articles</a>
+    <a href="/signals">Signals</a>
+    <a href="/scan" class="art-nav-cta">Run a scan</a>
+  </div>
+</nav>
+
+<div class="art-shell">
+  <div class="art-titleblock">
+    ${article.eyebrow ? `<div class="art-eyebrow">${escapeHtml(article.eyebrow)}</div>` : ""}
+    <h1 class="art-title">${escapeHtml(article.title)}</h1>
+    ${article.dek ? `<p class="art-dek">${escapeHtml(article.dek)}</p>` : ""}
+    <div class="art-meta">
+      <span>${pubDate}</span>
+      <span class="art-meta-dot">·</span>
+      <span>${article.reading_time} min read</span>
+      ${article.desk ? `<span class="art-meta-dot">·</span><span>${escapeHtml(article.desk)}</span>` : ""}
+    </div>
+  </div>
+
+  ${heroHtml}
+
+  <div class="art-body">${bodyHtml}</div>
+
+  <div class="art-cta-strip">
+    <p class="art-cta-text">This is the kind of thing a scan surfaces in ten minutes. Run one.</p>
+    <a href="/scan" class="art-cta-btn">Run a scan &rarr;</a>
+  </div>
+
+  <div class="art-subscribe">
+    <div class="art-subscribe-head">Alert me to new signals</div>
+    <p class="art-subscribe-sub">New opportunity in your sector, straight to your inbox.</p>
+    <form class="art-subscribe-form" method="POST" action="/subscribe/briefing">
+      <input type="email" name="email" placeholder="your@email.com" required value="${escapeHtml(authCtx?.email ?? "")}">
+      <button type="submit">Subscribe</button>
+    </form>
+  </div>
+
+  <div class="art-comments">
+    <h2 class="art-comments-head">Discussion</h2>
+    <p class="art-comments-meta">${comments.length} comment${comments.length !== 1 ? "s" : ""}</p>
+    ${commentsHtml}
+    ${commentFormHtml}
+  </div>
+</div>
+
+<footer class="art-foot">
+  <span>© ${new Date().getFullYear()} GovRevenue</span>
+  <div style="display:flex;gap:20px"><a href="/">Home</a><a href="/articles">Articles</a><a href="/scan">Run a scan</a><a href="/pricing">Pricing</a></div>
+</footer>
+<script>
+function likeComment(id, btn) {
+  fetch('/articles/comments/' + id + '/like', { method: 'POST', credentials: 'same-origin' })
+    .then(r => r.json()).then(d => { if (d.count !== undefined) btn.textContent = '♥ ' + d.count; });
+}
+function showReply(id) {
+  const el = document.getElementById('reply-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body></html>`;
+}
+
+function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
+  const cards = articles.map(a => {
+    const date = a.published_at ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+    return `<a class="art-card" href="/articles/${escapeHtml(a.slug)}">
+  ${a.hero_image_url ? `<div class="art-card-img" style="background-image:url('${escapeHtml(a.hero_image_url)}')"></div>` : `<div class="art-card-img art-card-img-ph"></div>`}
+  <div class="art-card-body">
+    ${a.eyebrow ? `<div class="art-card-eyebrow">${escapeHtml(a.eyebrow)}</div>` : ""}
+    <h2 class="art-card-title">${escapeHtml(a.title)}</h2>
+    ${a.dek ? `<p class="art-card-dek">${escapeHtml(a.dek)}</p>` : ""}
+    <div class="art-card-meta">${date} <span style="color:var(--brand)">·</span> ${a.reading_time} min read</div>
+  </div>
+</a>`;
+  }).join("");
+
+  const emptyHtml = articles.length === 0
+    ? `<p style="font-family:var(--mono);font-size:13px;color:var(--muted);padding:40px 0">No articles published yet.</p>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Articles — GovRevenue</title>
+<meta name="description" content="Intelligence on public procurement, written for UK SMEs and diaspora businesses chasing government contracts.">
+<style>${articlePageCss()}
+.art-index-hero{padding:56px 0 40px;border-bottom:1px solid var(--border-2)}
+.art-index-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px}
+.art-index-title{font-family:var(--serif);font-size:clamp(28px,4vw,42px);font-weight:500;color:#ECE6D6;letter-spacing:-.02em;line-height:1.1;margin-bottom:10px}
+.art-index-sub{font-size:15px;color:var(--text-mid);line-height:1.6;max-width:480px}
+.art-index-body{padding:40px 0 80px}
+.art-card{display:block;background:var(--surface);border:1px solid var(--border-2);margin-bottom:16px;transition:border-color .15s}
+.art-card:hover{border-color:var(--brand)}
+.art-card-img{width:100%;height:220px;background:var(--surface-2);background-size:cover;background-position:center}
+.art-card-img-ph{background:var(--surface-2)}
+.art-card-body{padding:20px 24px}
+.art-card-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.art-card-title{font-family:var(--serif);font-size:22px;font-weight:500;color:#ECE6D6;line-height:1.2;margin-bottom:8px}
+.art-card-dek{font-size:14px;color:var(--text-mid);line-height:1.55;margin-bottom:12px}
+.art-card-meta{font-family:var(--mono);font-size:10px;color:var(--muted)}
+@media(min-width:640px){.art-card{display:grid;grid-template-columns:260px 1fr}.art-card-img{height:auto;min-height:180px}}
+</style>
+</head>
+<body>
+<nav class="art-nav">
+  <div style="display:flex;align-items:center">
+    <span class="art-nav-dot"></span>
+    <a href="/" class="art-nav-logo">Gov<b>Revenue</b></a>
+  </div>
+  <div class="art-nav-links">
+    <a href="/desks">Desks</a>
+    <a href="/signals">Signals</a>
+    <a href="/scan" class="art-nav-cta">Run a scan</a>
+  </div>
+</nav>
+<div class="art-shell" style="max-width:780px">
+  <div class="art-index-hero">
+    <div class="art-index-eyebrow">Intelligence</div>
+    <h1 class="art-index-title">Procurement, unfiltered</h1>
+    <p class="art-index-sub">The public money is in plain sight. We're just going to explain exactly how it works.</p>
+  </div>
+  <div class="art-index-body">
+    ${emptyHtml}${cards}
+  </div>
+</div>
+<footer class="art-foot">
+  <span>© ${new Date().getFullYear()} GovRevenue</span>
+  <div style="display:flex;gap:20px"><a href="/">Home</a><a href="/scan">Run a scan</a><a href="/pricing">Pricing</a></div>
+</footer>
+</body></html>`;
+}
+
+// ── Admin articles pages ──────────────────────────────────────────────────────
+
+function adminArticleCss(): string {
+  return `
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090F;--surface:#0B1018;--surface-2:#111A26;--surface-3:#18222F;
+  --brand:#A0522D;--green:#22C55E;--red:#EF4444;--gold:#A0522D;
+  --text:#D4DAE4;--muted:#8893A4;--faint:#566273;
+  --border:#1E2A3A;--border-2:#222E40;
+  --sans:"Libre Franklin",system-ui,-apple-system,sans-serif;
+  --mono:"Spline Sans Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+}
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+/* layout */
+.al-shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.al-sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column}
+.al-logo{font-family:var(--serif);font-size:16px;font-weight:500;color:var(--text);padding:0 18px 18px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.al-logo b{color:var(--brand)}
+.al-nav a{display:block;padding:7px 18px;font-size:12px;color:var(--muted);transition:color .12s}
+.al-nav a:hover,.al-nav a.active{color:var(--text)}
+.al-nav a.active{border-left:2px solid var(--brand);padding-left:16px}
+.al-nav-div{height:1px;background:var(--border);margin:10px 18px}
+.al-main{padding:28px 32px;overflow:auto}
+/* topbar */
+.al-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.al-topbar-title{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text)}
+.al-btn{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:8px 14px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);cursor:pointer;transition:border-color .12s}
+.al-btn:hover{border-color:var(--brand)}
+.al-btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.al-btn-primary:hover{opacity:.85}
+.al-btn-danger{border-color:rgba(239,68,68,.4);color:var(--red)}
+.al-btn-danger:hover{border-color:var(--red)}
+/* table */
+.al-table{width:100%;border-collapse:collapse}
+.al-table th{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border-2)}
+.al-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.al-table tr:hover td{background:var(--surface-2)}
+.al-pill{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:2px}
+.al-pill-published{background:rgba(34,197,94,.12);color:var(--green)}
+.al-pill-draft{background:rgba(136,147,164,.1);color:var(--muted)}
+.al-pill-scheduled{background:rgba(160,82,45,.15);color:var(--brand)}
+.al-pill-pending{background:rgba(239,68,68,.1);color:var(--red)}
+.al-pill-approved{background:rgba(34,197,94,.12);color:var(--green)}
+.al-pill-spam,.al-pill-hidden{background:rgba(239,68,68,.1);color:var(--red)}
+/* editor split */
+.al-editor{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 120px);border:1px solid var(--border-2)}
+.al-editor-pane{overflow:auto;display:flex;flex-direction:column}
+.al-editor-pane-head{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-shrink:0}
+.al-source{flex:1;resize:none;background:var(--bg);color:var(--text);border:none;border-right:1px solid var(--border-2);padding:14px;font-family:var(--mono);font-size:13px;line-height:1.65;outline:none}
+.al-preview-pane{background:var(--surface);border-left:1px solid var(--border-2);overflow:auto}
+.al-preview-iframe{width:100%;height:100%;border:none;background:var(--surface)}
+/* fields panel */
+.al-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.al-field{display:flex;flex-direction:column;gap:4px}
+.al-field-full{grid-column:1/-1}
+.al-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.al-input{width:100%;padding:9px 11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;outline:none}
+.al-input:focus{border-color:var(--brand)}
+.al-select{width:100%;padding:9px 11px;background:var(--surface);border:1px solid var(--border-2);color:var(--text);font-family:var(--mono);font-size:12px;outline:none}
+.al-actions{display:flex;gap:10px;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+/* comment rows */
+.al-comment-row{background:var(--surface);border:1px solid var(--border);padding:14px 16px;margin-bottom:8px}
+.al-comment-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.al-comment-body-text{font-size:13px;color:var(--text);line-height:1.55;margin-bottom:10px}
+.al-comment-actions{display:flex;gap:8px;flex-wrap:wrap}
+.al-empty{font-family:var(--mono);font-size:12px;color:var(--muted);padding:40px 0}
+.al-alert{padding:10px 14px;font-family:var(--mono);font-size:11px;margin-bottom:16px}
+.al-alert-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green)}
+.al-alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red)}
+`;
+}
+
+function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: string): string {
+  const rows = articles.map(a => {
+    const date = a.published_at ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
+    const pill = `<span class="al-pill al-pill-${a.status}">${a.status}</span>`;
+    return `<tr>
+  <td><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a></td>
+  <td>${pill}</td>
+  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(a.desk ?? "—")}</td>
+  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${date}</td>
+  <td style="font-family:var(--mono);font-size:11px">${a.views}</td>
+  <td style="display:flex;gap:6px;flex-wrap:wrap">
+    <a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" class="al-btn" style="font-size:10px;padding:5px 10px">Edit</a>
+    ${a.status === "published" ? `<a href="/articles/${escapeHtml(a.slug)}" target="_blank" class="al-btn" style="font-size:10px;padding:5px 10px">Live ↗</a>` : ""}
+    <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this article?')" style="display:inline">
+      <button class="al-btn al-btn-danger" type="submit" style="font-size:10px;padding:5px 10px">Delete</button>
+    </form>
+  </td>
+</tr>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Articles — Admin — GovRevenue</title>
+<style>${adminArticleCss()}</style>
+</head>
+<body>
+<div class="al-shell">
+  <aside class="al-sidebar">
+    <div class="al-logo">Gov<b>Revenue</b></div>
+    <nav class="al-nav">
+      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="active">Articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}">New article</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}">Comment queue</a>
+    </nav>
+  </aside>
+  <div class="al-main">
+    <div class="al-topbar">
+      <div class="al-topbar-title">Articles</div>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="al-btn al-btn-primary">+ New article</a>
+    </div>
+    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
+    ${articles.length === 0
+      ? `<p class="al-empty">No articles yet. <a href="/admin/articles/new?token=${encodeURIComponent(token)}" style="color:var(--brand)">Write the first one.</a></p>`
+      : `<table class="al-table"><thead><tr><th>Title</th><th>Status</th><th>Desk</th><th>Published</th><th>Views</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`}
+  </div>
+</div>
+</body></html>`;
+}
+
+function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: string, isNew: boolean, msg?: string): string {
+  const v = article ?? {};
+  const titleEsc = escapeHtml(v.title ?? "");
+  const dekEsc = escapeHtml(v.dek ?? "");
+  const eyebrowEsc = escapeHtml(v.eyebrow ?? "");
+  const deskEsc = escapeHtml(v.desk ?? "");
+  const heroPromptEsc = escapeHtml(v.hero_prompt ?? "");
+  const bodyEsc = escapeHtml(v.body_md ?? "");
+  const schedEsc = v.published_at ? new Date(v.published_at).toISOString().slice(0, 16) : "";
+  const id = v.id ?? "";
+  const slug = escapeHtml(v.slug ?? "");
+
+  const formAction = isNew
+    ? `/admin/articles/new?token=${encodeURIComponent(token)}`
+    : `/admin/articles/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`;
+
+  const extraActions = !isNew ? `
+    <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/publish?token=${encodeURIComponent(token)}" style="display:inline">
+      <button class="al-btn al-btn-primary" type="submit">${v.status === "published" ? "Update published" : "Publish"}</button>
+    </form>
+    <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/unpublish?token=${encodeURIComponent(token)}" style="display:inline">
+      <button class="al-btn" type="submit">Unpublish</button>
+    </form>
+    <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/render-images?token=${encodeURIComponent(token)}" style="display:inline">
+      <button class="al-btn" type="submit">Render images</button>
+    </form>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${isNew ? "New article" : escapeHtml(v.title ?? "Edit article")} — Admin — GovRevenue</title>
+<style>${adminArticleCss()}</style>
+</head>
+<body>
+<div class="al-shell">
+  <aside class="al-sidebar">
+    <div class="al-logo">Gov<b>Revenue</b></div>
+    <nav class="al-nav">
+      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}">Articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"${isNew ? ' class="active"' : ""}>New article</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}">Comment queue</a>
+    </nav>
+  </aside>
+  <div class="al-main">
+    <div class="al-topbar">
+      <div class="al-topbar-title">${isNew ? "New article" : "Edit article"}</div>
+      ${!isNew ? `<a href="/articles/${slug}" target="_blank" class="al-btn">View live ↗</a>` : ""}
+    </div>
+    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
+
+    <form method="POST" action="${formAction}" id="article-form">
+      <div class="al-fields">
+        <div class="al-field al-field-full">
+          <label class="al-label">Title</label>
+          <input class="al-input" name="title" value="${titleEsc}" required placeholder="The £369bn nobody told you about">
+        </div>
+        <div class="al-field al-field-full">
+          <label class="al-label">Dek (mono, sienna — one witty line)</label>
+          <input class="al-input" name="dek" value="${dekEsc}" placeholder="A quiet horror story about the public money sitting in plain sight.">
+        </div>
+        <div class="al-field">
+          <label class="al-label">Eyebrow</label>
+          <input class="al-input" name="eyebrow" value="${eyebrowEsc}" placeholder="Procurement">
+        </div>
+        <div class="al-field">
+          <label class="al-label">Desk / tag</label>
+          <input class="al-input" name="desk" value="${deskEsc}" placeholder="Digital & IT">
+        </div>
+        <div class="al-field">
+          <label class="al-label">Status</label>
+          <select class="al-select" name="status">
+            <option value="draft"${v.status === "draft" || !v.status ? " selected" : ""}>Draft</option>
+            <option value="scheduled"${v.status === "scheduled" ? " selected" : ""}>Scheduled</option>
+            <option value="published"${v.status === "published" ? " selected" : ""}>Published</option>
+          </select>
+        </div>
+        <div class="al-field">
+          <label class="al-label">Schedule date (if scheduled)</label>
+          <input class="al-input" name="scheduled_at" type="datetime-local" value="${schedEsc}">
+        </div>
+        <div class="al-field al-field-full">
+          <label class="al-label">Hero image prompt (DALL-E 3)</label>
+          <input class="al-input" name="hero_prompt" value="${heroPromptEsc}" placeholder="Editorial illustration, semi-realistic, cinematic...">
+        </div>
+        ${!isNew ? `<div class="al-field">
+          <label class="al-label">Slug</label>
+          <input class="al-input" name="slug" value="${slug}">
+        </div>` : ""}
+      </div>
+      <div class="al-actions" style="margin-bottom:14px">
+        <button class="al-btn al-btn-primary" type="submit" name="action" value="save">Save draft</button>
+        ${extraActions}
+        ${isNew ? `<button class="al-btn al-btn-primary" type="submit" name="action" value="publish">Publish now</button>` : ""}
+        <a href="/admin/articles?token=${encodeURIComponent(token)}" class="al-btn">Cancel</a>
+      </div>
+    </form>
+
+    <div class="al-editor">
+      <div class="al-editor-pane">
+        <div class="al-editor-pane-head">SOURCE — markdown + shortcodes</div>
+        <textarea class="al-source" id="source" placeholder="Start writing...&#10;&#10;:::image{prompt=&quot;...&quot; ratio=&quot;16:9&quot;}&#10;Caption goes here.&#10;:::&#10;&#10;:::record&#10;GovRevenue indexes £369bn across 17,939 notices.&#10;source: GovRevenue desk index&#10;:::&#10;&#10;:::quote&#10;The money is right there.&#10;:::">${bodyEsc}</textarea>
+      </div>
+      <div class="al-editor-pane">
+        <div class="al-editor-pane-head">PREVIEW</div>
+        <iframe class="al-preview-iframe" id="preview-frame" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const src = document.getElementById('source');
+const frame = document.getElementById('preview-frame');
+const form = document.getElementById('article-form');
+let previewTimer;
+
+function updatePreview() {
+  const body = src.value;
+  fetch('/api/articles/preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ body })
+  }).then(r => r.text()).then(html => {
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+  }).catch(() => {});
+}
+
+src.addEventListener('input', () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updatePreview, 600);
+});
+
+// Wire body textarea into form on submit
+form.addEventListener('submit', () => {
+  let hidden = form.querySelector('[name="body_md"]');
+  if (!hidden) { hidden = document.createElement('input'); hidden.type='hidden'; hidden.name='body_md'; form.appendChild(hidden); }
+  hidden.value = src.value;
+});
+
+updatePreview();
+</script>
+</body></html>`;
+}
+
+function adminCommentsPage(comments: CommentRow[], token: string, filter: string, msg?: string): string {
+  const rows = comments.map(c => {
+    const date = new Date(c.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+    const pill = `<span class="al-pill al-pill-${c.status}">${c.status}</span>`;
+    const isAuthorRep = c.is_author_reply ? `<span class="al-pill al-pill-published" style="font-size:8px">Author</span>` : "";
+    return `<div class="al-comment-row">
+  <div class="al-comment-meta">
+    ${pill}${isAuthorRep}
+    <span>${escapeHtml(c.author_email ?? c.user_id)}</span>
+    <span>on <a href="/articles/${escapeHtml(c.article_slug ?? "")}" style="color:var(--brand)" target="_blank">${escapeHtml(c.article_title ?? c.article_id)}</a></span>
+    <span>${date}</span>
+    <span>♥ ${c.like_count}</span>
+  </div>
+  <div class="al-comment-body-text">${escapeHtml(c.body)}</div>
+  <div class="al-comment-actions">
+    ${c.status === "pending" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/approve?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px;color:var(--green)">Approve</button></form>` : ""}
+    <button class="al-btn" style="font-size:10px;padding:5px 10px" onclick="toggleReply('${escapeHtml(c.id)}')">Reply</button>
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/like?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">♥ Author like</button></form>
+    ${c.status !== "hidden" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/hide?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">Hide</button></form>` : ""}
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/spam?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn al-btn-danger" style="font-size:10px;padding:5px 10px">Spam</button></form>
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete comment?')" style="display:inline"><button class="al-btn al-btn-danger" style="font-size:10px;padding:5px 10px">Delete</button></form>
+  </div>
+  <div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px">
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/reply?token=${encodeURIComponent(token)}">
+      <textarea name="body" placeholder="Your reply (posts as GovRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--bg);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;outline:none"></textarea><br>
+      <button class="al-btn al-btn-primary" type="submit" style="margin-top:6px;font-size:10px">Post reply</button>
+    </form>
+  </div>
+</div>`;
+  }).join("");
+
+  const tabs = ["pending", "approved", "all"].map(t =>
+    `<a href="/admin/articles/comments?token=${encodeURIComponent(token)}&filter=${t}" class="al-btn${filter === t ? " al-btn-primary" : ""}" style="font-size:10px;padding:5px 10px">${t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}</a>`
+  ).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comment queue — Admin — GovRevenue</title>
+<style>${adminArticleCss()}</style>
+</head>
+<body>
+<div class="al-shell">
+  <aside class="al-sidebar">
+    <div class="al-logo">Gov<b>Revenue</b></div>
+    <nav class="al-nav">
+      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}">Articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}">New article</a>
+      <div class="al-nav-div"></div>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="active">Comment queue</a>
+    </nav>
+  </aside>
+  <div class="al-main">
+    <div class="al-topbar">
+      <div class="al-topbar-title">Comments</div>
+      <div style="display:flex;gap:8px">${tabs}</div>
+    </div>
+    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
+    ${comments.length === 0
+      ? `<p class="al-empty">No comments in this queue.</p>`
+      : rows}
+  </div>
+</div>
+<script>
+function toggleReply(id) {
+  const el = document.getElementById('reply-'+id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body></html>`;
 }
 
 function waitingPage(scan: ScanRecord): string {
@@ -8105,91 +9165,6 @@ ${pageShellFoot()}
 </html>`);
 }));
 
-app.get("/articles", (_req, res) => {
-  res.type("html").send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Articles — GovRevenue</title>
-<style>${pageShellCss()}
-/* ── articles page ── */
-.art-page-head{padding:52px 0 40px;border-bottom:1px solid var(--border)}
-.art-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
-h1.art-h1{font-family:var(--sans);font-size:36px;font-weight:800;letter-spacing:-.025em;line-height:1.1;margin-bottom:12px;color:var(--text)}
-.art-sub{font-size:15px;color:var(--muted);max-width:42em}
-.articles-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;padding:40px 0 72px}
-.article-card{border:1px solid var(--border-2);padding:28px;background:var(--surface);display:flex;flex-direction:column;gap:10px;transition:border-color .2s,background .2s}
-.article-card:hover{border-color:rgba(255,255,255,.2);background:var(--surface-2)}
-.art-tag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
-.art-title{font-family:var(--sans);font-size:18px;font-weight:700;line-height:1.25;letter-spacing:-.01em;color:var(--text)}
-.art-desc{font-size:13.5px;color:var(--muted);line-height:1.65;flex:1}
-.art-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;gap:16px}
-.art-cta{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;align-self:flex-start}
-.coming-banner{background:var(--surface-2);border:1px solid var(--border-2);padding:44px 40px;text-align:center;margin:44px 0}
-.coming-banner h2{font-family:var(--sans);font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--text);margin-bottom:10px}
-.coming-banner p{font-size:14px;color:var(--muted);max-width:36em;margin:0 auto 24px}
-.sub-form{display:flex;gap:0;max-width:440px;margin:0 auto;border:1px solid var(--border-2)}
-.sub-form input{flex:1;font-family:var(--mono);font-size:13px;padding:12px 14px;border:0;background:var(--surface);color:var(--text);outline:none}
-.sub-form input::placeholder{color:var(--muted)}
-.sub-form input:focus{outline:2px solid var(--brand);outline-offset:-2px}
-.sub-form button{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:0 20px;background:var(--brand);color:#fff;border:0;cursor:pointer}
-.sub-form button:hover{background:var(--brand-hot)}
-.art-wrap{max-width:1280px;padding:0 40px;margin:0 auto}
-@media(max-width:700px){.articles-grid{grid-template-columns:1fr}h1.art-h1{font-size:26px}.art-wrap{padding:0 16px}}
-</style>
-</head>
-<body>
-${pageShellHeader(null, null)}
-<main>
-<div class="art-wrap">
-  <div class="art-page-head">
-    <div class="art-eyebrow">Intelligence Briefings</div>
-    <h1 class="art-h1">Read before you bid.</h1>
-    <p class="art-sub">Practical intelligence on procurement strategy, buyer mapping, framework access, and how to read the public record before your competitors do.</p>
-  </div>
-  <div class="articles-grid">
-    <div class="article-card">
-      <span class="art-tag">Strategy</span>
-      <div class="art-title">How to read a procurement record before the tender drops</div>
-      <div class="art-desc">Most firms wait for the ITT. The buyers who win consistently start six months earlier &mdash; and the public record tells you exactly when to move.</div>
-      <div class="art-meta"><span>Coming soon</span></div>
-    </div>
-    <div class="article-card">
-      <span class="art-tag">Bid writing</span>
-      <div class="art-title">Evidence grade: why your bid loses before the scoring starts</div>
-      <div class="art-desc">Evaluators can tell within two pages whether a supplier has done the homework. Here&rsquo;s what separates a Bronze bid from a Gold one.</div>
-      <div class="art-meta"><span>Coming soon</span></div>
-    </div>
-    <div class="article-card">
-      <span class="art-tag">Framework access</span>
-      <div class="art-title">The framework shortcut: pre-qualification without the open tender</div>
-      <div class="art-desc">Over 60% of public sector spend flows through frameworks. Most SMEs aren&rsquo;t on them &mdash; and most frameworks are easier to join than they look.</div>
-      <div class="art-meta"><span>Coming soon</span></div>
-    </div>
-    <div class="article-card">
-      <span class="art-tag">Buyer intelligence</span>
-      <div class="art-title">Mapping the buyer: who really controls the budget</div>
-      <div class="art-desc">The contracting authority on the notice is rarely the person you need to speak to. The procurement record tells you who has commissioned before.</div>
-      <div class="art-meta"><span>Coming soon</span></div>
-    </div>
-  </div>
-  <div class="coming-banner">
-    <h2>First briefings publishing soon.</h2>
-    <p>Enter your email and we&rsquo;ll send you each piece as it goes live &mdash; plus a weekly digest of the open contracts most relevant to your sector.</p>
-    <form class="sub-form" action="/form-submit" method="post">
-      <input type="hidden" name="_type" value="briefing">
-      <input type="hidden" name="_source" value="articles">
-      <input type="email" name="email" placeholder="your@email.com" required>
-      <button type="submit">Notify me</button>
-    </form>
-  </div>
-</div>
-</main>
-${pageShellFoot()}
-</body>
-</html>`);
-});
 
 app.get("/charts", asyncRoute(async (req, res) => {
   type DetailPoint = { label: string; total_m: number; open_m: number; notice_count: number; open_count: number };
@@ -11381,6 +12356,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     signalsStatsRes,
     subsRes, briefRes,
     vDaysRes, vPathsRes, vIpsRes, vTodayRes,
+    ordersRes, articleStatsRes, commentStatsRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -11441,6 +12417,20 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     GROUP BY ip ORDER BY visits DESC LIMIT 30`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
     FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours'`),
+    safePool(`SELECT COALESCE(SUM(amount),0)::int AS total_pence,COUNT(*)::int AS order_count,
+      COALESCE(SUM(amount) FILTER(WHERE plan='payg'),0)::int AS payg_pence,
+      COALESCE(SUM(amount) FILTER(WHERE plan='pro'),0)::int AS pro_pence,
+      COALESCE(SUM(amount) FILTER(WHERE plan='agency'),0)::int AS agency_pence
+    FROM orders WHERE status='complete'`),
+    safePool(`SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER(WHERE status='published')::int AS published,
+      COUNT(*) FILTER(WHERE status='draft')::int AS draft,
+      COALESCE(SUM(views),0)::int AS total_views
+    FROM articles`),
+    safePool(`SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER(WHERE status='pending')::int AS pending,
+      COUNT(*) FILTER(WHERE status='approved')::int AS approved
+    FROM comments`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -11460,14 +12450,25 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     displayEmail: (String(s.email || s.email2 || "")).trim(),
   }));
 
+  const revStats  = (ordersRes.rows[0]     as any) || {};
+  const articleStats = (articleStatsRes.rows[0] as any) || {};
+  const commentStats = (commentStatsRes.rows[0] as any) || {};
+
+  const gradeCount: Record<string, number> = {};
+  scans.forEach((s: any) => {
+    const g = (s.edp?.evidenceGrade || "").charAt(0);
+    const key = ["A","B","C","D","E"].includes(g) ? g : "—";
+    gradeCount[key] = (gradeCount[key] || 0) + 1;
+  });
+
   const vColor = (v: string) => {
     const l = v.toLowerCase();
-    if (l.includes("strong") || l.startsWith("yes")) return "#3ddc84";
-    if (l.includes("possible") || l.includes("conditional")) return "#f59e0b";
-    return "#e87979";
+    if (l.includes("strong") || l.startsWith("yes")) return "#15803D";
+    if (l.includes("possible") || l.includes("conditional")) return "#92400E";
+    return "#B91C1C";
   };
   const gColor = (g: string) =>
-    g === "A" ? "#3ddc84" : g === "B" ? "#60a5fa" : g === "C" ? "#f59e0b" : "#e87979";
+    g === "A" ? "#15803D" : g === "B" ? "#1D4ED8" : g === "C" ? "#92400E" : "#B91C1C";
 
   // Pre-compute scan-per-day chart (14 days)
   const days14: string[] = [];
@@ -11487,7 +12488,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       const h = n === 0 ? 2 : Math.max(4, Math.round((n / maxSPerDay) * 64));
       const isToday = d === new Date().toISOString().slice(0, 10);
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${n} scans">
-        <div style="width:100%;height:${h}px;background:${isToday ? "#B4924E" : "rgba(155,44,44,.38)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+        <div style="width:100%;height:${h}px;background:${isToday ? "#B4924E" : "rgba(180,146,78,.35)"};border-radius:1px 1px 0 0;min-height:2px"></div>
         <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
       </div>`;
     }).join("")}
@@ -11507,7 +12508,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
         const h = visits === 0 ? 2 : Math.max(4, Math.round((visits / maxVPerDay) * 64));
         const isToday = d === new Date().toISOString().slice(0, 10);
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${visits} views, ${uips} IPs">
-          <div style="width:100%;height:${h}px;background:${isToday ? "#2563ab" : "rgba(37,99,171,.4)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+          <div style="width:100%;height:${h}px;background:${isToday ? "#1D4ED8" : "rgba(29,78,216,.3)"};border-radius:1px 1px 0 0;min-height:2px"></div>
           <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
         </div>`;
       }).join("")}
@@ -11522,8 +12523,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
           <span style="font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${escapeHtml(p.path)}</span>
           <span style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px;flex-shrink:0">${Number(p.visits).toLocaleString()}</span>
         </div>
-        <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px">
-          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#2563ab;opacity:.7;border-radius:2px"></div>
+        <div style="height:3px;background:rgba(0,0,0,.08);border-radius:2px">
+          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#B4924E;opacity:.8;border-radius:2px"></div>
         </div>
       </div>`).join("");
 
@@ -11664,100 +12665,111 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GovRevenue — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Spline+Sans+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --accent:#A0522D;--accent-hot:#B8673A;--slate:#566273;--green:#22C55E;--gold:#F59E0B;--blue:#3B82F6;
-  --serif:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
-  --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
-  --bg:#06090F;--surface:#0B1018;--surface-2:#111A26;
-  --border:rgba(255,255,255,.06);--border-2:rgba(255,255,255,.1);
-  --muted:#8893A4;--text:#E9EEF5;
+  --base:#F4F1E9;--surface:#FFFFFF;--surface-2:#F9F7F2;
+  --brand:#B4924E;--brand-dim:rgba(180,146,78,.1);--brand-mid:rgba(180,146,78,.3);
+  --border:#E5DFD4;--border-2:#D4CBBA;
+  --text:#1A1208;--muted:#7D6B50;--muted-2:#A8957C;
+  --green:#15803D;--green-bg:#F0FDF4;
+  --red:#B91C1C;--red-bg:#FEF2F2;
+  --amber:#92400E;--amber-bg:#FFFBEB;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;
+  --serif:"Newsreader",Georgia,serif;
+  --sans:"Libre Franklin",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"Spline Sans Mono","SF Mono",ui-monospace,Menlo,monospace;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
+html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:none}
 a:hover{text-decoration:underline}
 .shell{display:flex;min-height:100vh}
-.sidebar{width:210px;flex-shrink:0;background:#060A0D;border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
+.sidebar{width:224px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
-.sb-brand{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
-.sb-logo{font-family:var(--sans);font-size:19px;font-weight:800;letter-spacing:-.03em;color:var(--text)}
-.sb-logo b{color:var(--accent)}
-.sb-tag{font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:3px}
-.sb-nav{padding:10px 0;flex:1}
-.sb-link{display:flex;align-items:center;gap:8px;padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-decoration:none!important;transition:all .12s;border-left:2px solid transparent}
-.sb-link:hover{color:var(--text);background:rgba(255,255,255,.04);text-decoration:none}
-.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(160,82,45,.14)}
-.sb-count{margin-left:auto;background:rgba(255,255,255,.08);font-size:9px;padding:1px 5px;border-radius:8px}
-.sb-div{height:1px;background:var(--border);margin:5px 16px}
-.sb-foot{padding:10px 12px;border-top:1px solid var(--border);margin-top:auto}
-.sb-token{font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:7px;letter-spacing:.04em}
-.sb-action{display:block;width:100%;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:4px;transition:.12s;text-decoration:none}
-.sb-action:hover{background:rgba(255,255,255,.1);color:var(--text);text-decoration:none}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:#060A0D;position:sticky;top:0;z-index:150}
-.topbar-title{font-family:var(--serif);font-size:15px;font-weight:600}
-.topbar-meta{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
-.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px;animation:lp 2s infinite}
+.sb-brand{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.sb-logo b{color:var(--brand)}
+.sb-tag{font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin-top:4px}
+.sb-nav{padding:6px 0;flex:1}
+.sb-group{font-family:var(--mono);font-size:7.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);padding:12px 18px 3px}
+.sb-link{display:flex;align-items:center;gap:8px;padding:7px 18px;font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--muted);text-decoration:none!important;transition:color .12s,background .12s;border-left:2px solid transparent}
+.sb-link:hover{color:var(--text);background:var(--surface-2);text-decoration:none}
+.sb-link.active{color:var(--brand);border-left-color:var(--brand);background:var(--brand-dim)}
+.sb-count{margin-left:auto;background:var(--base);border:1px solid var(--border);font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:8px;color:var(--muted)}
+.sb-div{height:1px;background:var(--border);margin:4px 18px}
+.sb-foot{padding:12px;border-top:1px solid var(--border);margin-top:auto}
+.sb-token{font-family:var(--mono);font-size:8px;color:var(--muted-2);margin-bottom:8px;letter-spacing:.04em}
+.sb-action{display:block;width:100%;padding:7px 10px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:5px;transition:.12s;text-decoration:none;border-radius:5px}
+.sb-action:hover{background:var(--brand-dim);border-color:var(--brand-mid);color:var(--brand);text-decoration:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:150}
+.topbar-left{display:flex;align-items:center;gap:14px}
+.topbar-title{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--text)}
+.topbar-date{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
+.topbar-meta{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;animation:lp 2s infinite}
 @keyframes lp{0%,100%{opacity:1}50%{opacity:.25}}
-.section{padding:24px 24px 0}
-.s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-.s-eyebrow{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
-.s-title{font-family:var(--sans);font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.05;color:#fff}
-.s-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
-.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px}
-.kpi{background:var(--surface);padding:16px 14px 12px}
-.kpi-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
-.kpi-val{font-family:var(--sans);font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;color:#fff}
-.kpi-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px}
-.kpi-green{color:#3ddc84}.kpi-red{color:#e87979}.kpi-gold{color:#f59e0b}.kpi-blue{color:#60a5fa}
-.stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:12px}
-.stat-cell{background:var(--surface-2);padding:12px 14px}
-.stat-val{font-family:var(--serif);font-size:19px;color:var(--text);margin-bottom:2px}
-.stat-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:16px;border-radius:10px;backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);position:relative;overflow:hidden;transition:transform .22s ease,border-color .22s,box-shadow .22s}
-.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 55%);pointer-events:none}
-.card:hover{transform:perspective(700px) translateY(-4px) rotateX(2deg);border-color:rgba(255,255,255,.15);box-shadow:0 20px 40px -16px rgba(0,0,0,.6)}
-.card-head{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between}
-.card-head-val{color:var(--text);font-size:10.5px;text-transform:none;letter-spacing:0}
-.tier-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.tier-lbl{font-family:var(--mono);font-size:9.5px;width:52px;flex-shrink:0}
-.tier-track{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px}
+.section{padding:28px 28px 0}
+.s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid var(--border)}
+.s-eyebrow{font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:4px}
+.s-title{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.05;color:var(--text)}
+.s-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted-2)}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.kpi{background:var(--surface);padding:18px 16px 14px}
+.kpi-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);margin-bottom:8px}
+.kpi-val{font-family:var(--serif);font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--text)}
+.kpi-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px}
+.kpi-green{color:var(--green)}.kpi-red{color:var(--red)}.kpi-gold{color:var(--brand)}.kpi-blue{color:var(--blue)}
+.stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.stat-cell{background:var(--surface-2);padding:14px 16px}
+.stat-val{font-family:var(--serif);font-size:22px;font-weight:600;color:var(--text);margin-bottom:2px}
+.stat-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);padding:18px;border-radius:10px;transition:box-shadow .2s;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.07)}
+.card-head{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-head-val{color:var(--text);font-size:11px;text-transform:none;letter-spacing:0;font-weight:600}
+.tier-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.tier-lbl{font-family:var(--mono);font-size:9.5px;width:52px;flex-shrink:0;color:var(--muted)}
+.tier-track{flex:1;height:5px;background:var(--border);border-radius:3px}
 .tier-fill{height:100%;border-radius:3px}
-.tier-n{font-family:var(--mono);font-size:9.5px;color:var(--text);width:20px;text-align:right;flex-shrink:0}
-.tbl-wrap{overflow-x:auto;border:1px solid var(--border)}
+.tier-n{font-family:var(--mono);font-size:9.5px;color:var(--text);width:22px;text-align:right;flex-shrink:0;font-weight:600}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
 .scroll-tbl{max-height:480px;overflow-y:auto}
 table.a-tbl{border-collapse:collapse;width:100%;font-size:12px}
-table.a-tbl th{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 11px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface);position:sticky;top:0;z-index:10}
-table.a-tbl td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
-table.a-tbl tr:hover td{background:rgba(255,255,255,.02)}
-.pill{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:2px;font-weight:500;border:1px solid}
-.pill-completed{background:#0a2018;color:#3ddc84;border-color:#1d6b4f44}
-.pill-failed{background:#200a0a;color:#e87979;border-color:#9b2d2044}
-.pill-running,.pill-pending{background:#20160a;color:#f59e0b;border-color:#b4530944}
-.pill-free{background:#141e28;color:var(--muted);border-color:rgba(255,255,255,.1)}
-.pill-pro{background:#200a0a;color:#e87979;border-color:#9b2d2044}
-.pill-agency{background:#20160a;color:#f59e0b;border-color:#a9793244}
-.pill-active{background:#0a2018;color:#3ddc84;border-color:#1d6b4f44}
-.pill-inactive{background:#141e28;color:var(--muted);border-color:rgba(255,255,255,.08)}
-.a-btn{display:inline-block;font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.12s;background:none;white-space:nowrap}
-.a-btn:hover{background:rgba(255,255,255,.07);color:var(--text);text-decoration:none}
-.a-btn-danger{border-color:rgba(155,45,45,.4);color:#e87979}
-.a-btn-danger:hover{background:#200a0a}
-.a-btn-ok{border-color:rgba(29,107,79,.4);color:#3ddc84}
-.a-btn-ok:hover{background:#0a2018}
-#sel-bar{display:none;align-items:center;gap:10px;padding:8px 24px;background:rgba(155,44,44,.12);border-bottom:1px solid rgba(155,44,44,.3);position:sticky;top:46px;z-index:140}
+table.a-tbl th{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface-2);position:sticky;top:0;z-index:10}
+table.a-tbl td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+table.a-tbl tr:last-child td{border-bottom:none}
+table.a-tbl tr:hover td{background:var(--brand-dim)}
+.pill{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px;font-weight:600;border:1px solid}
+.pill-completed{background:var(--green-bg);color:var(--green);border-color:rgba(21,128,61,.2)}
+.pill-failed{background:var(--red-bg);color:var(--red);border-color:rgba(185,28,28,.2)}
+.pill-running,.pill-pending{background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)}
+.pill-free{background:var(--base);color:var(--muted);border-color:var(--border-2)}
+.pill-pro{background:var(--brand-dim);color:var(--brand);border-color:var(--brand-mid)}
+.pill-agency{background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)}
+.pill-active{background:var(--green-bg);color:var(--green);border-color:rgba(21,128,61,.2)}
+.pill-inactive{background:var(--base);color:var(--muted);border-color:var(--border)}
+.a-btn{display:inline-block;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.12s;background:var(--surface);white-space:nowrap;border-radius:5px}
+.a-btn:hover{background:var(--base);border-color:var(--border-2);color:var(--text);text-decoration:none}
+.a-btn-danger{border-color:rgba(185,28,28,.25);color:var(--red);background:var(--red-bg)}
+.a-btn-danger:hover{background:var(--red-bg);border-color:rgba(185,28,28,.4)}
+.a-btn-ok{border-color:rgba(21,128,61,.25);color:var(--green);background:var(--green-bg)}
+.a-btn-ok:hover{background:var(--green-bg);border-color:rgba(21,128,61,.4)}
+#sel-bar{display:none;align-items:center;gap:10px;padding:9px 28px;background:rgba(185,28,28,.05);border-bottom:1px solid rgba(185,28,28,.12);position:sticky;top:46px;z-index:140}
 #sel-bar.visible{display:flex}
-.a-alert-ok{padding:9px 16px;background:#0a2018;border:1px solid #1d6b4f44;color:#3ddc84;font-family:var(--mono);font-size:10.5px;margin-bottom:12px;border-radius:2px}
-.env-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.a-alert-ok{padding:10px 18px;background:var(--green-bg);border:1px solid rgba(21,128,61,.2);color:var(--green);font-family:var(--mono);font-size:10.5px;margin-bottom:14px;border-radius:6px}
+.env-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.env-row:last-child{border-bottom:none}
 .env-key{font-family:var(--mono);font-size:10px;color:var(--muted);width:210px;flex-shrink:0}
-.env-set{color:#3ddc84;font-family:var(--mono);font-size:10px}
-.env-unset{color:var(--muted);opacity:.4;font-family:var(--mono);font-size:10px}
+.env-set{color:var(--green);font-family:var(--mono);font-size:10px;font-weight:600}
+.env-unset{color:var(--muted-2);opacity:.6;font-family:var(--mono);font-size:10px}
 .env-val{font-family:var(--mono);font-size:10px;color:var(--text)}
-.gap{height:24px}
-input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;cursor:pointer}
+.gap{height:28px}
+input[type=checkbox]{accent-color:var(--brand);width:12px;height:12px;cursor:pointer}
+.insight-num{font-family:var(--serif);font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--text)}
+.insight-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:5px}
 </style>
 </head>
 <body>
@@ -11768,17 +12780,21 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;cursor:po
     <div class="sb-tag">Command Centre</div>
   </div>
   <nav class="sb-nav">
+    <div class="sb-group">Intelligence</div>
     <a href="#overview" class="sb-link active">Overview</a>
     <a href="#scans" class="sb-link">Scans <span class="sb-count">${ss.total || 0}</span></a>
     <a href="#users" class="sb-link">Users <span class="sb-count">${us.total || 0}</span></a>
-    <div class="sb-div"></div>
+    <div class="sb-group">Analytics</div>
     <a href="#visitors" class="sb-link">Visitors</a>
-    <a href="#signals" class="sb-link">Signals <span class="sb-count">${sigs.total || 0}</span></a>
-    <div class="sb-div"></div>
+    <a href="#signals" class="sb-link">Signals <span class="sb-count">${Number(sigs.total||0).toLocaleString()}</span></a>
+    <div class="sb-group">Audience</div>
     <a href="#alerts" class="sb-link">Alerts <span class="sb-count">${activeSubCount}</span></a>
     <a href="#briefing" class="sb-link">Briefing <span class="sb-count">${briefing.length}</span></a>
-    <div class="sb-div"></div>
-    <a href="#system" class="sb-link">System</a>
+    <div class="sb-group">Content</div>
+    <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles <span class="sb-count">${articleStats.total||0}</span></a>
+    <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comments${Number(commentStats.pending||0)>0?` <span class="sb-count" style="background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)">${commentStats.pending}</span>`:""}</a>
+    <div class="sb-group">System</div>
+    <a href="#system" class="sb-link">System Status</a>
   </nav>
   <div class="sb-foot">
     <div class="sb-token">Token: ****${escapeHtml(token.slice(-6))}</div>
@@ -11792,16 +12808,19 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;cursor:po
   </div>
 </aside>
 <div class="main">
+
 <div class="topbar">
-  <div class="topbar-title">Admin Command Centre</div>
+  <div class="topbar-left">
+    <div class="topbar-title">Admin Dashboard</div>
+    <div class="topbar-date"><span class="live-dot"></span><span id="aclock">${new Date().toISOString().slice(0,19).replace("T"," ")} UTC</span></div>
+  </div>
   <div class="topbar-meta">
-    <span><span class="live-dot"></span>Live</span>
-    <span id="aclock">${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC</span>
-    <a href="/admin/scans?token=${encodeURIComponent(token)}" style="color:var(--muted)">↻ Refresh</a>
-    <a href="/" target="_blank" style="color:var(--muted)">↗ Site</a>
+    <a href="/admin/scans?token=${encodeURIComponent(token)}" style="color:var(--brand);font-weight:600">↻ Refresh</a>
+    <a href="/" target="_blank" style="color:var(--muted)">↗ Live site</a>
   </div>
 </div>
-${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} scan(s) re-queued.</div>` : ""}
+
+${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} scan(s) re-queued.</div>` : ""}
 <div id="sel-bar">
   <span id="sel-count" style="font-family:var(--mono);font-size:11px">0 selected</span>
   <button class="a-btn a-btn-ok" onclick="bulkAction('rerun')">↻ Re-run</button>
@@ -11818,28 +12837,72 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     <div><div class="s-eyebrow">Dashboard</div><div class="s-title">Overview</div></div>
     <div class="s-sub">${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
   </div>
+
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-lbl">Total Scans</div><div class="kpi-val">${ss.total || 0}</div><div class="kpi-sub"><span class="kpi-green">+${ss.today || 0}</span> today &middot; ${ss.this_week || 0} this week</div></div>
-    <div class="kpi"><div class="kpi-lbl">Success Rate</div><div class="kpi-val ${Number(ss.success_rate || 0) >= 80 ? "kpi-green" : "kpi-red"}">${ss.success_rate || 0}%</div><div class="kpi-sub">${ss.completed || 0} ok &middot; ${ss.failed || 0} failed</div></div>
-    <div class="kpi"><div class="kpi-lbl">Registered Users</div><div class="kpi-val">${us.total || 0}</div><div class="kpi-sub"><span class="kpi-green">+${us.new_this_week || 0}</span> this week</div></div>
-    <div class="kpi"><div class="kpi-lbl">Open Signals</div><div class="kpi-val kpi-red">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div><div class="kpi-sub">${sigs.new_24h || 0} new &middot; ${sigs.closing_7d || 0} closing</div></div>
-    <div class="kpi"><div class="kpi-lbl">Open Value</div><div class="kpi-val" style="font-size:20px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="kpi-sub">${sigs.categories || 0} active desks</div></div>
-    <div class="kpi"><div class="kpi-lbl">Visitors Today</div><div class="kpi-val kpi-blue">${Number(vToday.total || 0).toLocaleString()}</div><div class="kpi-sub">${Number(vToday.unique_ips || 0)} unique IPs</div></div>
+    <div class="kpi">
+      <div class="kpi-lbl">Total Scans</div>
+      <div class="kpi-val">${ss.total || 0}</div>
+      <div class="kpi-sub"><span class="kpi-green">+${ss.today || 0}</span> today &middot; ${ss.this_week || 0} this week</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Success Rate</div>
+      <div class="kpi-val ${Number(ss.success_rate || 0) >= 80 ? "kpi-green" : "kpi-red"}">${ss.success_rate || 0}%</div>
+      <div class="kpi-sub">${ss.completed || 0} ok &middot; ${ss.failed || 0} failed</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Registered Users</div>
+      <div class="kpi-val">${us.total || 0}</div>
+      <div class="kpi-sub"><span class="kpi-green">+${us.new_this_week || 0}</span> this week</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Open Signals</div>
+      <div class="kpi-val kpi-gold">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div>
+      <div class="kpi-sub">${sigs.new_24h || 0} new &middot; ${sigs.closing_7d || 0} closing soon</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Open Value</div>
+      <div class="kpi-val" style="font-size:22px">${fmtMoney(Number(sigs.open_value || 0))}</div>
+      <div class="kpi-sub">${sigs.categories || 0} active desks</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Visitors Today</div>
+      <div class="kpi-val kpi-blue">${Number(vToday.total || 0).toLocaleString()}</div>
+      <div class="kpi-sub">${Number(vToday.unique_ips || 0)} unique IPs</div>
+    </div>
   </div>
-  <div class="two-col">
+
+  <div class="three-col">
     <div class="card">
       <div class="card-head">User Breakdown <span class="card-head-val">${us.total || 0} total</span></div>
-      <div class="tier-row"><span class="tier-lbl" style="color:var(--muted)">Free</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalFreeCount/totalUserCount)}%;background:var(--slate)"></div></div><span class="tier-n">${us.free_count || 0}</span></div>
-      <div class="tier-row"><span class="tier-lbl" style="color:#e87979">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--accent)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
-      <div class="tier-row"><span class="tier-lbl" style="color:#f59e0b">Agency</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalAgencyCount/totalUserCount)}%;background:var(--gold)"></div></div><span class="tier-n">${us.agency_count || 0}</span></div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        <div class="tier-row"><span class="tier-lbl" style="color:#3ddc84;font-size:9px">Alerts</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*activeSubCount/totalUserCount))}%;background:var(--green)"></div></div><span class="tier-n">${activeSubCount}</span></div>
-        <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:#60a5fa;font-size:9px">Briefing</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*briefing.length/totalUserCount))}%;background:var(--blue)"></div></div><span class="tier-n">${briefing.length}</span></div>
+      <div class="tier-row"><span class="tier-lbl">Free</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalFreeCount/totalUserCount)}%;background:var(--muted-2)"></div></div><span class="tier-n">${us.free_count || 0}</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:var(--brand)">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--brand)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
+      <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:var(--amber)">Agency</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalAgencyCount/totalUserCount)}%;background:var(--amber)"></div></div><span class="tier-n">${us.agency_count || 0}</span></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="tier-row"><span class="tier-lbl" style="color:var(--green);font-size:9px">Alerts</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*activeSubCount/totalUserCount))}%;background:var(--green)"></div></div><span class="tier-n">${activeSubCount}</span></div>
+        <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:var(--blue);font-size:9px">Briefing</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*briefing.length/totalUserCount))}%;background:var(--blue)"></div></div><span class="tier-n">${briefing.length}</span></div>
       </div>
     </div>
     <div class="card">
       <div class="card-head">Scan Activity <span class="card-head-val">Last 14 days</span></div>
       ${scanActivityHtml}
+    </div>
+    <div class="card">
+      <div class="card-head">Grade Distribution <span class="card-head-val">${scans.filter((s:any)=>s.edp?.evidenceGrade).length} graded</span></div>
+      ${["A","B","C","D","E"].map(g => {
+        const n = gradeCount[g] || 0;
+        const gradedTotal = Math.max(1, scans.filter((s:any) => s.edp?.evidenceGrade).length);
+        const pct = Math.round((n / gradedTotal) * 100);
+        const gc = g==="A"?"var(--green)":g==="B"?"var(--blue)":g==="C"?"var(--amber)":g==="D"?"var(--red)":"var(--muted)";
+        return `<div style="margin-bottom:11px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-family:var(--serif);font-size:15px;font-weight:700;color:${gc}">Grade ${g}</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${n} <span style="opacity:.55">(${pct}%)</span></span>
+          </div>
+          <div style="height:5px;background:var(--border);border-radius:3px">
+            <div style="width:${pct}%;height:100%;background:${gc};opacity:.75;border-radius:3px"></div>
+          </div>
+        </div>`;
+      }).join("")}
     </div>
   </div>
 </section>
@@ -11851,13 +12914,13 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     <div><div class="s-eyebrow">Database</div><div class="s-title">Scan Intelligence</div></div>
     <div class="s-sub">${scans.length} records &middot; most recent first &middot; all form fields</div>
   </div>
-  <div class="stat-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:12px">
-    <div class="stat-cell"><div class="stat-val" style="color:#3ddc84">${ss.completed || 0}</div><div class="stat-lbl">Completed</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:#e87979">${ss.failed || 0}</div><div class="stat-lbl">Failed</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:#f59e0b">${ss.in_progress || 0}</div><div class="stat-lbl">In Progress</div></div>
+  <div class="stat-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
+    <div class="stat-cell"><div class="stat-val" style="color:var(--green)">${ss.completed || 0}</div><div class="stat-lbl">Completed</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--red)">${ss.failed || 0}</div><div class="stat-lbl">Failed</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--amber)">${ss.in_progress || 0}</div><div class="stat-lbl">In Progress</div></div>
     <div class="stat-cell"><div class="stat-val">${ss.today || 0}</div><div class="stat-lbl">Today</div></div>
     <div class="stat-cell"><div class="stat-val">${ss.this_week || 0}</div><div class="stat-lbl">This Week</div></div>
-    <div class="stat-cell"><div class="stat-val">${ss.success_rate || 0}%</div><div class="stat-lbl">Success Rate</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:${Number(ss.success_rate||0)>=80?"var(--green)":"var(--red)"}">${ss.success_rate || 0}%</div><div class="stat-lbl">Success Rate</div></div>
   </div>
   <div class="tbl-wrap scroll-tbl">
     <table class="a-tbl">
@@ -11895,20 +12958,20 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     <div><div class="s-eyebrow">Analytics</div><div class="s-title">Visitor Intelligence</div></div>
     <div class="s-sub">HTML page views only &middot; x-forwarded-for IPs &middot; API/admin excluded</div>
   </div>
-  <div class="stat-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:12px">
-    <div class="stat-cell"><div class="stat-val" style="color:#60a5fa">${Number(vToday.total || 0).toLocaleString()}</div><div class="stat-lbl">Views today</div></div>
+  <div class="stat-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
+    <div class="stat-cell"><div class="stat-val" style="color:var(--blue)">${Number(vToday.total || 0).toLocaleString()}</div><div class="stat-lbl">Views today</div></div>
     <div class="stat-cell"><div class="stat-val">${Number(vToday.unique_ips || 0)}</div><div class="stat-lbl">Unique IPs today</div></div>
     <div class="stat-cell"><div class="stat-val">${vDays.reduce((s: number, d: any) => s + Number(d.visits || 0), 0).toLocaleString()}</div><div class="stat-lbl">Views 14 days</div></div>
     <div class="stat-cell"><div class="stat-val">${vIps.length}</div><div class="stat-lbl">Distinct IPs 7d</div></div>
     <div class="stat-cell"><div class="stat-val">${vPaths.length}</div><div class="stat-lbl">Distinct paths 7d</div></div>
   </div>
-  <div class="card" style="margin-bottom:12px">
+  <div class="card" style="margin-bottom:14px">
     <div class="card-head">Daily Traffic <span class="card-head-val">last 14 days</span></div>
     ${visitorChartHtml}
   </div>
   <div class="two-col">
     <div class="card"><div class="card-head">Top Pages <span class="card-head-val">7 days</span></div>${topPathsHtml}</div>
-    <div class="card"><div class="card-head">Top IPs <span class="card-head-val">7 days</span></div><div class="tbl-wrap scroll-tbl" style="max-height:260px;border:none">${topIpsHtml}</div></div>
+    <div class="card"><div class="card-head">Top IPs <span class="card-head-val">7 days</span></div><div class="tbl-wrap scroll-tbl" style="max-height:260px;border:none;box-shadow:none">${topIpsHtml}</div></div>
   </div>
 </section>
 <div class="gap"></div>
@@ -11920,10 +12983,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     <div class="s-sub">${Number(sigs.total || 0).toLocaleString()} notices indexed</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(6,1fr)">
-    <div class="stat-cell"><div class="stat-val" style="color:#3ddc84">${Number(sigs.open_count || 0).toLocaleString()}</div><div class="stat-lbl">Open now</div></div>
-    <div class="stat-cell"><div class="stat-val" style="font-size:16px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="stat-lbl">Open value</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:#e87979">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:#f59e0b">${sigs.closing_7d || 0}</div><div class="stat-lbl">Closing &lt;7d</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--green)">${Number(sigs.open_count || 0).toLocaleString()}</div><div class="stat-lbl">Open now</div></div>
+    <div class="stat-cell"><div class="stat-val" style="font-size:18px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="stat-lbl">Open value</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--brand)">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--amber)">${sigs.closing_7d || 0}</div><div class="stat-lbl">Closing &lt;7d</div></div>
     <div class="stat-cell"><div class="stat-val">${sigs.categories || 0}</div><div class="stat-lbl">Active desks</div></div>
     <div class="stat-cell"><div class="stat-val">${Number(sigs.total || 0).toLocaleString()}</div><div class="stat-lbl">Total indexed</div></div>
   </div>
@@ -11960,13 +13023,45 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
 </section>
 <div class="gap"></div>
 
-<!-- §8 SYSTEM -->
+<!-- §8 CONTENT -->
+<section class="section" id="content">
+  <div class="s-head">
+    <div><div class="s-eyebrow">CMS</div><div class="s-title">Content</div></div>
+    <div class="s-sub">Articles &amp; comment moderation</div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head">Articles</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num">${articleStats.total||0}</div><div class="insight-lbl">Total</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--green)">${articleStats.published||0}</div><div class="insight-lbl">Published</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--muted)">${articleStats.draft||0}</div><div class="insight-lbl">Drafts</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--blue)">${Number(articleStats.total_views||0).toLocaleString()}</div><div class="insight-lbl">Total Views</div></div>
+      </div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="a-btn a-btn-ok" style="margin-right:6px">→ Manage articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="a-btn">+ New article</a>
+    </div>
+    <div class="card">
+      <div class="card-head">Comment Queue ${Number(commentStats.pending||0)>0?`<span style="background:var(--amber-bg);color:var(--amber);border:1px solid rgba(146,64,14,.2);padding:2px 7px;border-radius:8px;font-size:9px;font-family:var(--mono)">${commentStats.pending} pending</span>`:""}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num">${commentStats.total||0}</div><div class="insight-lbl">Total</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--green)">${commentStats.approved||0}</div><div class="insight-lbl">Approved</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:${Number(commentStats.pending||0)>0?"var(--amber)":"var(--muted)"}">${commentStats.pending||0}</div><div class="insight-lbl">Pending</div></div>
+        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--muted)">${Math.max(0,Number(commentStats.total||0)-Number(commentStats.approved||0)-Number(commentStats.pending||0))}</div><div class="insight-lbl">Hidden / Spam</div></div>
+      </div>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="a-btn ${Number(commentStats.pending||0)>0?"a-btn-ok":""}">→ Review queue</a>
+    </div>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §9 SYSTEM -->
 <section class="section" id="system">
   <div class="s-head">
     <div><div class="s-eyebrow">Infrastructure</div><div class="s-title">System Status</div></div>
     <div class="s-sub">Uptime ${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s &middot; Node ${process.version}</div>
   </div>
-  <div class="two-col" style="margin-bottom:12px">
+  <div class="two-col" style="margin-bottom:14px">
     <div class="card">
       <div class="card-head">Environment Variables</div>
       ${envRows.map(([k, set]) => `<div class="env-row"><span class="env-key">${k}</span><span class="${set ? "env-set" : "env-unset"}">${set ? "✓  Set" : "✗  Not set"}</span></div>`).join("")}
@@ -11974,8 +13069,8 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     <div class="card">
       <div class="card-head">Runtime Config</div>
       ${configRows.map(([k, v]) => `<div class="env-row"><span class="env-key">${escapeHtml(k)}</span><span class="env-val">${escapeHtml(v)}</span></div>`).join("")}
-      <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Quick Actions</div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px">Quick Actions</div>
         <div style="display:flex;gap:7px;flex-wrap:wrap">
           <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild signals</button></form>
           <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all 24 desk caches?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild desks</button></form>
@@ -11985,7 +13080,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} sca
     </div>
   </div>
 </section>
-<div style="height:40px"></div>
+<div style="height:48px"></div>
 </div><!-- .main -->
 </div><!-- .shell -->
 
@@ -12124,6 +13219,348 @@ app.post("/admin/subscriptions/:id/fire", requireAdmin, asyncRoute(async (req, r
     captureError(err, { alertFire: { subscriptionId: sub.id } });
   });
   res.json({ message: "Alert fired. Check logs for result." });
+}));
+
+// ── Article public routes ─────────────────────────────────────────────────────
+
+app.get("/articles", asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req);
+  const articles: ArticleRow[] = pool
+    ? (await pool.query<ArticleRow>(`SELECT * FROM articles WHERE status='published' ORDER BY published_at DESC LIMIT 50`)).rows
+    : [];
+  res.send(articlesIndexPage(articles, authCtx));
+}));
+
+app.get("/articles/:slug", asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req);
+  const slugParam = req.params.slug;
+
+  let article = await getArticleBySlug(slugParam);
+  if (!article && pool) {
+    // Check slug_redirects
+    const r = await pool.query<{ article_id: string }>(`SELECT article_id FROM slug_redirects WHERE old_slug=$1`, [slugParam]);
+    if (r.rows[0]) article = await getArticleById(r.rows[0].article_id);
+    if (article) { res.redirect(301, `/articles/${article.slug}`); return; }
+  }
+  if (!article || article.status !== "published") {
+    res.status(404).send(notFoundHtml("Article not found"));
+    return;
+  }
+
+  await incrementArticleViews(article.id);
+  const [assets, comments] = await Promise.all([
+    getArticleAssets(article.id),
+    getArticleComments(article.id),
+  ]);
+  res.send(articlePage(article, assets, comments, authCtx));
+}));
+
+app.post("/articles/:slug/comments", requireAuth, asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req)!;
+  const article = await getArticleBySlug(req.params.slug);
+  if (!article || article.status !== "published") { res.status(404).json({ error: "Not found" }); return; }
+
+  const body = String(req.body.body ?? "").trim().slice(0, 2000);
+  const parentId = req.body.parent_id ? String(req.body.parent_id) : null;
+  if (!body) { res.redirect(`/articles/${article.slug}`); return; }
+
+  if (!pool) { res.redirect(`/articles/${article.slug}`); return; }
+
+  const commentId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const isPaying = authCtx.tier !== "free";
+  const status: CommentStatus = isPaying ? "approved" : "pending";
+
+  await pool.query(
+    `INSERT INTO comments (id, article_id, user_id, parent_id, body, status) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [commentId, article.id, authCtx.userId, parentId, body, status]
+  );
+  res.redirect(`/articles/${article.slug}#c-${commentId}`);
+}));
+
+app.post("/articles/comments/:id/like", requireAuth, asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req)!;
+  if (!pool) { res.json({ count: 0 }); return; }
+  const commentId = req.params.id;
+  const likeId = `cl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    await pool.query(
+      `INSERT INTO comment_likes (id, comment_id, user_id, is_author) VALUES ($1,$2,$3,false)`,
+      [likeId, commentId, authCtx.userId]
+    );
+    await pool.query(`UPDATE comments SET like_count=like_count+1 WHERE id=$1`, [commentId]);
+  } catch {
+    // Duplicate like — idempotent, ignore
+  }
+  const r = await pool.query<{ like_count: number }>(`SELECT like_count FROM comments WHERE id=$1`, [commentId]);
+  res.json({ count: r.rows[0]?.like_count ?? 0 });
+}));
+
+// Article preview API (used by the split editor)
+app.post("/api/articles/preview", asyncRoute(async (req, res) => {
+  const bodyMd = String(req.body?.body ?? "").slice(0, 50_000);
+  const bodyHtml = parseShortcodes(bodyMd);
+  res.send(`<!DOCTYPE html><html><head><style>
+    @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500&family=Libre+Franklin:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--base:#0B1018;--surface:#111A26;--surface-2:#18222F;--brand:#A0522D;--text:#D4DAE4;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;--border:#1E2A3A;--border-2:#222E40;--mono:"Spline Sans Mono",monospace;--serif:"Newsreader",Georgia,serif;--sans:"Libre Franklin",system-ui,sans-serif}
+    body{background:var(--base);color:var(--text);font-family:var(--sans);padding:24px;font-size:17px;line-height:1.7}
+    p{margin-bottom:1.3em;color:var(--text-mid)}
+    h2{font-family:var(--serif);font-size:22px;font-weight:500;color:#ECE6D6;margin:2em 0 .7em}
+    h3{font-size:17px;font-weight:600;margin:1.6em 0 .5em}
+    ul{margin:0 0 1.3em 1.3em} li{margin-bottom:.35em;color:var(--text-mid)}
+    hr{border:none;border-top:1px solid var(--border-2);margin:2em 0}
+    s{color:var(--muted)} strong{color:var(--text)} a{color:var(--brand)}
+    .art-img-card{margin:2em -8px;border:1px solid var(--border-2);border-radius:4px;overflow:hidden;background:var(--surface)}
+    .art-img-wrap{position:relative;width:100%;padding-bottom:56.25%}
+    .art-img-wrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .art-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-2)}
+    .art-ph-inner{text-align:center;padding:12px} .art-ph-icon{font-size:22px;color:var(--brand);display:block;margin-bottom:6px}
+    .art-ph-label{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.4}
+    .art-gif-card{margin:2em -8px} .art-gif-img{width:100%;display:block;border-radius:4px}
+    .art-caption{font-family:var(--mono);font-size:11px;font-style:italic;color:var(--brand);padding:8px 12px;background:var(--surface);border-top:1px solid var(--border-2)}
+    .art-record{margin:2em 0;border:1px solid var(--border-2);background:var(--surface);padding:16px 20px;font-family:var(--mono)}
+    .art-record-head{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-2)}
+    .art-record-body p{font-size:14px;color:var(--text);line-height:1.55;margin-bottom:.5em}
+    .art-record-source{font-size:9px;color:var(--muted);margin-top:12px;padding-top:8px;border-top:1px solid var(--border-2)}
+    .art-pullquote{margin:2em 0;padding:16px 20px;border-left:3px solid var(--brand);background:var(--surface)}
+    .art-pullquote p{font-family:var(--serif);font-size:19px;font-weight:500;color:#ECE6D6;line-height:1.35;font-style:italic}
+  </style></head><body>${bodyHtml}</body></html>`);
+}));
+
+// ── Admin article routes ───────────────────────────────────────────────────────
+
+app.get("/admin/articles", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const msg = req.query.msg ? String(req.query.msg) : undefined;
+  const articles: ArticleRow[] = pool
+    ? (await pool.query<ArticleRow>(`SELECT * FROM articles ORDER BY updated_at DESC LIMIT 200`)).rows
+    : [];
+  res.send(adminArticlesListPage(articles, token, msg));
+}));
+
+app.get("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  res.send(adminArticleEditorPage(null, token, true));
+}));
+
+app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md, action } = req.body;
+
+  const rawSlug = slugInput || slugify(title ?? "untitled");
+  const finalSlug = rawSlug.replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
+  const id = `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+  const rt = computeReadingTime(body_md ?? "");
+  const publishedAt = action === "publish" ? now : (status === "scheduled" && scheduled_at ? new Date(scheduled_at).toISOString() : null);
+  const finalStatus: ArticleStatus = action === "publish" ? "published" : (status as ArticleStatus) ?? "draft";
+
+  if (pool) {
+    await pool.query(
+      `INSERT INTO articles (id, slug, title, dek, eyebrow, hero_prompt, body_md, desk, status, author_id, published_at, updated_at, reading_time)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, finalSlug, title ?? "", dek || null, eyebrow || null, hero_prompt || null, body_md ?? "", desk || null, finalStatus, "admin", publishedAt, now, rt]
+    );
+    await logAdminAudit("admin", "article:create", id, { title, status: finalStatus });
+  }
+  res.redirect(`/admin/articles/${id}/edit?token=${encodeURIComponent(token)}&msg=Article+created`);
+}));
+
+app.get("/admin/articles/:id/edit", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const msg = req.query.msg ? String(req.query.msg) : undefined;
+  const article = await getArticleById(req.params.id);
+  if (!article) { res.status(404).send(notFoundHtml("Article not found")); return; }
+  res.send(adminArticleEditorPage(article, token, false, msg));
+}));
+
+app.post("/admin/articles/:id", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const article = await getArticleById(req.params.id);
+  if (!article) { res.status(404).send(notFoundHtml("Article not found")); return; }
+
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md } = req.body;
+  const now = new Date().toISOString();
+  const rt = computeReadingTime(body_md ?? article.body_md);
+  const newSlug = (slugInput ?? article.slug).replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
+  const finalStatus: ArticleStatus = (status as ArticleStatus) ?? article.status;
+  const publishedAt = finalStatus === "published" && !article.published_at ? now : article.published_at;
+
+  if (pool) {
+    // Create slug redirect if slug changed
+    if (newSlug !== article.slug) {
+      await pool.query(
+        `INSERT INTO slug_redirects (old_slug, article_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [article.slug, article.id]
+      );
+    }
+    await pool.query(
+      `UPDATE articles SET title=$2,dek=$3,eyebrow=$4,desk=$5,hero_prompt=$6,body_md=$7,status=$8,published_at=$9,updated_at=$10,reading_time=$11,slug=$12 WHERE id=$1`,
+      [article.id, title ?? article.title, dek || null, eyebrow || null, desk || null, hero_prompt || null, body_md ?? article.body_md, finalStatus, publishedAt, now, rt, newSlug]
+    );
+    await saveArticleRevision(article.id, title ?? article.title, body_md ?? article.body_md, "admin");
+    await logAdminAudit("admin", "article:update", article.id, { title, status: finalStatus });
+  }
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Saved`);
+}));
+
+app.post("/admin/articles/:id/publish", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const article = await getArticleById(req.params.id);
+  if (!article || !pool) { res.redirect(`/admin/articles?token=${encodeURIComponent(token)}`); return; }
+  const now = new Date().toISOString();
+  await pool.query(
+    `UPDATE articles SET status='published', published_at=COALESCE(published_at,$2), updated_at=$2 WHERE id=$1`,
+    [article.id, now]
+  );
+  await logAdminAudit("admin", "article:publish", article.id, { slug: article.slug });
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Published`);
+}));
+
+app.post("/admin/articles/:id/unpublish", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const article = await getArticleById(req.params.id);
+  if (!article || !pool) { res.redirect(`/admin/articles?token=${encodeURIComponent(token)}`); return; }
+  await pool.query(`UPDATE articles SET status='draft', updated_at=now() WHERE id=$1`, [article.id]);
+  await logAdminAudit("admin", "article:unpublish", article.id, {});
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Unpublished`);
+}));
+
+app.post("/admin/articles/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    await pool.query(`DELETE FROM articles WHERE id=$1`, [req.params.id]);
+    await logAdminAudit("admin", "article:delete", req.params.id, {});
+  }
+  res.redirect(`/admin/articles?token=${encodeURIComponent(token)}&msg=Article+deleted`);
+}));
+
+app.post("/admin/articles/:id/render-images", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const article = await getArticleById(req.params.id);
+  if (!article) { res.redirect(`/admin/articles?token=${encodeURIComponent(token)}`); return; }
+
+  if (!process.env.OPENAI_API_KEY) {
+    res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=OPENAI_API_KEY+not+set`);
+    return;
+  }
+
+  // Fire rendering in background — DALL-E 3 takes 10–20s per image
+  renderArticleImages(article.id).catch(err => {
+    console.error("[article-images] background render failed", err);
+    captureError(err, { articleImages: { articleId: article.id } });
+  });
+
+  const imageCount = (article.body_md.match(/:::image\{/g) ?? []).length + (article.hero_prompt ? 1 : 0);
+  const est = imageCount * 15;
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Rendering+${imageCount}+image${imageCount !== 1 ? "s" : ""}+via+DALL-E+3+in+background+(est.+${est}s).+Refresh+the+page+in+a+moment.`);
+}));
+
+// Admin comment moderation
+app.get("/admin/articles/comments", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const msg = req.query.msg ? String(req.query.msg) : undefined;
+  const filter = String(req.query.filter ?? "pending");
+  const whereStatus = filter === "all" ? "" : `AND c.status='${filter === "approved" ? "approved" : "pending"}'`;
+  const comments: CommentRow[] = pool
+    ? (await pool.query<CommentRow>(
+        `SELECT c.*, u.email AS author_email, a.slug AS article_slug, a.title AS article_title
+         FROM comments c
+         JOIN users u ON u.id=c.user_id
+         JOIN articles a ON a.id=c.article_id
+         WHERE 1=1 ${whereStatus} ORDER BY c.created_at DESC LIMIT 200`
+      )).rows
+    : [];
+  res.send(adminCommentsPage(comments, token, filter, msg));
+}));
+
+app.post("/admin/articles/comments/:id/approve", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    await pool.query(`UPDATE comments SET status='approved' WHERE id=$1`, [req.params.id]);
+    await logAdminAudit("admin", "comment:approve", req.params.id, {});
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Approved`);
+}));
+
+app.post("/admin/articles/comments/:id/hide", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    await pool.query(`UPDATE comments SET status='hidden' WHERE id=$1`, [req.params.id]);
+    await logAdminAudit("admin", "comment:hide", req.params.id, {});
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Hidden`);
+}));
+
+app.post("/admin/articles/comments/:id/spam", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    await pool.query(`UPDATE comments SET status='spam' WHERE id=$1`, [req.params.id]);
+    await logAdminAudit("admin", "comment:spam", req.params.id, {});
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Marked+as+spam`);
+}));
+
+app.post("/admin/articles/comments/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    await pool.query(`DELETE FROM comments WHERE id=$1`, [req.params.id]);
+    await logAdminAudit("admin", "comment:delete", req.params.id, {});
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Deleted`);
+}));
+
+app.post("/admin/articles/comments/:id/like", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (pool) {
+    const likeId = `cl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    try {
+      await pool.query(
+        `INSERT INTO comment_likes (id, comment_id, user_id, is_author) VALUES ($1,$2,'admin',true)`,
+        [likeId, req.params.id]
+      );
+      await pool.query(`UPDATE comments SET like_count=like_count+1,is_author_reply=CASE WHEN is_author_reply THEN true ELSE false END WHERE id=$1`, [req.params.id]);
+    } catch { /* duplicate, ignore */ }
+    await pool.query(`UPDATE comments SET like_count=like_count+1 WHERE id=$1 AND NOT EXISTS (SELECT 1 FROM comment_likes WHERE comment_id=$1 AND user_id='admin')`, [req.params.id]);
+    await logAdminAudit("admin", "comment:like", req.params.id, {});
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Liked`);
+}));
+
+app.post("/admin/articles/comments/:id/reply", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const body = String(req.body.body ?? "").trim().slice(0, 2000);
+  if (!body || !pool) { res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}`); return; }
+
+  const parent = await pool.query<CommentRow>(`SELECT * FROM comments WHERE id=$1`, [req.params.id]);
+  if (!parent.rows[0]) { res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}`); return; }
+
+  const articleId = parent.rows[0].article_id;
+  const article = await getArticleById(articleId);
+  const adminUser = await pool.query<UserRecord>(`SELECT * FROM users WHERE email=$1 LIMIT 1`, [process.env.ADMIN_EMAIL ?? ""]);
+  const adminUserId = adminUser.rows[0]?.id ?? "admin";
+
+  const commentId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  await pool.query(
+    `INSERT INTO comments (id, article_id, user_id, parent_id, body, status, is_author_reply) VALUES ($1,$2,$3,$4,$5,'approved',true)`,
+    [commentId, articleId, adminUserId, req.params.id, body]
+  );
+  await logAdminAudit("admin", "comment:reply", commentId, { parentId: req.params.id, articleId });
+
+  if (article && isEmailConfigured()) {
+    const commenterEmail = parent.rows[0] ? (await pool.query<UserRecord>(`SELECT email FROM users WHERE id=$1`, [parent.rows[0].user_id])).rows[0]?.email : null;
+    if (commenterEmail) {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: process.env.FROM_EMAIL ?? "noreply@govrevenue.co.uk",
+        to: commenterEmail,
+        subject: `GovRevenue replied to your comment on "${article.title}"`,
+        html: `<p>GovRevenue replied to your comment on <a href="https://govrevenue-agent-production.up.railway.app/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
+      }).catch(() => {});
+    }
+  }
+  res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Reply+posted`);
 }));
 
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

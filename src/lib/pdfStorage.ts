@@ -85,6 +85,32 @@ export function buildPdfStorageKey(scanId: string, filename: string) {
   return `${prefix}/${scanId}/${safeFilename}`;
 }
 
+export async function storeObject(params: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}): Promise<{ key: string; publicUrl: string | null } | null> {
+  const currentConfig = getConfig();
+  const currentClient = getClient();
+  if (!currentConfig || !currentClient) return null;
+
+  await currentClient.send(
+    new PutObjectCommand({
+      Bucket: currentConfig.bucket,
+      Key: params.key,
+      Body: params.body,
+      ContentType: params.contentType,
+      CacheControl: "public, max-age=31536000, immutable"
+    })
+  );
+
+  const publicBaseUrl = currentConfig.publicBaseUrl?.replace(/\/+$/g, "");
+  return {
+    key: params.key,
+    publicUrl: publicBaseUrl ? `${publicBaseUrl}/${params.key}` : null
+  };
+}
+
 export async function storePdfObject(params: {
   key: string;
   filename: string;
