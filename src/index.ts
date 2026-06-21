@@ -1337,7 +1337,7 @@ async function queryLatestSignals(limit: number): Promise<HomepageSignal[]> {
 async function count24hSignals(): Promise<number> {
   if (pool) {
     const r = await pool.query<{ n: string }>(
-      `SELECT COUNT(*) AS n FROM homepage_signals WHERE notice_date > NOW() - INTERVAL '24 hours'`
+      `SELECT COUNT(*) AS n FROM homepage_signals`
     );
     return parseInt(r.rows[0]?.n || "0", 10);
   }
@@ -1447,7 +1447,7 @@ async function queryChaseableStats(): Promise<ChaseStats> {
        FROM homepage_signals
        WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
          AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')
-         AND value_amount > 0`
+         AND value_amount > 0 AND value_amount < 100000000`
     ),
   ]);
   const rawAvg = parseFloat(avgVal.rows[0]?.avg_k || "0");
@@ -1878,7 +1878,10 @@ function inlineMd(raw: string): string {
   s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
   s = s.replace(/~~(.+?)~~/g, "<s>$1</s>");
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) =>
+    /^https?:\/\//.test(href)
+      ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
+      : `<a href="${href}">${text}</a>`);
   return s;
 }
 
@@ -2198,6 +2201,16 @@ const authCss = `
   .auth-alt a{color:var(--brand);font-weight:600;text-decoration:none}
   .err{background:rgba(155,45,32,.06);border:1px solid rgba(155,45,32,.22);color:#9b2d20;padding:11px 14px;font-size:13px;margin-bottom:20px}
   .ok{background:rgba(29,107,79,.06);border:1px solid rgba(29,107,79,.22);color:#1d6b4f;padding:11px 14px;font-size:13px;margin-bottom:20px}
+  @media(max-width:540px){
+    .auth-nav{padding:0 16px}
+    .auth-wrap{padding:28px 12px}
+    .auth-card{padding:28px 20px}
+    .auth-card h1{font-size:22px}
+    .auth-card p.sub{font-size:13px;margin-bottom:22px}
+    .field{margin-bottom:16px}
+    .field input{padding:11px 12px;font-size:14px}
+    .btn-primary{padding:13px}
+  }
 `;
 
 function clientEmailFromInput(input: z.infer<typeof intakeSchema>) {
@@ -4795,11 +4808,11 @@ a{color:inherit;text-decoration:none}
 .art-hero-img{margin:36px 0 0}
 /* prose body */
 .art-body{padding:44px 0}
-.art-body p{font-family:var(--serif);font-size:19px;line-height:1.8;color:var(--text-mid);margin-bottom:1.5em;font-weight:400}
+.art-body p{font-family:var(--serif);font-size:19px;line-height:1.8;color:var(--text-mid);margin-bottom:1.5em;font-weight:400;text-align:justify;hyphens:auto;-webkit-hyphens:auto}
 .art-body h2{font-family:var(--serif);font-size:26px;font-weight:500;color:var(--text);margin:2.6em 0 .9em;letter-spacing:-.015em;line-height:1.2;padding-top:1.2em;border-top:1px solid var(--border)}
 .art-body h3{font-family:var(--sans);font-size:11px;font-weight:700;color:var(--muted);margin:2.2em 0 .7em;letter-spacing:.14em;text-transform:uppercase}
 .art-body ul{margin:0 0 1.5em 0;padding-left:1.5em;color:var(--text-mid)}
-.art-body li{font-family:var(--serif);font-size:19px;line-height:1.75;margin-bottom:.5em}
+.art-body li{font-family:var(--serif);font-size:19px;line-height:1.75;margin-bottom:.5em;text-align:justify;hyphens:auto;-webkit-hyphens:auto}
 .art-body hr{border:none;border-top:1px solid var(--border);margin:3em 0}
 .art-body s{color:var(--muted-2);text-decoration:line-through}
 .art-body strong{color:var(--text);font-weight:600}
@@ -5482,7 +5495,7 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
     return `<div class="al-comment-row">
   <div class="al-comment-meta">
     ${pill}${isAuthorRep}
-    <span>${escapeHtml(c.author_email ?? c.user_id)}</span>
+    <span>${escapeHtml(c.author_email ?? c.guest_name ?? "Guest")}</span>
     <span>on <a href="/articles/${escapeHtml(c.article_slug ?? "")}" style="color:var(--brand)" target="_blank">${escapeHtml(c.article_title ?? c.article_id)}</a></span>
     <span>${date}</span>
     <span>♥ ${c.like_count}</span>
@@ -5589,6 +5602,12 @@ h1 b{color:var(--brand);font-weight:500}
 .stage.fail .dot{background:var(--red)}
 .eta{font-size:12.5px;color:var(--muted);font-family:var(--mono);letter-spacing:0.04em}
 .err{margin-top:20px;padding:14px;background:rgba(155,45,32,.06);border:1px solid rgba(155,45,32,.22);font-size:13px;color:#9b2d20}
+@media(max-width:480px){
+  body{padding:16px}
+  .card{padding:28px 20px}
+  h1{font-size:21px}
+  .brand{margin-bottom:20px}
+}
 </style>
 </head>
 <body>
@@ -6704,7 +6723,7 @@ ${pageShellHeader(null, homepageAuth)}
       </div>
       <div class="chips">
         <div class="chip"><b>&pound;400bn</b> annual public spend</div>
-        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> signals tracked &middot; 24h</div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> signals tracked</div>
         <div class="chip">Live: Contracts Finder + Find a Tender</div>
       </div>
     </div>
@@ -8565,6 +8584,17 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 .pay-note a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
 .err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;font-family:var(--mono);font-size:12px;padding:12px 16px;margin-bottom:20px}
 @media(max-width:680px){.page{grid-template-columns:1fr;gap:24px;padding:24px 16px 60px}}
+@media(max-width:480px){
+  header{padding:0 14px}
+  .page{padding:20px 12px 48px;gap:16px}
+  .col-left,.col-right{padding:20px 16px}
+  .plan-name{font-size:16px}
+  .plan-price{font-size:32px}
+  .oi{font-size:13px}
+  .pay-head{font-size:12px}
+  .pay-sub{font-size:12px;margin-bottom:22px}
+  .btn-pay{padding:14px 16px;font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -8663,6 +8693,21 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 .cta-banner a{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px}
 .cta-banner a:hover{background:var(--brand-hot)}
 @media(max-width:640px){.edp-grid{grid-template-columns:1fr 1fr}.report-wrap{padding:24px 14px 60px}}
+@media(max-width:480px){
+  header{padding:0 14px}
+  .ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
+  .ribbon-cta a{font-size:10px;padding:5px 12px}
+  .report-wrap{padding:16px 12px 48px}
+  .section{padding:20px 16px}
+  .section-title{font-size:18px}
+  .edp-grid{grid-template-columns:1fr 1fr}
+  .ev-label{width:110px;font-size:10px}
+  .buyer-row{grid-template-columns:1fr auto;font-size:13px}
+  .buyer-row span:last-child{display:none}
+  .money-map-row{flex-direction:column;align-items:flex-start;gap:4px}
+  .cta-banner{padding:20px 16px}
+  .cta-banner-text{font-size:17px}
+}
 </style>
 </head>
 <body>
@@ -8816,6 +8861,24 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 .btn-submit{background:#102A1E;color:#F3EFE6;font-family:var(--sans);font-size:15px;font-weight:600;letter-spacing:.01em;padding:15px 32px;border:0;cursor:pointer;transition:.18s}
 .btn-submit:hover{background:#0A1C12}
 .submit-note{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5}
+@media(max-width:640px){
+  .topstrip{padding:0 14px;font-size:10px;gap:8px}
+  header{padding:0 14px}
+  .page{padding:32px 14px 56px}
+  .page-head{margin-bottom:28px;padding-bottom:20px}
+  h1{font-size:26px}
+  .form-grid{padding:0 14px}
+  .field{padding:14px 0}
+  .field input,.field textarea,.field select{font-size:14px;padding:11px 12px}
+  .submit-row{flex-direction:column;align-items:stretch;gap:12px}
+  .btn-submit{width:100%;padding:14px;font-size:14px}
+}
+@media(max-width:400px){
+  .topstrip{display:none}
+  .page{padding:24px 12px 48px}
+  .form-grid{padding:0 12px}
+  h1{font-size:22px}
+}
 </style>
 </head>
 <body>
@@ -9353,7 +9416,7 @@ app.get("/charts", asyncRoute(async (req, res) => {
                ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 1)::text AS total_val
         FROM homepage_signals
         WHERE notice_date > NOW() - INTERVAL '13 months' AND buyer IS NOT NULL AND buyer <> '' AND notice_date IS NOT NULL
-        GROUP BY buyer ORDER BY SUM(value_amount) DESC NULLS LAST LIMIT 5`),
+        GROUP BY buyer ORDER BY SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) DESC NULLS LAST LIMIT 5`),
       pool.query<SourceRow>(`
         SELECT source, COUNT(*)::text AS cnt
         FROM homepage_signals
@@ -10695,13 +10758,122 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     }).join("")
     : `<p style="color:var(--muted);font-size:14px;margin-top:16px">Category breakdown compiles on first desk load.</p>`;
 
+  const valueBands = [
+    { label: "< £100k",        min: 0,          max: 100_000,   count: 0 },
+    { label: "£100k – £500k", min: 100_000,  max: 500_000,   count: 0 },
+    { label: "£500k – £1m",   min: 500_000,  max: 1_000_000, count: 0 },
+    { label: "£1m – £5m",     min: 1_000_000, max: 5_000_000, count: 0 },
+    { label: "£5m+",           min: 5_000_000,  max: Infinity,  count: 0 },
+  ];
+  for (const notice of validAwardedNotices) {
+    const v = notice.awardedValue ?? 0;
+    if (v <= 0) continue;
+    const band = valueBands.find(b => v >= b.min && v < b.max);
+    if (band) band.count++;
+  }
+  const maxBandCount = Math.max(...valueBands.map(b => b.count), 1);
+  const totalBandCount = valueBands.reduce((s, b) => s + b.count, 0);
+
+  const spendTrendSvg = (() => {
+    if (trendData.length < 2) return `<p style="color:var(--muted);font-size:13px;padding:24px 0">Trend data builds after a few weeks of signals.</p>`;
+    const W = 600, H = 200, pL = 58, pR = 12, pT = 12, pB = 40;
+    const cW = W - pL - pR, cH = H - pT - pB;
+    const numMonths = trendData.length;
+    const slotW = cW / numMonths;
+    const bW = Math.max(slotW - 6, 4);
+    const baseY = pT + cH;
+    const slug = profile.slug;
+    const yLevels = [0, 0.33, 0.67, 1];
+    const yLines = yLevels.map(t => ({ y: +(pT + cH * (1 - t)).toFixed(1), label: t === 0 ? "£0" : fmtShort(maxMonthVal * t) }));
+    const bars = trendData.map(([key, val], i) => {
+      const h = Math.max(+((val / maxMonthVal) * cH).toFixed(1), 2);
+      const x = +(pL + slotW * i + (slotW - bW) / 2).toFixed(1);
+      const y = +(baseY - h).toFixed(1);
+      const cx = +(x + bW / 2).toFixed(1);
+      const mo = new Date(key + "-01").toLocaleDateString("en-GB", { month: "short" });
+      return { x, y, w: bW, h, cx, mo };
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;overflow:visible" aria-label="Monthly awarded spend">
+      <defs><linearGradient id="sg-${slug}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#B4924E" stop-opacity=".82"/><stop offset="100%" stop-color="#B4924E" stop-opacity=".28"/></linearGradient></defs>
+      ${yLines.map(({ y, label }) => `<line x1="${pL}" y1="${y}" x2="${W - pR}" y2="${y}" stroke="rgba(27,30,25,.08)" stroke-width="1"/><text x="${pL - 5}" y="${+y + 4}" font-size="9" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#9AA093" text-anchor="end">${escapeHtml(label)}</text>`).join("")}
+      <line x1="${pL}" y1="${baseY}" x2="${W - pR}" y2="${baseY}" stroke="rgba(27,30,25,.16)" stroke-width="1"/>
+      ${bars.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="url(#sg-${slug})" rx="2"/><text x="${b.cx}" y="${baseY + 14}" font-size="8.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E" text-anchor="middle">${escapeHtml(b.mo)}</text>`).join("")}
+    </svg>`;
+  })();
+
+  const buyersSvg = (() => {
+    const buyers = topBuyers.filter(([, info]) => info.awardedValue > 0).slice(0, 5);
+    if (buyers.length === 0) return `<p style="color:var(--muted);font-size:13px;padding:16px 0">Buyer data builds with demand signal.</p>`;
+    const maxVal = buyers[0][1].awardedValue;
+    const W = 500, rowH = 40, pT = 6, pL = 176, pR = 68;
+    const H = pT + rowH * buyers.length + 8;
+    const cW = W - pL - pR;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block" aria-label="Top buyers by spend">
+      ${buyers.map(([buyer, info], i) => {
+        const y = pT + rowH * i;
+        const barH = 14, barY = y + (rowH - barH) / 2 - 2;
+        const bW = Math.max(+(cW * (info.awardedValue / maxVal)).toFixed(1), 4);
+        const name = buyer.length > 26 ? buyer.slice(0, 25) + "…" : buyer;
+        const op = +(0.85 - i * 0.12).toFixed(2);
+        return `<text x="${pL - 8}" y="${barY + barH - 2}" font-size="10.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#1B1E19" text-anchor="end">${escapeHtml(name)}</text><rect x="${pL}" y="${barY}" width="${bW}" height="${barH}" fill="#B4924E" opacity="${op}" rx="2"/><text x="${pL + bW + 6}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E">${escapeHtml(fmtShort(info.awardedValue))}</text>`;
+      }).join("")}
+    </svg>`;
+  })();
+
+  const bandSvg = (() => {
+    if (totalBandCount === 0) return `<p style="color:var(--muted);font-size:13px;padding:16px 0">Distribution builds with awarded notices.</p>`;
+    const W = 500, rowH = 36, pT = 6, pL = 130, pR = 80;
+    const H = pT + rowH * valueBands.length + 8;
+    const cW = W - pL - pR;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block" aria-label="Contract value band distribution">
+      ${valueBands.map((b) => {
+        const idx = valueBands.indexOf(b);
+        const y = pT + rowH * idx;
+        const barH = 13, barY = y + (rowH - barH) / 2 - 2;
+        const bW = Math.max(+(cW * (b.count / maxBandCount)).toFixed(1), b.count > 0 ? 4 : 0);
+        const pctLbl = totalBandCount > 0 ? `${b.count} (${Math.round((b.count / totalBandCount) * 100)}%)` : "0";
+        const op = +(0.28 + (b.count / maxBandCount) * 0.57).toFixed(2);
+        return `<text x="${pL - 8}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E" text-anchor="end">${escapeHtml(b.label)}</text>${bW > 0 ? `<rect x="${pL}" y="${barY}" width="${bW}" height="${barH}" fill="#B4924E" opacity="${op}" rx="2"/>` : ""}<text x="${pL + Math.max(bW, 0) + 6}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E">${escapeHtml(pctLbl)}</text>`;
+      }).join("")}
+    </svg>`;
+  })();
+
   const analyticsHtml = profile.live && !isCompiling ? `
-  <section class="analytics-section">
-    <div class="analytics-inner analytics-inner--single">
+  <section class="analytics-section" id="desk-analytics">
+    <div style="padding:0 56px;margin-bottom:36px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div>
-        <div class="analytics-head">12-MONTH SPEND TREND</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:20px;letter-spacing:.01em">Monthly awarded contract value &mdash; public record</p>
-        ${spendChartHtml}
+        <div class="analytics-head" style="letter-spacing:.2em;margin-bottom:6px">DESK ANALYTICS</div>
+        <p style="font-size:13px;color:var(--muted);margin:0">12-month intelligence summary &mdash; public record only</p>
+      </div>
+      <a href="/desk/${profile.slug}/notices" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;letter-spacing:.06em">VIEW ALL OPPORTUNITIES &rarr;</a>
+    </div>
+    <div style="padding:0 56px;margin-bottom:48px">
+      <div class="analytics-head" style="margin-bottom:8px">12-MONTH SPEND TREND</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;letter-spacing:.01em">Monthly awarded contract value &mdash; ${trendData.length} months of public procurement data</p>
+      <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:22px 20px 14px">
+        ${spendTrendSvg}
+      </div>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:8px">${escapeHtml(fmtBig(totalAwarded))}+ total awarded &middot; ${escapeHtml(String(awardedCount))} contracts &middot; Public record only</p>
+    </div>
+    <div class="analytics-inner">
+      <div>
+        <div class="analytics-head" style="margin-bottom:8px">TOP BUYERS BY AWARDED SPEND</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Ranked by 12-month awarded value on this desk</p>
+        <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:18px 16px">
+          ${buyersSvg}
+        </div>
+        <p style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:8px">${topBuyers.length} active buyers tracked on this desk</p>
+      </div>
+      <div>
+        <div class="analytics-head" style="margin-bottom:8px">CONTRACT SIZE DISTRIBUTION</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">${totalBandCount} awarded contracts by value band</p>
+        <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:18px 16px">
+          ${bandSvg}
+        </div>
+        ${topCats.length > 0 ? `<div style="margin-top:32px">
+          <div class="analytics-head" style="margin-bottom:14px">CATEGORY BREAKDOWN</div>
+          ${catBreakdownHtml}
+        </div>` : ""}
       </div>
     </div>
   </section>` : "";
@@ -11067,6 +11239,8 @@ ${pulseHtml}
 </div>
 
 ${recentAwardsHtml}
+
+${analyticsHtml}
 
 <section class="dm-section" id="demand-map">
   <div class="dm-section-inner">
@@ -13680,7 +13854,7 @@ app.get("/admin/articles/comments", requireAdmin, asyncRoute(async (req, res) =>
     ? (await pool.query<CommentRow>(
         `SELECT c.*, u.email AS author_email, a.slug AS article_slug, a.title AS article_title
          FROM comments c
-         JOIN users u ON u.id=c.user_id
+         LEFT JOIN users u ON u.id=c.user_id
          JOIN articles a ON a.id=c.article_id
          WHERE 1=1 ${whereStatus} ORDER BY c.created_at DESC LIMIT 200`
       )).rows
