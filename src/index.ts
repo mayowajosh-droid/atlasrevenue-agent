@@ -5145,15 +5145,22 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
   const rows = articles.map(a => {
     const date = a.published_at ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
     const pill = `<span class="al-pill al-pill-${a.status}">${a.status}</span>`;
+    const hasImages = !!a.hero_image_url;
+    const imgIndicator = (a.hero_prompt || a.body_md.includes(":::image"))
+      ? (hasImages ? `<span title="Images rendered" style="color:#15803D;font-size:11px">✓ img</span>` : `<span title="Images pending" style="color:#B91C1C;font-size:11px">✗ img</span>`)
+      : "";
     return `<tr>
-  <td><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a></td>
+  <td><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a> ${imgIndicator}</td>
   <td>${pill}</td>
   <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(a.desk ?? "—")}</td>
   <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${date}</td>
   <td style="font-family:var(--mono);font-size:11px">${a.views}</td>
-  <td style="display:flex;gap:6px;flex-wrap:wrap">
+  <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     <a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" class="al-btn" style="font-size:10px;padding:5px 10px">Edit</a>
     ${a.status === "published" ? `<a href="/articles/${escapeHtml(a.slug)}" target="_blank" class="al-btn" style="font-size:10px;padding:5px 10px">Live ↗</a>` : ""}
+    <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/render-images?token=${encodeURIComponent(token)}" style="display:inline">
+      <button class="al-btn" type="submit" style="font-size:10px;padding:5px 10px" title="Regenerate all images for this article">🖼 Images</button>
+    </form>
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this article?')" style="display:inline">
       <button class="al-btn al-btn-danger" type="submit" style="font-size:10px;padding:5px 10px">Delete</button>
     </form>
@@ -13378,7 +13385,14 @@ app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
     );
     await logAdminAudit("admin", "article:create", id, { title, status: finalStatus });
   }
-  res.redirect(`/admin/articles/${id}/edit?token=${encodeURIComponent(token)}&msg=Article+created`);
+  // Fire image rendering in background if there are image prompts
+  if (process.env.OPENAI_API_KEY && (hero_prompt || (body_md ?? "").includes(":::image"))) {
+    renderArticleImages(id).catch(err => {
+      console.error("[article-images] background render failed on create", err);
+      captureError(err, { articleImages: { articleId: id } });
+    });
+  }
+  res.redirect(`/admin/articles/${id}/edit?token=${encodeURIComponent(token)}&msg=Article+created.+Images+rendering+in+background.`);
 }));
 
 app.get("/admin/articles/:id/edit", requireAdmin, asyncRoute(async (req, res) => {
@@ -13429,7 +13443,14 @@ app.post("/admin/articles/:id/publish", requireAdmin, asyncRoute(async (req, res
     [article.id, now]
   );
   await logAdminAudit("admin", "article:publish", article.id, { slug: article.slug });
-  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Published`);
+  // Fire image rendering in background on publish if images are missing
+  if (process.env.OPENAI_API_KEY && !article.hero_image_url && (article.hero_prompt || article.body_md.includes(":::image"))) {
+    renderArticleImages(article.id).catch(err => {
+      console.error("[article-images] background render failed on publish", err);
+      captureError(err, { articleImages: { articleId: article.id } });
+    });
+  }
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Published.+Images+rendering+in+background.`);
 }));
 
 app.post("/admin/articles/:id/unpublish", requireAdmin, asyncRoute(async (req, res) => {
@@ -13467,8 +13488,8 @@ app.post("/admin/articles/:id/render-images", requireAdmin, asyncRoute(async (re
   });
 
   const imageCount = (article.body_md.match(/:::image\{/g) ?? []).length + (article.hero_prompt ? 1 : 0);
-  const est = imageCount * 15;
-  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Rendering+${imageCount}+image${imageCount !== 1 ? "s" : ""}+via+DALL-E+3+in+background+(est.+${est}s).+Refresh+the+page+in+a+moment.`);
+  const est = imageCount * 20;
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Rendering+${imageCount}+image${imageCount !== 1 ? "s" : ""}+via+gpt-image-1+in+background+(est.+${est}s).+Refresh+this+page+once+done.`);
 }));
 
 // Admin comment moderation
