@@ -13338,6 +13338,18 @@ app.get("/admin/articles", requireAdmin, asyncRoute(async (req, res) => {
   res.send(adminArticlesListPage(articles, token, msg));
 }));
 
+app.get("/admin/articles/test-dalle", requireAdmin, asyncRoute(async (_req, res) => {
+  try {
+    const r = await openai.images.generate({
+      model: "dall-e-3", prompt: "A simple red circle on a white background.", n: 1,
+      size: "1024x1024", quality: "standard", response_format: "url",
+    });
+    res.json({ ok: true, url: r.data?.[0]?.url ?? null });
+  } catch (err: any) {
+    res.json({ ok: false, error: err?.message ?? String(err), status: err?.status, code: err?.code });
+  }
+}));
+
 app.get("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token ?? "");
   res.send(adminArticleEditorPage(null, token, true));
