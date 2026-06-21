@@ -5262,7 +5262,9 @@ a{color:inherit;text-decoration:none}
 .al-table tr:hover td{background:var(--surface-2)}
 .al-th-sort{cursor:pointer;user-select:none;white-space:nowrap}
 .al-th-sort:hover{color:var(--brand)}
-.al-si{font-size:9px;opacity:.7}
+.al-si{font-size:11px;opacity:.5;margin-left:3px}
+.al-th-sort.al-sort-active{color:var(--brand)}
+.al-th-sort.al-sort-active .al-si{opacity:1}
 .al-num{width:36px;text-align:center;font-family:var(--mono);color:var(--muted);font-size:11px}
 /* pills */
 .al-pill{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
@@ -5376,26 +5378,37 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
   var table=document.getElementById('al-articles-table');
   if(!table)return;
   var sortCol=-1,asc=true;
-  table.querySelectorAll('th.al-th-sort').forEach(function(th){
+  var ths=table.querySelectorAll('th.al-th-sort');
+  // seed all sort indicators with neutral icon
+  ths.forEach(function(th){var s=th.querySelector('.al-si');if(s)s.textContent='↕';});
+  ths.forEach(function(th){
     th.addEventListener('click',function(){
-      var col=+this.dataset.col;
+      var col=+this.getAttribute('data-col');
       asc=(sortCol===col)?!asc:true;
       sortCol=col;
-      table.querySelectorAll('.al-si').forEach(function(s){s.textContent='';});
-      this.querySelector('.al-si').textContent=asc?' ▲':' ▼';
+      // reset all headers
+      ths.forEach(function(h){
+        h.classList.remove('al-sort-active');
+        var s=h.querySelector('.al-si');if(s)s.textContent='↕';
+      });
+      // mark active header
+      this.classList.add('al-sort-active');
+      var si=this.querySelector('.al-si');if(si)si.textContent=asc?'▲':'▼';
+      // sort rows
       var tbody=table.querySelector('tbody');
       var rows=Array.from(tbody.rows);
       rows.sort(function(a,b){
-        var av=(a.cells[col].dataset.val||'').toLowerCase();
-        var bv=(b.cells[col].dataset.val||'').toLowerCase();
+        var av=(a.cells[col].getAttribute('data-val')||'').toLowerCase();
+        var bv=(b.cells[col].getAttribute('data-val')||'').toLowerCase();
         var an=parseFloat(av),bn=parseFloat(bv);
-        // ISO date strings sort correctly as strings; numbers sort numerically
         var cmp=(!isNaN(an)&&!isNaN(bn))?(an-bn):av.localeCompare(bv,'en',{numeric:true,sensitivity:'base'});
         return asc?cmp:-cmp;
       });
       rows.forEach(function(r){tbody.appendChild(r);});
-      // keep # column showing sorted position (not original order)
-      rows.forEach(function(r,i){r.cells[0].textContent=i+1;r.cells[0].dataset.val=String(i+1);});
+      rows.forEach(function(r,i){
+        r.cells[0].textContent=String(i+1);
+        r.cells[0].setAttribute('data-val',String(i+1));
+      });
     });
   });
 })();
