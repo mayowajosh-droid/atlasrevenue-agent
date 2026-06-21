@@ -6987,7 +6987,7 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .scan-strip-right{align-items:flex-start}
   .hero .wrap,.chartband .wrap,.product .wrap{grid-template-columns:1fr;gap:32px}
   .hero h1{font-size:36px}
-  #globe-canvas{opacity:.3}
+  #globe-canvas{opacity:.45}
   .hero-grad{background:none}
   .hero-card-wrap{transform:none;display:flex;justify-content:center}
   .desk-grid{grid-template-columns:1fr 1fr}
@@ -7198,8 +7198,9 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     W=rw; H=rh;
     cv.width=Math.round(W*pr); cv.height=Math.round(H*pr);
     ctx.setTransform(pr,0,0,pr,0,0);
-    cx=W*0.73; cy=H*0.50;
-    R=Math.min(W*0.31,H*0.43);
+    const mob=W<760;
+    cx=mob?W*0.50:W*0.73; cy=mob?H*0.70:H*0.50;
+    R=mob?Math.min(W*0.46,H*0.36):Math.min(W*0.31,H*0.43);
     ready=true;
   }
   window.addEventListener('resize',resize);
