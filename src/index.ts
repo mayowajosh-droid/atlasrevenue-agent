@@ -4926,7 +4926,7 @@ a{color:inherit;text-decoration:none}
 .art-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#102A1E;text-transform:uppercase;white-space:nowrap}
 .art-eyebrow-rule{height:1px;width:46px;background:#C9BFA6;flex-shrink:0}
 .art-eyebrow-num{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted)}
-.art-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;font-weight:500;color:#1a5c38;margin:0 0 28px}
+.art-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;font-weight:500;color:#0E2318;margin:0 0 28px}
 .art-dek{font-family:var(--serif);font-size:23px;line-height:1.5;color:var(--text-mid);font-style:italic;margin:0 0 36px;max-width:760px}
 .art-meta-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding-top:24px;border-top:1px solid var(--border-2)}
 .art-author{display:flex;align-items:center;gap:16px}
