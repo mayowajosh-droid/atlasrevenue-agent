@@ -1176,6 +1176,19 @@ async function initDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_visitor_logs_visited ON visitor_logs (visited_at DESC);`);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS visitor_events (
+      id          BIGSERIAL PRIMARY KEY,
+      event       TEXT NOT NULL,
+      path        TEXT,
+      meta        JSONB,
+      ip          TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_visitor_events_created ON visitor_events (created_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_visitor_events_event ON visitor_events (event, created_at DESC);`);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -4085,7 +4098,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "transport",
     label: "Transport & SEND",
     standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
-    live: true,
+    live: false,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "passenger transport SEND home to school transport community transport special educational needs",
@@ -4103,7 +4116,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "recruitment",
     label: "Recruitment",
     standfirst: "Temporary and permanent staffing frameworks across the NHS, councils, and central government.",
-    live: true,
+    live: false,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider",
@@ -4122,7 +4135,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "frameworks",
     label: "Frameworks",
     standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
-    live: true,
+    live: false,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "framework agreement dynamic purchasing system DPS call-off contract multi-provider",
@@ -5558,7 +5571,7 @@ ${featuredHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">Bloomberg Terminal for UK public-sector revenue. We turn fragmented procurement data into one sourced commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -6860,6 +6873,37 @@ function reportPage(scan: ScanRecord) {
           }
         });
       </script>
+    </div>
+
+    <div class="no-print" style="margin:24px auto;max-width:680px;padding:24px 28px;background:var(--surface-2);border:1px solid var(--border-2)">
+      <h3 style="margin-top:0;font-family:var(--sans);font-weight:800;color:var(--text)">Did this scan lead to action?</h3>
+      <p style="color:var(--muted);margin-bottom:16px;font-size:14px;line-height:1.6">Help us measure what matters. If you bid, won, or shortlisted something from this report, let us know — it makes the product better for everyone.</p>
+      <form id="outcome-form" style="display:flex;flex-direction:column;gap:12px">
+        <select id="outcome-action" style="padding:10px 14px;border:1px solid var(--border-2);font-size:14px;background:var(--surface);color:var(--text);appearance:none;-webkit-appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238893A4'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 14px center;padding-right:36px">
+          <option value="">Select outcome</option>
+          <option value="shortlisted">Shortlisted opportunities from the report</option>
+          <option value="submitted_bid">Submitted a bid based on the report</option>
+          <option value="won_contract">Won a contract found through GovRevenue</option>
+          <option value="contacted_buyer">Contacted a buyer from the watchlist</option>
+          <option value="applied_framework">Applied to a framework identified in the report</option>
+          <option value="no_action">Haven't taken action yet</option>
+        </select>
+        <input type="text" id="outcome-detail" placeholder="Optional: contract value, buyer name, or what you found useful" maxlength="300" style="padding:10px 14px;border:1px solid var(--border-2);font-size:14px;background:var(--surface);color:var(--text)">
+        <button type="submit" style="padding:10px 20px;background:var(--brand);color:#fff;border:0;font-size:14px;cursor:pointer;align-self:flex-start;font-weight:600">Submit feedback</button>
+      </form>
+      <p id="outcome-msg" style="margin-top:12px;font-size:14px;color:var(--green);display:none"></p>
+      <script>
+        document.getElementById("outcome-form").addEventListener("submit", function(e) {
+          e.preventDefault();
+          var a=document.getElementById("outcome-action").value;
+          var d=document.getElementById("outcome-detail").value;
+          var m=document.getElementById("outcome-msg");
+          if(!a){m.style.display="block";m.textContent="Please select an outcome.";m.style.color="var(--red)";return}
+          try{navigator.sendBeacon("/api/track",new Blob([JSON.stringify({event:"scan_outcome",path:location.pathname,meta:{action:a,detail:d.slice(0,300),scanId:"${escapeHtml(scan.id)}"}})],{type:"application/json"}))}catch(x){}
+          m.style.display="block";m.textContent="Thanks — your feedback helps us improve GovRevenue.";m.style.color="var(--green)";
+          document.getElementById("outcome-form").style.display="none";
+        });
+      </script>
     </div>` : ""}
   </main>
   <script>
@@ -6892,6 +6936,21 @@ app.get("/health", (_req, res) => {
     anthropicBillingFailed,
     model: OPENAI_MODEL
   });
+});
+
+app.post("/api/track", (req, res) => {
+  const event = String(req.body?.event || "").slice(0, 60);
+  const path = String(req.body?.path || "").slice(0, 200);
+  const meta = req.body?.meta && typeof req.body.meta === "object" ? req.body.meta : null;
+  if (!event) { res.status(400).json({ ok: false }); return; }
+  if (pool) {
+    const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 64);
+    pool.query(
+      `INSERT INTO visitor_events (event, path, meta, ip) VALUES ($1,$2,$3,$4)`,
+      [event, path, meta ? JSON.stringify(meta) : null, ip]
+    ).catch(() => {});
+  }
+  res.json({ ok: true });
 });
 
 app.post("/api/briefing", asyncRoute(async (req, res) => {
@@ -7020,7 +7079,7 @@ app.get("/", asyncRoute(async (req, res) => {
     : `${chartTrendPct >= 0 ? '+' : ''}${chartTrendPct}% · 3-month avg vs 12mo ago`;
   const topDeskLabel = chartResult.topDesk
     ? `Led by <b>${escapeHtml(chartResult.topDesk)}</b> this period`
-    : 'Across all 24 active desks';
+    : `Across all ${DESK_PROFILES.filter(d => d.live).length} active desks`;
   const chartBullets = chartResult.illustrative
     ? `<li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
         <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
@@ -7393,7 +7452,7 @@ ${chaseNowHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">Bloomberg Terminal for UK public-sector revenue. We turn fragmented procurement data into one sourced commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -8190,7 +8249,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
     ? `<a href="/scan/${escapeHtml(completedScans[1].id)}/compare?with=${encodeURIComponent(completedScans[0].id)}" class="dash-btn" style="font-size:9px">Compare latest 2 &rarr;</a>`
     : "";
 
-  const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
+  const navLinks = DESK_PROFILES.filter(d => d.live).map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
 
   // ── CSS ───────────────────────────────────────────────────────────────────
   const dashCss = `
@@ -8306,9 +8365,9 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
     <div class="pg-crumb"><a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
     <h1>Intelligence Dashboard</h1>
     <div class="pg-stats">
-      <div class="pg-stat"><span class="pg-stat-val">${userScans.length}</span><span class="pg-stat-label">Scans run</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${completedCount}</span><span class="pg-stat-label">Reports complete</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${upcomingDeadlines.length > 0 ? upcomingDeadlines.length : "&#8212;"}</span><span class="pg-stat-label">Live deadlines</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${userScans.length || `<a href="/scan" style="color:var(--brand);text-decoration:none">Run first scan &rarr;</a>`}</span><span class="pg-stat-label">${userScans.length ? "Scans run" : "Get started"}</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${completedCount || `<span style="font-size:14px;color:var(--muted)">Ready when you are</span>`}</span><span class="pg-stat-label">${completedCount ? "Reports complete" : "Reports"}</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${upcomingDeadlines.length > 0 ? upcomingDeadlines.length : totalOpenSignals > 0 ? totalOpenSignals.toLocaleString() : "&#8212;"}</span><span class="pg-stat-label">${upcomingDeadlines.length > 0 ? "Live deadlines" : "Open signals"}</span></div>
       <div class="pg-stat"><span class="pg-stat-val">${memberSince}</span><span class="pg-stat-label">Member since</span></div>
     </div>
   </div>
@@ -8389,7 +8448,7 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
       <div class="dash-card-body">
         <div style="font-size:12px;color:var(--slate);margin-bottom:14px;line-height:1.5">Click any sector to pre-fill the scan form with that desk&rsquo;s context &#8212; your profile against their live procurement data.</div>
         <div class="sector-shortcuts">
-          ${DESK_PROFILES.map(d => `<a href="/scan?desk=${escapeHtml(d.slug)}" class="sector-btn">${escapeHtml(d.label)}</a>`).join("")}
+          ${DESK_PROFILES.filter(d => d.live).map(d => `<a href="/scan?desk=${escapeHtml(d.slug)}" class="sector-btn">${escapeHtml(d.label)}</a>`).join("")}
         </div>
       </div>
     </div>
@@ -8407,7 +8466,7 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
           <div class="acct-meta-label">Plan</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
-            <span style="font-size:12px;color:var(--slate)">${user.tier === "free" ? "Free" : user.tier === "pro" ? "&pound;79/month" : "&pound;249/month"}</span>
+            <span style="font-size:12px;color:var(--slate)">${user.tier === "free" ? "Free" : user.tier === "pro" ? "&pound;79/month" : "&pound;499/month"}</span>
           </div>
         </div>
         <div class="acct-meta"><div class="acct-meta-label">Member since</div><div class="acct-meta-val">${memberSince}</div></div>
@@ -8421,24 +8480,28 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
     ${user.tier === "free" && stripe ? `
     <div class="upgrade-box">
       <h3>Unlock the full suite</h3>
-      <p>Free accounts run scans and read reports. Pro turns every scan into action with three intelligence tools.</p>
+      <p>Free accounts can run one scan. Pro turns every scan into action — unlimited scans, weekly alerts, and three intelligence tools that convert reports into submissions.</p>
       <ul>
+        <li>Unlimited scans &amp; full scan history</li>
         <li>Capability statement generator</li>
         <li>Buyer outreach email kit (3 per scan)</li>
         <li>Framework pre-qualification checker</li>
-        <li>Unlimited scan history</li>
         <li>Weekly opportunity alert emails</li>
-        <li>Evidence grade tracking</li>
+        <li>Evidence grade tracking over time</li>
       </ul>
       <a href="/billing/checkout?plan=pro" class="btn-upgrade">Upgrade to Pro &mdash; &pound;79/month</a>
-      <div style="margin-top:10px"><a href="/billing/checkout?plan=agency" style="font-family:var(--mono);font-size:9px;color:#7a909e;text-decoration:underline;letter-spacing:.05em">Agency plan &pound;249/month (unlimited users) &rarr;</a></div>
+      <div style="margin-top:10px"><a href="/billing/checkout?plan=agency" style="font-family:var(--mono);font-size:9px;color:#7a909e;text-decoration:underline;letter-spacing:.05em">Agency plan &pound;499/month (5 seats + portfolio review) &rarr;</a></div>
     </div>
+    ${userScans.length >= 1 ? `<div style="padding:14px 16px;background:rgba(155,45,32,.08);border:1px solid rgba(155,45,32,.18);font-family:var(--mono);font-size:11px;color:#9b2d20;line-height:1.6;margin-bottom:14px">
+      <strong>Free scan limit reached.</strong> You have used your free scan. Upgrade to Pro for unlimited scans and weekly alerts, or purchase a single scan for &pound;29.
+      <div style="margin-top:8px;display:flex;gap:10px"><a href="/billing/checkout?plan=pro" style="color:#9b2d20;text-decoration:underline;font-weight:600">Upgrade to Pro</a><a href="/checkout?plan=payg" style="color:#9b2d20;text-decoration:underline">One-off scan &pound;29</a></div>
+    </div>` : ""}
     ` : ""}
 
     <div class="dash-card">
       <div class="dash-card-head">
         <span class="dash-card-title">Hot sectors right now</span>
-        <a href="/desks" style="font-family:var(--mono);font-size:9.5px;color:var(--accent);text-decoration:none;text-transform:uppercase;letter-spacing:.06em">All 24 &rarr;</a>
+        <a href="/desks" style="font-family:var(--mono);font-size:9.5px;color:var(--accent);text-decoration:none;text-transform:uppercase;letter-spacing:.06em">All ${DESK_PROFILES.filter(d => d.live).length} &rarr;</a>
       </div>
       <div class="dash-card-body">${hotSectorRows}</div>
     </div>
@@ -8879,6 +8942,215 @@ body{display:block;background:var(--cream)}
   res.type("html").send(html);
 }));
 
+// ── Legal & info pages ──
+
+function legalPage(title: string, body: string, req: express.Request): string {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} — GovRevenue</title>
+<style>${pageShellCss()}
+.lp-wrap{max-width:780px;margin:0 auto;padding:56px 48px 80px}
+.lp-h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,40px);font-weight:400;letter-spacing:-.02em;color:var(--text);margin-bottom:12px}
+.lp-updated{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:36px}
+.lp-body{color:var(--text-mid);font-size:15.5px;line-height:1.75}
+.lp-body h2{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text);margin:36px 0 14px;letter-spacing:-.01em}
+.lp-body h3{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin:28px 0 10px}
+.lp-body p{margin-bottom:16px}
+.lp-body ul{margin:0 0 16px 20px}.lp-body li{margin-bottom:6px}
+.lp-body a{color:var(--brand);text-decoration:underline;text-underline-offset:3px}
+@media(max-width:640px){.lp-wrap{padding:32px 20px 56px}}
+</style></head><body>
+${pageShellHeader(null, getAuthUser(req))}
+<main class="lp-wrap"><h1 class="lp-h1">${escapeHtml(title)}</h1>
+<div class="lp-updated">Last updated: June 2026</div>
+<div class="lp-body">${body}</div></main>
+${pageShellFoot()}</body></html>`;
+}
+
+app.get("/privacy", (req, res) => {
+  res.type("html").send(legalPage("Privacy Policy", `
+<h2>What we collect</h2>
+<p>When you run a scan, we collect the company information you submit (name, services, location, and any optional fields you fill in). If you create an account, we store your email address and an encrypted password.</p>
+<p>We use cookies only for session authentication. We do not use tracking cookies, advertising pixels, or third-party analytics scripts.</p>
+
+<h2>How we use it</h2>
+<ul>
+<li>To generate your procurement intelligence report by searching public data sources</li>
+<li>To send scan results, weekly alerts, and briefing digests (if you subscribe)</li>
+<li>To improve search accuracy across our intelligence desks</li>
+</ul>
+<p>We do not sell, rent, or share your data with third parties. Your scan inputs are never used to train AI models.</p>
+
+<h2>Public data sources</h2>
+<p>Every data point in a GovRevenue report comes from publicly available procurement records: <a href="https://www.contractsfinder.service.gov.uk">Contracts Finder</a> (Crown Commercial Service) and the <a href="https://www.find-tender.service.gov.uk">Find a Tender Service</a> (Cabinet Office). We do not scrape private databases or access restricted systems.</p>
+
+<h2>Data retention</h2>
+<p>Scan data is retained for 12 months from the scan date. You can request deletion of your data at any time by emailing <a href="mailto:privacy@govrevenue.co.uk">privacy@govrevenue.co.uk</a>.</p>
+
+<h2>Your rights (UK GDPR)</h2>
+<p>You have the right to access, correct, or delete your personal data. You may also request a copy of your data in a portable format. To exercise any of these rights, contact us at the email above.</p>
+
+<h2>Payments</h2>
+<p>Payment processing is handled by <a href="https://stripe.com">Stripe</a>. We never see or store your card details. Stripe's privacy policy applies to payment data.</p>
+
+<h2>Contact</h2>
+<p>For privacy questions: <a href="mailto:privacy@govrevenue.co.uk">privacy@govrevenue.co.uk</a></p>
+`, req));
+});
+
+app.get("/terms", (req, res) => {
+  res.type("html").send(legalPage("Terms of Service", `
+<h2>The service</h2>
+<p>GovRevenue provides commercial intelligence reports based on publicly available UK procurement data. Reports are generated by AI analysis of public records and are intended as decision-support tools, not as legal or financial advice.</p>
+
+<h2>Intelligence, not certainty</h2>
+<p>Every figure in a GovRevenue report links back to a public notice published on Contracts Finder or the Find a Tender Service. However, procurement data can contain errors at source (incorrect values, duplicate entries, delayed publication). We cross-reference and filter where possible, but we cannot guarantee the accuracy of upstream government data.</p>
+<p>GovRevenue reports are intelligence products. They inform your decisions; they do not replace professional bid-writing, legal review, or due diligence.</p>
+
+<h2>Accounts and payment</h2>
+<p>Pay As You Go scans are one-time purchases. Pro and Agency subscriptions renew monthly and can be cancelled at any time. Refunds are considered on a case-by-case basis within 14 days of purchase.</p>
+
+<h2>Acceptable use</h2>
+<p>You may use GovRevenue reports for your own business purposes. You may not resell reports, use automated tools to bulk-scrape our pages, or misrepresent GovRevenue data as your own research without attribution.</p>
+
+<h2>Limitation of liability</h2>
+<p>GovRevenue is provided "as is." We are not liable for business decisions made on the basis of our reports, or for errors in upstream government data. Our total liability is limited to the amount you paid for the relevant scan or subscription period.</p>
+
+<h2>Changes</h2>
+<p>We may update these terms. Material changes will be communicated by email to registered users.</p>
+
+<h2>Contact</h2>
+<p>For terms questions: <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a></p>
+`, req));
+});
+
+app.get("/sources", (req, res) => {
+  res.type("html").send(legalPage("Our Sources", `
+<h2>Where the data comes from</h2>
+<p>GovRevenue indexes two official UK government procurement platforms, updated hourly:</p>
+
+<h3>Contracts Finder</h3>
+<p>Operated by the Crown Commercial Service. All UK public-sector contracts above £12,000 (central government) or £30,000 (sub-central) must be published here. We search via the official REST API (v2), filtered by keyword relevance and CPV classification codes per intelligence desk.</p>
+
+<h3>Find a Tender Service</h3>
+<p>Operated by the Cabinet Office. Publishes above-threshold procurement notices (typically £177,898+ for goods and services). We index via the OCDS (Open Contracting Data Standard) API, matching notices to sector desks by title keyword analysis.</p>
+
+<h2>What we do with it</h2>
+<ul>
+<li><strong>Filter</strong> — Each of our ${DESK_PROFILES.filter(d => d.live).length} intelligence desks has sector-specific keyword sets. Notices are matched by title to ensure relevance; we do not match on description text (which caused false positives in testing).</li>
+<li><strong>Aggregate</strong> — We compute awarded values, buyer concentration, category breakdowns, and spend trends from the raw notice data.</li>
+<li><strong>Analyse</strong> — Scan reports use AI (Claude by Anthropic, with OpenAI as fallback) to synthesise the matched procurement data into a structured commercial intelligence report. The AI has access to web search for additional context.</li>
+<li><strong>Cap outliers</strong> — Notices with awarded values above &pound;2bn are excluded from aggregated statistics to prevent data-entry errors from distorting desk-level metrics.</li>
+</ul>
+
+<h2>What we do not do</h2>
+<ul>
+<li>We do not scrape private databases, paywalled platforms, or restricted systems</li>
+<li>We do not access or store tender documents or bid submissions</li>
+<li>We do not predict outcomes — we report what the public record shows</li>
+</ul>
+
+<h2>Aggregator filtering</h2>
+<p>Procurement aggregators (Crown Commercial Service, YPO, ESPO, Pagabo, Scape, NHS Supply Chain, and others) are filtered from buyer-level statistics to prevent a single framework operator from distorting the buyer concentration picture for a given desk.</p>
+
+<h2>Limitations</h2>
+<p>Government data can be incomplete: some contracts are published late, some awarded values are missing or incorrect, and below-threshold contracts may not appear at all. GovRevenue reports what is published, not what exists. This is intelligence, not certainty.</p>
+`, req));
+});
+
+app.get("/roadmap", (req, res) => {
+  const liveDesks = DESK_PROFILES.filter(d => d.live).length;
+  res.type("html").send(legalPage("Product Roadmap", `
+<p style="font-size:16px;line-height:1.75;margin-bottom:32px">GovRevenue ships continuously. Here is what we have built, what we are building now, and where we are heading. This page is updated as priorities evolve.</p>
+
+<h2>Live now</h2>
+<ul>
+<li><strong>${liveDesks} intelligence desks</strong> — sector-specific procurement monitoring across facilities, digital, health, energy, construction, and more</li>
+<li><strong>AI-powered scan reports</strong> — 10-section structured intelligence report with evidence grading, buyer mapping, route-to-revenue analysis, and bid readiness scoring</li>
+<li><strong>Weekly opportunity alerts</strong> — automated email digests of new contracts matching your profile</li>
+<li><strong>Scan comparison</strong> — diff reports over time to track how your market position is changing</li>
+<li><strong>Competitor intelligence</strong> — incumbent mapping showing which firms are winning in your space</li>
+<li><strong>CPV code search</strong> — parallel classification-code search layer alongside keyword matching</li>
+<li><strong>Live signals dashboard</strong> — real-time feed of open tenders and awarded contracts across all desks</li>
+<li><strong>PDF export</strong> — print-ready A4 reports for board packs and meeting briefs</li>
+<li><strong>SSE scan progress</strong> — live stage-by-stage progress during scan execution</li>
+</ul>
+
+<h2>Building now</h2>
+<ul>
+<li><strong>Framework pre-qualification assistant</strong> — identify open frameworks in your sector, check eligibility criteria, and generate a readiness checklist before you apply</li>
+<li><strong>Scan-to-bid-pack</strong> — generate a capability statement and tailored outreach email from your top 3 routes to revenue, ready to send to contracting authorities</li>
+<li><strong>Desk page data visualisation</strong> — spend-by-buyer charts, open vs awarded breakdowns, and category trend analysis on every desk page</li>
+</ul>
+
+<h2>On the horizon</h2>
+<ul>
+<li><strong>API access</strong> — RESTful endpoints for integrating GovRevenue intelligence into your CRM, bid management tools, or internal dashboards</li>
+<li><strong>Multi-region expansion</strong> — extending coverage beyond UK central and sub-central procurement to devolved administrations and international equivalents</li>
+<li><strong>Pipeline forecasting</strong> — predictive signals based on historical re-let patterns and buyer procurement cycles</li>
+<li><strong>Team collaboration</strong> — shared workspaces for agency-tier accounts with role-based access and internal notes on opportunities</li>
+</ul>
+
+<h2>Suggest a feature</h2>
+<p>GovRevenue is built by people who use it. If there is something you need that is not on this list, email <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a> and it will be read by the team building the product.</p>
+`, req));
+});
+
+app.get("/api-docs", (req, res) => {
+  res.type("html").send(legalPage("API Documentation", `
+<p style="font-size:16px;line-height:1.75;margin-bottom:32px">GovRevenue provides a JSON API for integrating procurement intelligence into your CRM, bid management tools, or internal dashboards. The API is available on <strong>Agency</strong> plans and above.</p>
+
+<h2>Authentication</h2>
+<p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Agency accounts — contact <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a> to request access.</p>
+
+<h2>Base URL</h2>
+<p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">https://govrevenue-agent-production.up.railway.app</code></p>
+
+<h2>Endpoints</h2>
+
+<h3>Create a scan</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">POST /api/scans</code></p>
+<p>Submit a company profile for scanning. Returns the scan ID for polling status.</p>
+<p><strong>Request body (JSON):</strong></p>
+<ul>
+<li><code>companyName</code> (required) — company name</li>
+<li><code>mainServices</code> (required) — primary services offered</li>
+<li><code>location</code> — UK region or office location</li>
+<li><code>idealBuyers</code> — target buyer types</li>
+<li><code>teamSize</code> — staff count band</li>
+<li><code>idealContractSize</code> — preferred contract value range</li>
+<li>All other scan fields are optional enrichment</li>
+</ul>
+
+<h3>Get scan status</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/scans/:id/status</code></p>
+<p>Returns the current stage, progress percentage, and completion status.</p>
+
+<h3>Get scan result</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/scans/:id</code></p>
+<p>Returns the full scan data including procurement notices, evidence grade, verdict, and structured report sections.</p>
+
+<h3>Get scan data (JSON)</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/scans/:id/data.json</code></p>
+<p>Returns the raw procurement data: contract notices, buyer list, spend figures, and keyword matches.</p>
+
+<h3>Get report (Markdown)</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/scans/:id/report.md</code></p>
+<p>Returns the AI-generated 10-section report in Markdown format.</p>
+
+<h3>Download PDF</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/scans/:id/report.pdf</code></p>
+<p>Returns the rendered A4 PDF report.</p>
+
+<h2>Rate limits</h2>
+<p>API access is rate-limited to 60 requests per minute per API key. Scan creation is limited to 10 per hour.</p>
+
+<h2>Webhooks (coming soon)</h2>
+<p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a>.</p>
+
+<h2>Need help?</h2>
+<p>For API support, integration guidance, or to request access: <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a></p>
+`, req));
+});
+
 app.get("/pricing", (_req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -8981,7 +9253,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
         <li><span class="tick">&#10003;</span> PDF export</li>
         <li><span class="tick">&#10003;</span> Evidence grade &amp; verdict</li>
         <li><span class="dash">&ndash;</span> Weekly opportunity alerts</li>
-        <li><span class="dash">&ndash;</span> All 24 intelligence desks</li>
+        <li><span class="dash">&ndash;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
         <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
       </ul>
       <a href="/checkout?plan=payg" class="btn btn-outline">Get started &rarr;</a>
@@ -8995,7 +9267,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
       <ul>
         <li><span class="tick">&#10003;</span> Unlimited scans</li>
         <li><span class="tick">&#10003;</span> Weekly opportunity alerts (email)</li>
-        <li><span class="tick">&#10003;</span> All 24 intelligence desks</li>
+        <li><span class="tick">&#10003;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
         <li><span class="tick">&#10003;</span> Full reports &amp; PDF exports</li>
         <li><span class="tick">&#10003;</span> Buyer watchlist monitoring</li>
         <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
@@ -9005,17 +9277,17 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
     </div>
     <div class="plan">
       <div class="plan-name">Agency</div>
-      <div class="plan-price"><sup>£</sup>249</div>
+      <div class="plan-price"><sup>£</sup>499</div>
       <div class="plan-period">per month</div>
-      <div class="plan-desc">For consultancies and bid writers managing multiple clients. Run scans across different firm profiles and desks.</div>
+      <div class="plan-desc">For consultancies and bid writers managing client portfolios. Multiple firm profiles, team seats, and a quarterly review call.</div>
       <ul>
         <li><span class="tick">&#10003;</span> Everything in Pro</li>
         <li><span class="tick">&#10003;</span> Up to 10 firm profiles</li>
-        <li><span class="tick">&#10003;</span> Team access (3 seats)</li>
+        <li><span class="tick">&#10003;</span> Team access (5 seats)</li>
         <li><span class="tick">&#10003;</span> Client-ready PDF reports</li>
         <li><span class="tick">&#10003;</span> Priority support</li>
         <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
-        <li><span class="tick">&#10003;</span> Custom alert frequency</li>
+        <li><span class="tick">&#10003;</span> Quarterly portfolio review call</li>
       </ul>
       <a href="mailto:hello@govrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
       <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
@@ -9047,11 +9319,24 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
       <div class="faq-q">Is this a guarantee I&rsquo;ll win contracts?</div>
       <div class="faq-a">No. GovRevenue is intelligence, not certainty. We surface what the public record shows and give you a structured assessment of fit. Winning still depends on your bid quality, track record, and pricing. We help you stop chasing the wrong ones.</div>
     </div>
+    <div class="faq-item">
+      <div class="faq-q">Can I cancel or unsubscribe?</div>
+      <div class="faq-a">Yes. Pro and Agency subscriptions can be cancelled any time &mdash; no lock-in, no penalty. Weekly alert emails include a one-click unsubscribe link in every message. If you want to delete your account and data entirely, email us.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Where does the data come from?</div>
+      <div class="faq-a">Every data point comes from two official sources: <strong>Contracts Finder</strong> (Crown Commercial Service) and the <strong>Find a Tender Service</strong> (Cabinet Office). We do not scrape private databases. <a href="/sources" style="color:var(--brand);text-decoration:underline">Read about our sources &rarr;</a></div>
+    </div>
   </div>
 </div>
 </main>
 <footer style="border-top:1px solid var(--border);padding:32px">
   <div class="caveat">Public record only &middot; Intelligence, not certainty &middot; <a href="/" style="text-decoration:underline;color:var(--muted)">GovRevenue</a></div>
+  <div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.06em">
+    <a href="/privacy" style="color:var(--muted);text-decoration:none">Privacy</a> &middot;
+    <a href="/terms" style="color:var(--muted);text-decoration:none">Terms</a> &middot;
+    <a href="/sources" style="color:var(--muted);text-decoration:none">Sources</a>
+  </div>
 </footer>
 </body>
 </html>`);
@@ -9072,14 +9357,14 @@ const PLAN_CONFIG: Record<string, { name: string; price: string; period: string;
     price: "£79",
     period: "per month — cancel anytime",
     mode: "subscription",
-    items: ["Unlimited scans", "Weekly opportunity alerts (email)", "All 24 intelligence desks", "Full reports & PDF exports", "Buyer watchlist monitoring"],
+    items: ["Unlimited scans", "Weekly opportunity alerts (email)", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`, "Full reports & PDF exports", "Buyer watchlist monitoring"],
   },
   agency: {
     name: "Agency",
-    price: "£249",
+    price: "£499",
     period: "per month",
     mode: "subscription",
-    items: ["Everything in Pro", "Up to 10 firm profiles", "Team access (3 seats)", "Client-ready PDF reports", "Priority support", "Dedicated desk monitoring"],
+    items: ["Everything in Pro", "Up to 10 firm profiles", "Team access (5 seats)", "Client-ready PDF reports", "Priority support", "Dedicated desk monitoring", "Quarterly portfolio review call"],
   },
 };
 
@@ -9407,13 +9692,30 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 .field label span{color:var(--brand)}
 .field input,.field textarea,.field select{width:100%;border:1px solid var(--border-2);background:var(--surface);padding:13px 15px;font-family:var(--sans);font-size:15px;color:var(--text);transition:.15s;resize:vertical;outline:none}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--brand)}
+.field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2386897E'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer}
+.field select option{background:var(--surface);color:var(--text)}
 .field textarea{min-height:76px}
 .field .hint{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.5}
-.section-label{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);background:var(--surface-2);padding:12px 0;margin:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.section-label{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.06);padding:14px 0;margin:8px 0 0;border-top:2px solid rgba(180,146,78,.18);border-bottom:1px solid var(--border);font-weight:600}
 .submit-row{margin-top:36px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 .btn-submit{background:#102A1E;color:#F3EFE6;font-family:var(--sans);font-size:15px;font-weight:600;letter-spacing:.01em;padding:15px 32px;border:0;cursor:pointer;transition:.18s}
 .btn-submit:hover{background:#0A1C12}
 .submit-note{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5}
+/* wizard steps */
+.step-bar{display:flex;align-items:center;gap:0;margin-bottom:32px}
+.step-pill{flex:1;text-align:center;padding:11px 0;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--border-2);background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.15s}
+.step-pill.active{background:#102A1E;color:#F3EFE6;border-color:#102A1E;font-weight:600}
+.step-pill.done{background:var(--surface);color:var(--brand);border-color:var(--brand)}
+.step-pill+.step-pill{border-left:0}
+.form-step{display:none}.form-step.visible{display:block}
+.btn-continue{display:inline-flex;align-items:center;gap:8px;background:#102A1E;color:#F3EFE6;font-family:var(--sans);font-size:15px;font-weight:600;padding:15px 32px;border:0;cursor:pointer;transition:.18s;margin-top:28px}
+.btn-continue:hover{background:#0A1C12}
+.btn-skip{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:0;margin-top:12px;padding:0}
+.btn-skip:hover{color:var(--text-mid)}
+.step-intro{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:8px;padding:14px 0}
+.field.invalid input,.field.invalid textarea{border-color:#c53030}
+.field .err-msg{font-family:var(--mono);font-size:10px;color:#c53030;margin-top:4px;display:none}
+.field.invalid .err-msg{display:block}
 @media(max-width:640px){
   .topstrip{padding:0 14px;font-size:10px;gap:8px}
   header{padding:0 14px}
@@ -9425,6 +9727,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
   .field input,.field textarea,.field select{font-size:14px;padding:11px 12px}
   .submit-row{flex-direction:column;align-items:stretch;gap:12px}
   .btn-submit{width:100%;padding:14px;font-size:14px}
+  .btn-continue{width:100%;justify-content:center}
 }
 @media(max-width:400px){
   .topstrip{display:none}
@@ -9448,124 +9751,242 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
     <div class="eyebrow">Intelligence scan</div>
     <h1>Tell us about your firm.</h1>
     <p class="sub">The more context you give, the sharper the signal. We scan Contracts Finder, Find a Tender and LA spend data, then return a sourced verdict on where the money is and how to reach it.</p>
+    <details style="margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6;cursor:pointer">
+      <summary style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);cursor:pointer">What is an Evidence Grade?</summary>
+      <p style="margin-top:10px">Every report receives a grade from <strong style="color:var(--text)">A</strong> (strongest fit) to <strong style="color:var(--text)">E</strong> (weakest). The grade measures how well your profile matches live public contracts: buyer overlap, contract size fit, sector relevance, and track record. Filling in experience, certifications, and past wins strengthens the grade. First-time bidders typically start at C and improve as they build evidence.</p>
+    </details>
   </div>
   ${contextBannerHtml}
-  <form method="POST" action="/form-submit" autocomplete="off" class="form-grid">
+  <div class="step-bar">
+    <div class="step-pill active" id="sp1" onclick="showStep(1)">1 &middot; Core profile</div>
+    <div class="step-pill" id="sp2" onclick="if(this.classList.contains('done')||this.classList.contains('active'))showStep(2)">2 &middot; Sharpen your report</div>
+  </div>
+
+  <form method="POST" action="/form-submit" autocomplete="off" id="scanForm">
     ${deskParam ? `<input type="hidden" name="_deskContext" value="${escapeHtml(deskParam)}">` : ""}
     ${noticeIdParam ? `<input type="hidden" name="_noticeContext" value="${escapeHtml(noticeIdParam)}">` : ""}
 
-    <div class="section-label">Your firm</div>
+    <!-- ─── STEP 1: Core profile (5 fields) ─── -->
+    <div class="form-step visible" id="step1">
+      <div class="form-grid">
+        <div class="step-intro">Five fields. That is all we need to search the public record and return a verdict. Fill these and you can submit immediately, or continue to step 2 for a sharper report.</div>
 
-    <div class="field">
-      <label for="companyName">Company name <span>*</span></label>
-      <input id="companyName" name="companyName" required placeholder="e.g. Apex Facilities Ltd">
-    </div>
-    <div class="field">
-      <label for="website">Website</label>
-      <input id="website" name="website" placeholder="e.g. https://apexfacilities.co.uk">
-    </div>
-    <div class="field">
-      <label for="location">Location / base</label>
-      <input id="location" name="location" placeholder="e.g. Birmingham, West Midlands">
-    </div>
-    <div class="field">
-      <label for="teamSize">Team size</label>
-      <input id="teamSize" name="teamSize" placeholder="e.g. 12 FTE">
-    </div>
+        <div class="field" data-required>
+          <label for="companyName">Company name <span>*</span></label>
+          <input id="companyName" name="companyName" required placeholder="e.g. Apex Facilities Ltd">
+          <div class="err-msg">Company name is required</div>
+        </div>
+        <div class="field" data-required>
+          <label for="mainServices">Main services <span>*</span></label>
+          <textarea id="mainServices" name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
+          <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
+          <div class="err-msg">Describe your main services so we can match you to contracts</div>
+        </div>
+        <div class="field">
+          <label for="location">Location / base</label>
+          <input id="location" name="location" placeholder="e.g. Birmingham, West Midlands">
+        </div>
+        <div class="field">
+          <label for="idealBuyers">Ideal public-sector buyers</label>
+          <textarea id="idealBuyers" name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
+        </div>
+        <div class="field">
+          <label for="mainGoal">Main business goal</label>
+          <textarea id="mainGoal" name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
+        </div>
+      </div>
 
-    <div class="section-label">Services &amp; scope</div>
-
-    <div class="field">
-      <label for="mainServices">Main services <span>*</span></label>
-      <textarea id="mainServices" name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
-      <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
-    </div>
-    <div class="field">
-      <label for="secondaryServices">Secondary services</label>
-      <textarea id="secondaryServices" name="secondaryServices" placeholder="e.g. grounds maintenance, pest control"></textarea>
-    </div>
-    <div class="field">
-      <label for="areasServed">Areas / regions served</label>
-      <textarea id="areasServed" name="areasServed" placeholder="e.g. West Midlands, East Midlands, national frameworks"></textarea>
-    </div>
-    <div class="field">
-      <label for="excludedServices">Services you do NOT want</label>
-      <textarea id="excludedServices" name="excludedServices" placeholder="e.g. residential, defence, high-security sites"></textarea>
+      <button type="button" class="btn-continue" onclick="goStep2()">Continue &mdash; sharpen your report &rarr;</button>
+      <div>
+        <button type="submit" class="btn-skip" onclick="return validateStep1()">Skip details, submit now &rarr;</button>
+      </div>
     </div>
 
-    <div class="section-label">Contract appetite</div>
+    <!-- ─── STEP 2: Full details (optional enrichment) ─── -->
+    <div class="form-step" id="step2">
+      <div class="form-grid">
+        <div class="step-intro">Every field you fill here makes the scan more precise. Skip any that do not apply.</div>
+        <div class="step-intro" style="font-size:12px;color:var(--brand);margin-top:-8px;padding:10px 14px;background:rgba(180,146,78,.06);border:1px solid rgba(180,146,78,.12)"><strong>Minimum for a strong scan:</strong> team size + ideal contract size + one of experience, certifications, or case studies. These three inputs drive buyer matching and evidence grading. Without them the scan still works — it just focuses on market-level intelligence rather than firm-specific routes.</div>
 
-    <div class="field">
-      <label for="idealContractSize">Ideal contract size</label>
-      <input id="idealContractSize" name="idealContractSize" placeholder="e.g. £100k &ndash; £500k per year">
-    </div>
-    <div class="field">
-      <label for="maximumContractSize">Maximum contract size</label>
-      <input id="maximumContractSize" name="maximumContractSize" placeholder="e.g. £2m">
-    </div>
-    <div class="field">
-      <label for="idealBuyers">Ideal public-sector buyers</label>
-      <textarea id="idealBuyers" name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
-    </div>
-    <div class="field">
-      <label for="regionsToScan">Regions to scan first</label>
-      <textarea id="regionsToScan" name="regionsToScan" placeholder="e.g. West Midlands priority, then national frameworks"></textarea>
-    </div>
+        <div class="section-label">Firm details</div>
+        <div class="field">
+          <label for="website">Website</label>
+          <input id="website" name="website" type="url" placeholder="e.g. https://apexfacilities.co.uk">
+        </div>
+        <div class="field">
+          <label for="teamSize">Team size</label>
+          <select id="teamSize" name="teamSize">
+            <option value="">Select team size</option>
+            <option value="1-5">1–5 (micro)</option>
+            <option value="6-20">6–20 (small)</option>
+            <option value="21-50">21–50 (medium)</option>
+            <option value="51-250">51–250 (mid-market)</option>
+            <option value="250+">250+ (enterprise)</option>
+          </select>
+        </div>
 
-    <div class="section-label">Track record &amp; credentials</div>
+        <div class="section-label">Services &amp; scope</div>
+        <div class="field">
+          <label for="secondaryServices">Secondary services</label>
+          <textarea id="secondaryServices" name="secondaryServices" maxlength="500" placeholder="e.g. grounds maintenance, pest control"></textarea>
+        </div>
+        <div class="field">
+          <label for="areasServed">Areas / regions served</label>
+          <textarea id="areasServed" name="areasServed" maxlength="300" placeholder="e.g. West Midlands, East Midlands, national frameworks"></textarea>
+        </div>
+        <div class="field">
+          <label for="excludedServices">Services you do NOT want</label>
+          <textarea id="excludedServices" name="excludedServices" maxlength="300" placeholder="e.g. residential, defence, high-security sites"></textarea>
+        </div>
 
-    <div class="field">
-      <label for="publicSectorExperience">Public-sector experience</label>
-      <input id="publicSectorExperience" name="publicSectorExperience" placeholder="e.g. 3 years, 6 active public contracts">
-    </div>
-    <div class="field">
-      <label for="lastPublicContract">Last public contract won</label>
-      <textarea id="lastPublicContract" name="lastPublicContract" placeholder="e.g. 2yr cleaning contract, Birmingham City Council, £180k/yr, ended 2024"></textarea>
-      <div class="hint">Most recent win &mdash; buyer name, value, and date if known. Helps us assess your evidence grade.</div>
-    </div>
-    <div class="field">
-      <label for="caseStudies">Case studies or proof</label>
-      <textarea id="caseStudies" name="caseStudies" placeholder="e.g. Delivered responsive repairs for housing association 2022&ndash;24, 94% satisfaction score"></textarea>
-    </div>
-    <div class="field">
-      <label for="certifications">Certifications / accreditations</label>
-      <textarea id="certifications" name="certifications" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
-    </div>
-    <div class="field">
-      <label for="frameworkStatus">Framework access</label>
-      <textarea id="frameworkStatus" name="frameworkStatus" placeholder="e.g. On Crown Commercial Service RM6187, YPO cleaning framework — or none yet"></textarea>
-      <div class="hint">Framework memberships unlock fast-track contract routes. List any you hold or are applying for.</div>
-    </div>
+        <div class="section-label">Contract appetite</div>
+        <div class="field">
+          <label for="idealContractSize">Ideal contract size</label>
+          <select id="idealContractSize" name="idealContractSize">
+            <option value="">Select ideal contract size</option>
+            <option value="Under £25k">Under £25k</option>
+            <option value="£25k – £100k">£25k – £100k</option>
+            <option value="£100k – £500k">£100k – £500k</option>
+            <option value="£500k – £2m">£500k – £2m</option>
+            <option value="£2m – £10m">£2m – £10m</option>
+            <option value="£10m+">£10m+</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="maximumContractSize">Maximum contract size</label>
+          <select id="maximumContractSize" name="maximumContractSize">
+            <option value="">Select maximum you can handle</option>
+            <option value="Up to £50k">Up to £50k</option>
+            <option value="Up to £250k">Up to £250k</option>
+            <option value="Up to £1m">Up to £1m</option>
+            <option value="Up to £5m">Up to £5m</option>
+            <option value="Up to £20m">Up to £20m</option>
+            <option value="No upper limit">No upper limit</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="regionsToScan">Regions to scan first</label>
+          <select id="regionsToScan" name="regionsToScan">
+            <option value="">Select primary region</option>
+            <option value="National (all UK)">National (all UK)</option>
+            <option value="London & South East">London &amp; South East</option>
+            <option value="South West">South West</option>
+            <option value="East of England">East of England</option>
+            <option value="East Midlands">East Midlands</option>
+            <option value="West Midlands">West Midlands</option>
+            <option value="North West">North West</option>
+            <option value="North East">North East</option>
+            <option value="Yorkshire & Humber">Yorkshire &amp; Humber</option>
+            <option value="Scotland">Scotland</option>
+            <option value="Wales">Wales</option>
+            <option value="Northern Ireland">Northern Ireland</option>
+          </select>
+        </div>
 
-    <div class="section-label">Goals &amp; context</div>
+        <div class="section-label">Track record &amp; credentials</div>
+        <div class="field">
+          <label for="publicSectorExperience">Public-sector experience</label>
+          <select id="publicSectorExperience" name="publicSectorExperience">
+            <option value="">Select experience level</option>
+            <option value="None yet — new to public sector">None yet — new to public sector</option>
+            <option value="Under 1 year, 1-2 contracts">Under 1 year, 1–2 contracts</option>
+            <option value="1-3 years, several contracts">1–3 years, several contracts</option>
+            <option value="3-5 years, established track record">3–5 years, established track record</option>
+            <option value="5+ years, deep public-sector portfolio">5+ years, deep public-sector portfolio</option>
+          </select>
+          <div class="hint">Strengthens your evidence grade. New entrants get different route recommendations.</div>
+        </div>
+        <div class="field">
+          <label for="lastPublicContract">Last public contract won</label>
+          <textarea id="lastPublicContract" name="lastPublicContract" maxlength="400" placeholder="e.g. 2yr cleaning contract, Birmingham City Council, £180k/yr, ended 2024"></textarea>
+          <div class="hint">Most recent win &mdash; buyer name, value, and date if known.</div>
+        </div>
+        <div class="field">
+          <label for="caseStudies">Case studies or proof</label>
+          <textarea id="caseStudies" name="caseStudies" maxlength="600" placeholder="e.g. Delivered responsive repairs for housing association 2022&ndash;24, 94% satisfaction score"></textarea>
+        </div>
+        <div class="field">
+          <label for="certifications">Certifications / accreditations</label>
+          <textarea id="certifications" name="certifications" maxlength="400" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
+        </div>
+        <div class="field">
+          <label for="frameworkStatus">Framework access</label>
+          <textarea id="frameworkStatus" name="frameworkStatus" maxlength="400" placeholder="e.g. On Crown Commercial Service RM6187, YPO cleaning framework — or none yet"></textarea>
+          <div class="hint">Framework memberships unlock fast-track contract routes.</div>
+        </div>
 
-    <div class="field">
-      <label for="mainGoal">Main business goal</label>
-      <textarea id="mainGoal" name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
-    </div>
-    <div class="field">
-      <label for="preferredOutput">Preferred output</label>
-      <textarea id="preferredOutput" name="preferredOutput" placeholder="e.g. Focus on frameworks we can get on now, not long tender processes"></textarea>
-      <div class="hint">Tell us what kind of results matter most &mdash; this shapes the report focus.</div>
-    </div>
-    <div class="field">
-      <label for="biggestConcern">Biggest concern</label>
-      <textarea id="biggestConcern" name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
-    </div>
+        <div class="section-label">Goals &amp; context</div>
+        <div class="field">
+          <label for="preferredOutput">Preferred output</label>
+          <select id="preferredOutput" name="preferredOutput">
+            <option value="">What matters most?</option>
+            <option value="Frameworks I can join now">Frameworks I can join now</option>
+            <option value="Open tenders I can bid for today">Open tenders I can bid for today</option>
+            <option value="Buyers I should be building relationships with">Buyers to build relationships with</option>
+            <option value="Full landscape — show me everything">Full landscape — show me everything</option>
+          </select>
+          <div class="hint">Shapes the report focus — you can always see everything, but this prioritises what surfaces first.</div>
+        </div>
+        <div class="field">
+          <label for="biggestConcern">Biggest concern</label>
+          <select id="biggestConcern" name="biggestConcern">
+            <option value="">What is your biggest challenge?</option>
+            <option value="Finding the right tenders to bid for">Finding the right tenders to bid for</option>
+            <option value="Losing to incumbents on price">Losing to incumbents on price</option>
+            <option value="Not enough public-sector experience">Not enough public-sector experience</option>
+            <option value="Don't know where to start">Don't know where to start</option>
+            <option value="Framework access — not on any yet">Framework access — not on any yet</option>
+          </select>
+        </div>
+      </div>
 
-    <div class="submit-row">
-      <button type="submit" class="btn-submit">${auth ? "Run GovRevenue Scan" : "Continue to payment (£29)"} &rarr;</button>
-      <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
+      <div class="submit-row">
+        <button type="submit" class="btn-submit">${auth ? "Run GovRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
+        <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
+      </div>
     </div>
   </form>
 </main>
 <script>
-window.addEventListener("pageshow", () => {
-  document.querySelectorAll("input:not([type=hidden]), textarea").forEach(f => {
-    if (!f.value) f.setAttribute("autocomplete","off");
+function showStep(n){
+  document.querySelectorAll('.form-step').forEach(s=>s.classList.remove('visible'));
+  document.getElementById('step'+n).classList.add('visible');
+  document.querySelectorAll('.step-pill').forEach(p=>p.classList.remove('active'));
+  document.getElementById('sp'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function validateStep1(){
+  var ok=true;
+  document.querySelectorAll('#step1 [data-required]').forEach(function(f){
+    var el=f.querySelector('input,textarea');
+    if(!el||!el.value.trim()){f.classList.add('invalid');ok=false}
+    else f.classList.remove('invalid');
+  });
+  return ok;
+}
+function goStep2(){
+  if(!validateStep1())return;
+  document.getElementById('sp1').classList.remove('active');
+  document.getElementById('sp1').classList.add('done');
+  showStep(2);
+}
+document.getElementById('scanForm').addEventListener('submit',function(e){
+  if(!validateStep1()){e.preventDefault();showStep(1)}
+});
+document.querySelectorAll('#step1 [data-required] input, #step1 [data-required] textarea').forEach(function(el){
+  el.addEventListener('input',function(){
+    var f=el.closest('.field');if(f&&el.value.trim())f.classList.remove('invalid');
   });
 });
 </script>
+<footer style="max-width:760px;margin:0 auto;padding:32px 32px 48px;text-align:center">
+  <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY</div>
+  <div style="font-family:var(--mono);font-size:10px;letter-spacing:.06em">
+    <a href="/privacy" style="color:var(--muted);text-decoration:none">Privacy</a> &middot;
+    <a href="/terms" style="color:var(--muted);text-decoration:none">Terms</a> &middot;
+    <a href="/sources" style="color:var(--muted);text-decoration:none">Sources</a>
+  </div>
+</footer>
 </body>
 </html>`);
 });
@@ -9996,11 +10417,12 @@ td{padding:14px;font-size:14px;vertical-align:top}
 .pg-info{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 auto}
 .empty{padding:64px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 @media(max-width:980px){.sig-outer{padding:0 26px}.stat-row{grid-template-columns:1fr 1fr}.sig-hero{flex-direction:column;align-items:flex-start;gap:20px}.chart-top{flex-direction:column;gap:12px}.chart-latest-val,.chart-latest-lbl{text-align:left}}
+@media(max-width:768px){.stat-card{padding:16px 18px}.stat-val{font-size:30px}.stat-lbl{font-size:9px}.sig-cta{padding:12px 18px;font-size:12px}.ctrl-bar{flex-wrap:wrap}.ctrl-select{flex:1 1 120px}}
 @media(max-width:600px){.sig-outer{padding:0 16px}.stat-row{grid-template-columns:1fr 1fr}.sig-h1{font-size:28px}.sig-buyer,.sig-dl{display:none}thead th:nth-child(3),thead th:nth-child(7){display:none}.ctrl-bar{gap:8px}.ctrl-search-wrap{flex:1 1 100%}.pager{flex-wrap:wrap;gap:8px;padding:16px 0 32px}.pg-info{order:3;width:100%;text-align:center;margin:0}}
 </style>
 </head>
 <body>
-${pageShellHeader(null, null)}
+${pageShellHeader(null, getAuthUser(req))}
 <main>
 <div class="sig-outer">
 
@@ -10256,14 +10678,14 @@ app.get("/charts", asyncRoute(async (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>UK Public Sector Procurement Spend Analysis 2026 — GovRevenue</title>
-<meta name="description" content="Live intelligence on ${fmtBnShort(totalAnnualM)} in UK public procurement. ${totalNotices.toLocaleString()} notices tracked across 24 sector desks. Open pipeline ${fmtBnShort(openPipelineM)}. Updated hourly from Contracts Finder and Find a Tender.">
+<meta name="description" content="Live intelligence on ${fmtBnShort(totalAnnualM)} in UK public procurement. ${totalNotices.toLocaleString()} notices tracked across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Open pipeline ${fmtBnShort(openPipelineM)}. Updated hourly from Contracts Finder and Find a Tender.">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="article">
 <meta property="og:title" content="${fmtBnShort(totalAnnualM)} in UK Public Contracts — Live Procurement Intelligence">
 <meta property="og:description" content="${totalNotices.toLocaleString()} procurement notices tracked. ${fmtBnShort(openPipelineM)} open pipeline. ${closing30} contracts closing in the next 30 days.">
 <meta property="og:url" content="https://govrevenue-agent-production.up.railway.app/charts">
 <link rel="canonical" href="https://govrevenue-agent-production.up.railway.app/charts">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across 24 procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://govrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"GovRevenue","url":"https://govrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across ${DESK_PROFILES.filter(d => d.live).length} procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://govrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"GovRevenue","url":"https://govrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
 <style>${pageShellCss()}
 /* ── charts / intelligence page ── */
 strong{font-weight:700}
@@ -10349,6 +10771,15 @@ canvas#detailChart{display:block;width:100%}
 .bname{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:70px;text-align:right}
 .bcnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:60px;text-align:right;white-space:nowrap}
+.proof-sec{padding:72px 0;border-bottom:1px solid var(--border);background:var(--base)}
+.proof-wrap{max-width:1160px;margin:0 auto;padding:0 40px}
+.proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.proof-card{background:var(--surface);border:1px solid var(--border-2);padding:32px 28px}
+.proof-num{font-family:var(--mono);font-size:36px;font-weight:600;color:rgba(180,146,78,.22);letter-spacing:-.02em;line-height:1;margin-bottom:14px}
+.proof-label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.proof-body{font-size:14.5px;line-height:1.7;color:var(--text-mid)}
+.proof-meta{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:16px;letter-spacing:.04em}
+@media(max-width:768px){.proof-grid{grid-template-columns:1fr}.proof-wrap{padding:0 20px}}
 .brief-sec{padding:72px 0;border-bottom:1px solid var(--border);background:#F7F4EE}
 .brief-wrap{max-width:1160px;margin:0 auto;padding:0 40px}
 .brief-intro{max-width:680px;margin-bottom:56px}
@@ -10451,7 +10882,7 @@ ${pageShellHeader(null, getAuthUser(req))}
       <div class="kcard gold rv">
         <span class="kcard-label">12-month awarded</span>
         <span class="kcard-val c-gold">${fmtBnShort(totalAnnualM)}</span>
-        <span class="kcard-sub">${escapeHtml(reportMonthRange)} &middot; all 24 desks</span>
+        <span class="kcard-sub">${escapeHtml(reportMonthRange)} &middot; all ${DESK_PROFILES.filter(d => d.live).length} desks</span>
         <div class="kcard-glow gold" aria-hidden="true"></div>
       </div>
       <div class="kcard grn rv">
@@ -10545,6 +10976,37 @@ ${deskBreak.length > 0 ? `
 </section>
 ` : ""}
 
+<section class="proof-sec" aria-label="How companies use GovRevenue">
+  <div class="proof-wrap">
+    <div class="sec-eye" style="text-align:center">From scan to shortlist</div>
+    <h2 class="sec-h" style="text-align:center;font-size:clamp(22px,2.6vw,34px);margin-bottom:8px">What a GovRevenue scan actually produces</h2>
+    <p style="text-align:center;color:var(--t3);font-size:15px;max-width:600px;margin:0 auto 44px;line-height:1.7">A facilities management firm ran a scan. Here is what the report surfaced — and what they did with it.</p>
+    <div class="proof-grid">
+      <div class="proof-card rv">
+        <div class="proof-num">01</div>
+        <div class="proof-label">Scan input</div>
+        <p class="proof-body">&ldquo;FM company, 35 staff, ISO 9001, West Midlands. Reactive repairs, planned maintenance, void works. £100k–£500k contracts.&rdquo;</p>
+        <div class="proof-meta">5 fields &middot; 45 seconds</div>
+      </div>
+      <div class="proof-card rv">
+        <div class="proof-num">02</div>
+        <div class="proof-label">Report delivered</div>
+        <p class="proof-body">12 open tenders matched. 3 framework entry points identified. 8 buyers mapped with re-let windows. Evidence Grade: <strong style="color:var(--brand)">B</strong> (strong sector fit, limited case study depth).</p>
+        <div class="proof-meta">10-section report &middot; 3 minutes</div>
+      </div>
+      <div class="proof-card rv">
+        <div class="proof-num">03</div>
+        <div class="proof-label">Action taken</div>
+        <p class="proof-body">Shortlisted 2 framework applications and 1 open tender worth &pound;220k. Used the Buyer Watchlist to contact 3 housing associations before the notice dropped. Submitted within 2 weeks.</p>
+        <div class="proof-meta">Scan &rarr; shortlist &rarr; submission</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:36px">
+      <a href="/scan" style="display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);text-decoration:underline;text-underline-offset:4px">Run your scan &rarr;</a>
+    </div>
+  </div>
+</section>
+
 <section class="brief-sec" aria-labelledby="brief-heading">
   <div class="brief-wrap">
     <div class="brief-intro rv">
@@ -10625,7 +11087,7 @@ ${deskBreak.length > 0 ? `
 
     <div class="brief-refs">
       <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em;line-height:1.9">
-        GovRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across 24 sector desks. Available at: govrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
+        GovRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Available at: govrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
       </p>
     </div>
   </div>
@@ -10646,7 +11108,7 @@ ${deskBreak.length > 0 ? `
       <p class="nl-note">No spam. Unsubscribe any time. Weekly only.</p>
       <div class="nl-proof">
         <div><span class="nl-pv">${totalNotices.toLocaleString()}+</span><span class="nl-pl">Notices scored, 12 months</span></div>
-        <div><span class="nl-pv">24</span><span class="nl-pl">Sector desks</span></div>
+        <div><span class="nl-pv">${DESK_PROFILES.filter(d => d.live).length}</span><span class="nl-pl">Sector desks</span></div>
         <div><span class="nl-pv">Hourly</span><span class="nl-pl">Data refresh</span></div>
         <div><span class="nl-pv">${fmtBnShort(openPipelineM)}</span><span class="nl-pl">Open pipeline</span></div>
       </div>
@@ -12510,7 +12972,7 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
 }
 
 function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string; tier: UserTier } | null): string {
-  const navLinks = DESK_PROFILES.map(d =>
+  const navLinks = DESK_PROFILES.filter(d => d.live).map(d =>
     `<a href="/desk/${d.slug}"${profile && d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
   ).join("");
   const authHtml = authCtx
@@ -12546,8 +13008,25 @@ function pageShellFoot(): string {
     <span>PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY</span>
     <a href="/scan" style="color:var(--brand)">Run a scan &rarr;</a>
   </div>
+  <div style="max-width:1320px;margin:0 auto;padding:12px 48px 0;display:flex;align-items:center;justify-content:center;gap:24px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase">
+    <a href="/privacy" style="color:var(--muted);text-decoration:none">Privacy Policy</a>
+    <span style="color:var(--faint)">&middot;</span>
+    <a href="/terms" style="color:var(--muted);text-decoration:none">Terms of Service</a>
+    <span style="color:var(--faint)">&middot;</span>
+    <a href="/sources" style="color:var(--muted);text-decoration:none">Our Sources</a>
+    <span style="color:var(--faint)">&middot;</span>
+    <a href="/roadmap" style="color:var(--muted);text-decoration:none">Roadmap</a>
+    <span style="color:var(--faint)">&middot;</span>
+    <a href="/api-docs" style="color:var(--muted);text-decoration:none">API</a>
+  </div>
 </footer>
-<div class="pg-copy">&copy; 2026 GovRevenue &mdash; Intelligence, not certainty.</div>`;
+<div class="pg-copy">&copy; ${new Date().getFullYear()} GovRevenue &mdash; Intelligence, not certainty.</div>
+<script>
+(function(){var q=[];function t(e,m){if(q.length>20)return;q.push(1);try{navigator.sendBeacon('/api/track',new Blob([JSON.stringify({event:e,path:location.pathname,meta:m||null})],{type:'application/json'}))}catch(x){}}
+t('page_view',{ref:document.referrer.slice(0,200)});
+document.addEventListener('click',function(e){var a=e.target.closest('a[href]');if(a){var h=a.getAttribute('href');if(h==='/scan')t('cta_scan');else if(h==='/pricing')t('cta_pricing');else if(h&&h.startsWith('/desk/'))t('cta_desk',{desk:h})}var b=e.target.closest('button');if(b){if(b.classList.contains('btn-submit'))t('form_submit');if(b.classList.contains('btn-continue'))t('form_step2');if(b.classList.contains('btn-skip'))t('form_skip_step2')}});
+})();
+</script>`;
 }
 
 function notFoundHtml(message: string, authCtx?: { email: string; tier: UserTier } | null): string {
@@ -12637,13 +13116,19 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
         <div class="dl-share-track"><div class="dl-share-fill" style="width:${sharePct}%"></div></div>
       </div>` : "";
 
+    const hasAnyData = d.totalValue > 0 || d.openCount > 0 || d.awardedCount > 0 || d.uniqueBuyers > 0;
+    const emptyNotice = !hasAnyData && d.cachedAt
+      ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 0 4px;line-height:1.6;letter-spacing:.02em">No matched contracts yet. This desk&rsquo;s keywords did not return results in the current data window. Data refreshes hourly.</div>`
+      : !hasAnyData
+        ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 0 4px;line-height:1.6;letter-spacing:.02em">Data compiling &mdash; check back shortly.</div>`
+        : "";
     const statsGrid = `
       <div class="dl-stats">
         <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue)+"+" : "—"}</div><div class="dl-stat-lbl">Awarded Value</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.openCount > 0 ? d.openCount : "—"}</div><div class="dl-stat-lbl">Open Now</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.awardedCount > 0 ? d.awardedCount : "—"}</div><div class="dl-stat-lbl">Awarded</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.uniqueBuyers > 0 ? d.uniqueBuyers : "—"}</div><div class="dl-stat-lbl">Buyers</div></div>
-      </div>`;
+      </div>${emptyNotice}`;
 
     const catsBlock = d.topCats.length > 0 ? `
       <div class="dl-cats">
@@ -12690,7 +13175,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>All Intelligence Desks — GovRevenue</title>
-<meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.length} industry desks. Live data from Contracts Finder and Find a Tender.">
+<meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.filter(d => d.live).length} industry desks. Live data from Contracts Finder and Find a Tender.">
 <style>
 ${pageShellCss()}
 .dl-hero{background:radial-gradient(120% 170% at 82% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6;padding:60px 0 56px}
@@ -12778,7 +13263,7 @@ ${pageShellHeader(null, authCtx)}
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalOpen > 0 ? totalOpen.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Open Now</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalAwarded > 0 ? totalAwarded.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Awarded</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalBuyers > 0 ? totalBuyers.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Buyers Tracked</div></div>
-      <div class="dl-agg-stat"><div class="dl-agg-val">${liveCount}<span style="font-size:18px;opacity:.5">/${DESK_PROFILES.length}</span></div><div class="dl-agg-lbl">Desks Live</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${liveCount}<span style="font-size:18px;opacity:.5">/${DESK_PROFILES.filter(d => d.live).length}</span></div><div class="dl-agg-lbl">Desks Live</div></div>
     </div>
   </div>
 </section>
@@ -12786,7 +13271,7 @@ ${pageShellHeader(null, authCtx)}
   <div class="dl-body-inner">
     <div class="dl-sort-bar">
       <div class="dl-sort-title">All Desks — ranked by contract value</div>
-      <div class="dl-sort-meta">${DESK_PROFILES.length} desks &middot; ${totalNotices.toLocaleString()} notices indexed</div>
+      <div class="dl-sort-meta">${DESK_PROFILES.filter(d => d.live).length} desks &middot; ${totalNotices.toLocaleString()} notices indexed</div>
     </div>
     <div class="dl-grid">${cards}</div>
     ${pagerNav}
@@ -13506,6 +13991,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     ordersRes, ordersListRes, articleStatsRes, commentStatsRes,
     webhookRes, auditRes, deskCacheRes,
     slugRedirectsRes, articleLikesRes, articleAssetsRes, articleRevisionsRes,
+    eventStatsRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -13601,6 +14087,10 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     safePool(`SELECT ar.article_id, COUNT(*)::int AS revision_count, MAX(ar.created_at) AS last_edit, a.title
     FROM article_revisions ar LEFT JOIN articles a ON a.id=ar.article_id
     GROUP BY ar.article_id, a.title ORDER BY last_edit DESC LIMIT 50`),
+    safePool(`SELECT event, COUNT(*)::int AS cnt,
+      COUNT(*) FILTER(WHERE created_at > NOW() - INTERVAL '24 hours')::int AS today,
+      COUNT(*) FILTER(WHERE created_at > NOW() - INTERVAL '7 days')::int AS week
+    FROM visitor_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY event ORDER BY cnt DESC LIMIT 20`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -13631,6 +14121,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const articleLikeRows  = articleLikesRes.rows     as any[];
   const articleAssets    = articleAssetsRes.rows     as any[];
   const articleRevisions = articleRevisionsRes.rows  as any[];
+  const eventStats      = eventStatsRes.rows        as any[];
 
   // Build article-likes lookup map by article_id
   const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
@@ -14048,6 +14539,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="#users" class="sb-link">Users <span class="sb-count">${us.total || 0}</span></a>
     <div class="sb-group">Analytics</div>
     <a href="#visitors" class="sb-link">Visitors</a>
+    <a href="#events" class="sb-link">Events <span class="sb-count">${eventStats.reduce((s: number, e: any) => s + Number(e.today || 0), 0)}</span></a>
     <a href="#signals" class="sb-link">Signals <span class="sb-count">${Number(sigs.total||0).toLocaleString()}</span></a>
     <div class="sb-group">Audience</div>
     <a href="#alerts" class="sb-link">Alerts <span class="sb-count">${activeSubCount}</span></a>
@@ -14257,6 +14749,30 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div class="card"><div class="card-head">Top Pages <span class="card-head-val">7 days</span></div>${topPathsHtml}</div>
     <div class="card"><div class="card-head">Top IPs <span class="card-head-val">7 days</span></div><div class="tbl-wrap scroll-tbl" style="max-height:260px;border:none;box-shadow:none">${topIpsHtml}</div></div>
   </div>
+</section>
+<div class="gap"></div>
+
+<!-- §4b EVENT TRACKING -->
+<section class="section" id="events">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Conversion</div>
+      <div class="s-title">Event Tracking</div>
+    </div>
+    <div class="s-sub">Client-side events &middot; 30-day window</div>
+  </div>
+  ${eventStats.length === 0
+    ? `<div style="padding:20px 0;font-family:var(--mono);font-size:11px;color:var(--muted)">No event data yet — tracking starts after deploy.</div>`
+    : `<div class="tbl-wrap scroll-tbl" style="margin-bottom:0">
+    <table>
+      <thead><tr><th>Event</th><th>Today</th><th>7 days</th><th>30 days</th></tr></thead>
+      <tbody>${eventStats.map((e: any) => `<tr>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(e.event)}</td>
+        <td>${e.today}</td>
+        <td>${e.week}</td>
+        <td>${e.cnt}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`}
 </section>
 <div class="gap"></div>
 
@@ -14547,7 +15063,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
         <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px">Quick Actions</div>
         <div style="display:flex;gap:7px;flex-wrap:wrap">
           <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild signals</button></form>
-          <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all 24 desk caches?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild desks</button></form>
+          <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all desk caches?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild desks</button></form>
           <button class="a-btn a-btn-danger" onclick="bulkDeleteFailed()">✕ Purge failed scans</button>
         </div>
       </div>
