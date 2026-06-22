@@ -7367,6 +7367,9 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   footer.hp-foot .wrap{grid-template-columns:1fr 1fr}
   .section{padding:52px 0}
   .chartband{padding:52px 0}
+  .subscribe .wrap{grid-template-columns:1fr!important;text-align:center!important}
+  .subscribe .wrap>div:first-child h2,.subscribe .wrap>div:first-child p,.subscribe .wrap>div:first-child .subnote{text-align:center!important}
+  .subscribe .subform{justify-content:center!important}
 }
 @media(max-width:760px){
   .gh-tag,.gh-live,.gh-auth-name{display:none}
@@ -7408,22 +7411,22 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
 ${chaseNowCss()}
 ${oppCardCss()}
 /* ── sample report CTA (homepage copy — dark island) ── */
-.scta{max-width:680px;margin:0 auto;background:#0B1018;border:1px solid #1E2A3A;position:relative;overflow:hidden}
-.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#A0522D,#22C55E,#A0522D)}
+.scta{max-width:none;background:#0E2318;border:1px solid rgba(34,197,94,.12);position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
 .scta-inner{padding:32px 36px}
-.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#A0522D;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
-.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#E9EEF5;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
-.scta-p{font-size:13px;color:#B0BAC8;line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#ECE6D6;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:#9AA093;line-height:1.6;margin-bottom:20px;max-width:48em}
 .scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
-.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8893A4;padding:5px 0}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#9AA093;padding:5px 0}
 .scta-item::before{content:'\\2713';color:#22C55E;font-weight:700;font-size:12px}
 .scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.scta-btn{display:inline-flex;align-items:center;gap:8px;background:#A0522D;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
-.scta-btn:hover{background:#B8673A}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:opacity .15s}
+.scta-btn:hover{opacity:.88}
 .scta-btn::after{content:'\\2192';font-size:14px}
-.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#566273}
-.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#111A26;border-top:1px solid #1E2A3A;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#566273}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B6F65}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#0A1C12;border-top:1px solid rgba(34,197,94,.12);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#6B6F65}
 @media(max-width:600px){.scta-inner{padding:24px 20px}.scta-grid{grid-template-columns:1fr}.scta-foot{padding:8px 20px;flex-wrap:wrap;gap:4px}}
 </style>
 </head>
@@ -7533,19 +7536,19 @@ ${chaseNowHtml}
     </div>
   </div>
 </section>
-<div class="wrap">
-${sampleCtaBlock("full")}
-</div>
 <section class="subscribe" id="subscribe">
-  <div class="wrap">
-    <div class="eyebrow">Join the briefing</div>
-    <h2>Intelligence before the tender.</h2>
-    <p>One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
-    <form class="subform" id="briefing-form">
-      <input type="email" id="briefing-email" placeholder="you@firm.co.uk" aria-label="Email address" required>
-      <button type="submit">Reserve</button>
-    </form>
-    <div class="subnote" id="briefing-note">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
+  <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;text-align:left">
+    <div>
+      <div class="eyebrow">Join the briefing</div>
+      <h2 style="text-align:left">Intelligence before the tender.</h2>
+      <p style="text-align:left">One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
+      <form class="subform" id="briefing-form" style="justify-content:flex-start">
+        <input type="email" id="briefing-email" placeholder="you@firm.co.uk" aria-label="Email address" required>
+        <button type="submit">Reserve</button>
+      </form>
+      <div class="subnote" id="briefing-note" style="text-align:left">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
+    </div>
+    ${sampleCtaBlock("full")}
     <script>
     document.getElementById(‘briefing-form’).addEventListener(‘submit’,function(e){
       e.preventDefault();
@@ -7900,10 +7903,15 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
 
   const authUser = getAuthUser(req);
 
-  // Guest checkout: create the scan in pending_payment status, carry id through Stripe
   if (!authUser) {
+    res.redirect(302, `/login?next=${encodeURIComponent("/scan")}`);
+    return;
+  }
+
+  // Free tier: no scans — must upgrade or pay per scan
+  if (authUser.tier === "free") {
     const scan = await createScan(parsed.data);
-    if (pool) await pool.query(`UPDATE scans SET status='pending_payment' WHERE id=$1`, [scan.id]);
+    if (pool) await pool.query(`UPDATE scans SET user_id=$2, status='pending_payment' WHERE id=$1`, [scan.id, authUser.userId]);
     res.redirect(302, `/checkout?plan=payg&scan=${encodeURIComponent(scan.id)}`);
     return;
   }
