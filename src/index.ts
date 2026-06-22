@@ -15920,7 +15920,7 @@ app.get("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
 
 app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token ?? "");
-  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMdNew, action } = req.body;
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMdNew, action, tags: tagsInput } = req.body;
   const body_md = rawBodyMdNew != null ? String(rawBodyMdNew).replace(/\r\n/g, "\n").replace(/\r/g, "\n") : "";
 
   const rawSlug = slugInput || slugify(title ?? "untitled");
@@ -15933,9 +15933,9 @@ app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
 
   if (pool) {
     await pool.query(
-      `INSERT INTO articles (id, slug, title, dek, eyebrow, hero_prompt, body_md, desk, status, author_id, published_at, updated_at, reading_time)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [id, finalSlug, title ?? "", dek || null, eyebrow || null, hero_prompt || null, body_md ?? "", desk || null, finalStatus, "admin", publishedAt, now, rt]
+      `INSERT INTO articles (id, slug, title, dek, eyebrow, hero_prompt, body_md, desk, status, author_id, published_at, updated_at, reading_time, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [id, finalSlug, title ?? "", dek || null, eyebrow || null, hero_prompt || null, body_md ?? "", desk || null, finalStatus, "admin", publishedAt, now, rt, tagsInput || null]
     );
     await logAdminAudit("admin", "article:create", id, { title, status: finalStatus });
   }
@@ -15962,7 +15962,7 @@ app.post("/admin/articles/:id", requireAdmin, asyncRoute(async (req, res) => {
   const article = await getArticleById(req.params.id);
   if (!article) { res.status(404).send(notFoundHtml("Article not found")); return; }
 
-  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMd } = req.body;
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMd, tags: tagsInput } = req.body;
   const body_md = rawBodyMd != null ? String(rawBodyMd).replace(/\r\n/g, "\n").replace(/\r/g, "\n") : undefined;
   const now = new Date().toISOString();
   const rt = computeReadingTime(body_md ?? article.body_md);
@@ -15979,8 +15979,8 @@ app.post("/admin/articles/:id", requireAdmin, asyncRoute(async (req, res) => {
       );
     }
     await pool.query(
-      `UPDATE articles SET title=$2,dek=$3,eyebrow=$4,desk=$5,hero_prompt=$6,body_md=$7,status=$8,published_at=$9,updated_at=$10,reading_time=$11,slug=$12 WHERE id=$1`,
-      [article.id, title ?? article.title, dek || null, eyebrow || null, desk || null, hero_prompt || null, body_md ?? article.body_md, finalStatus, publishedAt, now, rt, newSlug]
+      `UPDATE articles SET title=$2,dek=$3,eyebrow=$4,desk=$5,hero_prompt=$6,body_md=$7,status=$8,published_at=$9,updated_at=$10,reading_time=$11,slug=$12,tags=$13 WHERE id=$1`,
+      [article.id, title ?? article.title, dek || null, eyebrow || null, desk || null, hero_prompt || null, body_md ?? article.body_md, finalStatus, publishedAt, now, rt, newSlug, tagsInput !== undefined ? (tagsInput || null) : article.tags]
     );
     await saveArticleRevision(article.id, title ?? article.title, body_md ?? article.body_md, "admin");
     await logAdminAudit("admin", "article:update", article.id, { title, status: finalStatus });
