@@ -1910,6 +1910,8 @@ function renderMarkdown(md: string): string {
   let html = "";
   const paraLines: string[] = [];
   const listLines: string[] = [];
+  let inTable = false;
+  let tableHeaderDone = false;
 
   const flushPara = () => {
     const t = paraLines.splice(0).join(" ").trim();
@@ -1919,10 +1921,33 @@ function renderMarkdown(md: string): string {
     if (!listLines.length) return;
     html += `<ul>${listLines.splice(0).map(l => `<li>${inlineMd(l)}</li>`).join("")}</ul>\n`;
   };
+  const flushTable = () => {
+    if (!inTable) return;
+    html += `</tbody></table></div>\n`;
+    inTable = false;
+    tableHeaderDone = false;
+  };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (line.startsWith(":::")) { flushPara(); flushList(); continue; }
+    if (line.startsWith(":::")) { flushPara(); flushList(); flushTable(); continue; }
+
+    if (line.trimStart().startsWith("|") && line.trimEnd().endsWith("|")) {
+      flushPara(); flushList();
+      const cells = line.split("|").slice(1, -1).map(c => c.trim());
+      const isDivider = cells.every(c => /^:?-{2,}:?$/.test(c));
+      if (isDivider) { tableHeaderDone = true; continue; }
+      if (!inTable) {
+        html += `<div class="art-table-wrap"><table class="art-table"><thead><tr>${cells.map(c => `<th>${inlineMd(c)}</th>`).join("")}</tr></thead><tbody>\n`;
+        inTable = true;
+        continue;
+      }
+      html += `<tr>${cells.map(c => `<td>${inlineMd(c)}</td>`).join("")}</tr>\n`;
+      continue;
+    }
+
+    if (inTable) flushTable();
+
     if (/^#{1,6}\s/.test(line)) {
       flushPara(); flushList();
       const lvl = line.match(/^(#+)/)![1].length;
@@ -1940,7 +1965,7 @@ function renderMarkdown(md: string): string {
     if (listLines.length) flushList();
     paraLines.push(line);
   }
-  flushPara(); flushList();
+  flushPara(); flushList(); flushTable();
   return html;
 }
 
@@ -4976,6 +5001,13 @@ a{color:inherit;text-decoration:none}
 .art-body li{font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--text);padding-left:20px;position:relative}
 .art-body li::before{content:"—";position:absolute;left:0;color:var(--gold)}
 .art-body hr{border:none;border-top:1px solid var(--border);margin:3em 0}
+.art-table-wrap{overflow-x:auto;margin:28px 0;border:1px solid var(--border-2);border-radius:6px}
+.art-table{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:14px}
+.art-table thead{background:var(--surface-2)}
+.art-table th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 16px;text-align:left;border-bottom:2px solid var(--border-2);white-space:nowrap}
+.art-table td{padding:11px 16px;border-bottom:1px solid var(--border);color:var(--text);line-height:1.45}
+.art-table tbody tr:last-child td{border-bottom:none}
+.art-table tbody tr:hover{background:rgba(180,146,78,.04)}
 .art-body s{color:var(--muted);text-decoration:line-through}
 .art-body strong{color:var(--dark);font-weight:600}
 .art-body a{color:var(--gold);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;font-weight:500}
