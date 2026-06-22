@@ -9773,13 +9773,8 @@ app.get("/signals", asyncRoute(async (req, res) => {
       v: p.total_bn,
       ch: i > 0 ? +((p.total_bn - vals[i - 1]) / (Math.abs(vals[i - 1]) + 0.001) * 100).toFixed(1) : null,
     })));
-    const hitRects = pts.map((p, i) => {
-      const left = i === 0 ? LPAD : (xFn(i - 1) + p[0]) / 2;
-      const right = i === n - 1 ? LPAD + PW : (p[0] + xFn(i + 1)) / 2;
-      return `<rect x="${+left.toFixed(1)}" y="${top}" width="${+(right - left).toFixed(1)}" height="${plotH + 10}" fill="transparent" onmouseenter="sigShow(${i})"/>`;
-    }).join("");
     chartSvgHtml = `<div id="sig-wrap" style="position:relative">
-<svg id="sig-svg" viewBox="0 0 ${TOTAL_W} 218" style="width:100%;height:auto;display:block;overflow:visible" onmouseleave="sigHide()">
+<svg id="sig-svg" viewBox="0 0 ${TOTAL_W} 218" style="width:100%;height:auto;display:block;overflow:visible;cursor:crosshair">
 <defs><linearGradient id="sgFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity="0.14"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0.01"/></linearGradient></defs>
 ${yGridHtml}
 <path d="${areaPath}" fill="url(#sgFill)"/>
@@ -9789,7 +9784,6 @@ ${yGridHtml}
 <circle cx="${lastPt[0]}" cy="${lastPt[1]}" r="5" fill="var(--brand)"/>
 <line id="sig-hl" x1="${LPAD}" y1="${top}" x2="${LPAD}" y2="${base}" stroke="var(--brand)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
 <circle id="sig-hd" cx="${LPAD}" cy="${top}" r="5" fill="var(--surface)" stroke="var(--brand)" stroke-width="2" opacity="0"/>
-${hitRects}
 ${monthLabels}
 </svg>
 <div id="sig-tip" style="display:none;position:absolute;top:4px;background:var(--surface);border:1px solid var(--border-2);border-radius:2px;padding:11px 15px;min-width:148px;box-shadow:0 4px 18px rgba(0,0,0,.10);pointer-events:none;z-index:10">
@@ -9801,30 +9795,40 @@ ${monthLabels}
 <script>
 (function(){
 var D=${chartJson};
+var svg=document.getElementById('sig-svg');
 var tip=document.getElementById('sig-tip');
 var hl=document.getElementById('sig-hl');
 var hd=document.getElementById('sig-hd');
 var wrap=document.getElementById('sig-wrap');
-window.sigShow=function(i){
+var curI=-1;
+function fmtV(v){return v>=1?'£'+v.toFixed(1)+'bn':'£'+Math.round(v*1000)+'m';}
+function showI(i){
+  if(i===curI)return;
+  curI=i;
   var d=D[i];
-  var fv=d.v>=1?'£'+d.v.toFixed(1)+'bn':'£'+Math.round(d.v*1000)+'m';
   document.getElementById('sig-tip-mon').textContent=d.lb;
-  document.getElementById('sig-tip-val').textContent=fv;
+  document.getElementById('sig-tip-val').textContent=fmtV(d.v);
   var cel=document.getElementById('sig-tip-ch');
   if(d.ch!==null){cel.style.color=d.ch>=0?'var(--green)':'var(--red)';cel.textContent=(d.ch>=0?'▲ +':'')+d.ch+'% vs prev mo';}
-  else{cel.textContent='';}
-  hl.setAttribute('x1',${LPAD}+d.xp*${PW});hl.setAttribute('x2',${LPAD}+d.xp*${PW});hl.setAttribute('opacity','0.5');
-  hd.setAttribute('cx',${LPAD}+d.xp*${PW});hd.setAttribute('cy',d.y);hd.setAttribute('opacity','1');
+  else cel.textContent='';
+  var sx=${LPAD}+d.xp*${PW};
+  hl.setAttribute('x1',sx);hl.setAttribute('x2',sx);hl.setAttribute('opacity','0.5');
+  hd.setAttribute('cx',sx);hd.setAttribute('cy',d.y);hd.setAttribute('opacity','1');
   tip.style.display='block';
   var wW=wrap.offsetWidth;
-  var pxX=(${LPAD}/1000*wW)+(d.xp*(${PW}/1000)*wW);
-  tip.style.left=(pxX>wW*0.55?(pxX-tip.offsetWidth-10):(pxX+10))+'px';
-};
-window.sigHide=function(){
-  tip.style.display='none';
-  hl.setAttribute('opacity','0');
-  hd.setAttribute('opacity','0');
-};
+  var pxX=(${LPAD}/1000)*wW+(d.xp*(${PW}/1000))*wW;
+  var tipW=tip.offsetWidth||150;
+  tip.style.left=(pxX>wW*0.55?(pxX-tipW-10):(pxX+10))+'px';
+}
+function hide(){curI=-1;tip.style.display='none';hl.setAttribute('opacity','0');hd.setAttribute('opacity','0');}
+svg.addEventListener('mousemove',function(e){
+  var r=svg.getBoundingClientRect();
+  var svgX=(e.clientX-r.left)/r.width*1000;
+  if(svgX<${LPAD}||svgX>${LPAD+PW}){hide();return;}
+  var frac=(svgX-${LPAD})/${PW};
+  showI(Math.min(Math.max(Math.round(frac*(D.length-1)),0),D.length-1));
+});
+svg.addEventListener('mouseleave',hide);
 })();
 </script>
 </div>`;
