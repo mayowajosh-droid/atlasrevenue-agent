@@ -10305,7 +10305,8 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let stats: SigStats = { total: "0", open_cnt: "0", total_val: "0", closing14: "0", closing7: "0" };
   let signals: HomepageSignal[] = [];
   let totalFiltered = 0;
-  let chartPoints: Array<{ label: string; total_bn: number }> = [];
+  let chartPoints: Array<{ label: string; total_bn: number; notice_count: number; open_count: number }> = [];
+  let chartDeskMap: Record<string, Array<{ label: string; val: string }>> = {};
 
   if (pool) {
     const conds: string[] = [];
@@ -10363,16 +10364,36 @@ app.get("/signals", asyncRoute(async (req, res) => {
     );
     signals = r.rows;
 
-    const chartR = await pool.query<{ label: string; total_bn: number }>(`
-      SELECT to_char(date_trunc('month', notice_date), 'Mon YY') AS label,
-             ROUND(COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < 2000000000), 0) / 1e9::numeric, 2)::float AS total_bn
-      FROM homepage_signals
-      WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW()
-      GROUP BY date_trunc('month', notice_date)
-      ORDER BY date_trunc('month', notice_date)
-      LIMIT 12
-    `);
+    const [chartR, deskChartR] = await Promise.all([
+      pool.query<{ label: string; total_bn: number; notice_count: number; open_count: number }>(`
+        SELECT to_char(date_trunc('month', notice_date), 'Mon YY') AS label,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < 2000000000), 0) / 1e9::numeric, 2)::float AS total_bn,
+               COUNT(*)::int AS notice_count,
+               COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW()
+        GROUP BY date_trunc('month', notice_date)
+        ORDER BY date_trunc('month', notice_date)
+        LIMIT 12
+      `),
+      pool.query<{ mlabel: string; category: string; total_bn: number }>(`
+        SELECT to_char(date_trunc('month', notice_date), 'Mon YY') AS mlabel,
+               category,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < 2000000000), 0) / 1e9::numeric, 3)::float AS total_bn
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW()
+        GROUP BY date_trunc('month', notice_date), category
+        ORDER BY date_trunc('month', notice_date), SUM(value_amount) DESC NULLS LAST
+      `),
+    ]);
     chartPoints = chartR.rows;
+    for (const r of deskChartR.rows) {
+      if (!r.total_bn || r.total_bn <= 0) continue;
+      const lbl = DESK_PROFILES.find(d => d.slug === r.category)?.label || r.category.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const valStr = r.total_bn >= 1 ? `£${r.total_bn.toFixed(1)}bn+` : `£${Math.round(r.total_bn * 1000)}m+`;
+      (chartDeskMap[r.mlabel] = chartDeskMap[r.mlabel] || []).push({ label: lbl, val: valStr });
+    }
+    for (const k of Object.keys(chartDeskMap)) chartDeskMap[k] = chartDeskMap[k].slice(0, 5);
   } else {
     const seen = new Set<string>();
     let all = [...sigMemStore.values()]
@@ -10433,12 +10454,17 @@ app.get("/signals", asyncRoute(async (req, res) => {
     }).join("");
     const peakAnchor = peakIdx < n / 2 ? "start" : "end";
     const peakLX = peakPt[0] + (peakIdx < n / 2 ? 8 : -8);
+    const liveDesks = DESK_PROFILES.filter(d => d.live).length;
     const chartJson = JSON.stringify(chartPoints.map((p, i) => ({
       lb: p.label,
       xp: +((xFn(i) - LPAD) / PW).toFixed(4),
       y: +yFn(p.total_bn).toFixed(1),
       v: p.total_bn,
+      nc: p.notice_count,
+      oc: p.open_count,
       ch: i > 0 ? +((p.total_bn - vals[i - 1]) / (Math.abs(vals[i - 1]) + 0.001) * 100).toFixed(1) : null,
+      desks: chartDeskMap[p.label] || [],
+      td: liveDesks,
     })));
     chartSvgHtml = `<div id="sig-wrap" style="position:relative">
 <svg id="sig-svg" viewBox="0 0 ${TOTAL_W} 218" style="width:100%;height:auto;display:block;overflow:visible;cursor:crosshair">
@@ -10453,11 +10479,21 @@ ${yGridHtml}
 <circle id="sig-hd" cx="${LPAD}" cy="${top}" r="5" fill="var(--surface)" stroke="var(--brand)" stroke-width="2" opacity="0"/>
 ${monthLabels}
 </svg>
-<div id="sig-tip" style="display:none;position:absolute;top:4px;background:var(--surface);border:1px solid var(--border-2);border-radius:2px;padding:11px 15px;min-width:148px;box-shadow:0 4px 18px rgba(0,0,0,.10);pointer-events:none;z-index:10">
-<div id="sig-tip-mon" style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px"></div>
-<div id="sig-tip-val" style="font-family:var(--serif);font-size:21px;font-weight:500;color:var(--text);line-height:1"></div>
-<div id="sig-tip-ch" style="font-family:var(--mono);font-size:10px;margin-top:4px"></div>
-<div style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:6px;text-transform:uppercase;letter-spacing:.1em">Awarded</div>
+<div id="sig-tip" style="display:none;position:absolute;top:4px;background:var(--surface);border:1px solid var(--border-2);border-radius:2px;min-width:200px;box-shadow:0 4px 18px rgba(0,0,0,.10);pointer-events:none;z-index:10">
+<div style="padding:14px 18px">
+  <div id="sig-tip-mon" style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px"></div>
+  <div style="display:flex;align-items:baseline;gap:8px">
+    <span style="font-family:var(--mono);font-size:9px;color:var(--brand)">&#9679;</span>
+    <span style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Awarded</span>
+    <span id="sig-tip-val" style="font-family:var(--serif);font-size:19px;font-weight:500;color:var(--text)"></span>
+    <span id="sig-tip-ch" style="font-family:var(--mono);font-size:10px"></span>
+  </div>
+  <div id="sig-tip-nc" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px"></div>
+</div>
+<div id="sig-tip-desks" style="border-top:1px solid var(--border);padding:12px 18px">
+  <div id="sig-tip-desk-head" style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px"></div>
+  <div id="sig-tip-desk-rows"></div>
+</div>
 </div>
 <script>
 (function(){
@@ -10467,8 +10503,12 @@ var tip=document.getElementById('sig-tip');
 var hl=document.getElementById('sig-hl');
 var hd=document.getElementById('sig-hd');
 var wrap=document.getElementById('sig-wrap');
+var deskRows=document.getElementById('sig-tip-desk-rows');
+var deskHead=document.getElementById('sig-tip-desk-head');
+var desksPanel=document.getElementById('sig-tip-desks');
 var curI=-1;
-function fmtV(v){return v>=1?'£'+v.toFixed(1)+'bn':'£'+Math.round(v*1000)+'m';}
+var COLORS=['var(--brand)','#D4A95A','#5DA3C5','#C47A5A','#8B9F7B'];
+function fmtV(v){return v>=1?'£'+v.toFixed(1)+'bn+':'£'+Math.round(v*1000)+'m+';}
 function showI(i){
   if(i===curI)return;
   curI=i;
@@ -10476,15 +10516,23 @@ function showI(i){
   document.getElementById('sig-tip-mon').textContent=d.lb;
   document.getElementById('sig-tip-val').textContent=fmtV(d.v);
   var cel=document.getElementById('sig-tip-ch');
-  if(d.ch!==null){cel.style.color=d.ch>=0?'var(--green)':'var(--red)';cel.textContent=(d.ch>=0?'▲ +':'')+d.ch+'% vs prev mo';}
+  if(d.ch!==null){cel.style.color=d.ch>=0?'var(--green)':'var(--red)';cel.textContent=(d.ch>=0?'\\u25B2 +':'\\u25BC ')+d.ch+'%';}
   else cel.textContent='';
+  document.getElementById('sig-tip-nc').textContent=d.nc+' notices \\u00B7 '+d.oc+' open';
+  if(d.desks&&d.desks.length>0){
+    desksPanel.style.display='';
+    deskHead.textContent='TOP '+d.desks.length+' DESKS OF '+d.td;
+    deskRows.innerHTML=d.desks.map(function(dk,j){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px"><span style="color:var(--text)">'+dk.label+'</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+dk.val+'</span></div><div style="height:3px;background:var(--border);border-radius:2px;margin-bottom:4px"><div style="height:100%;border-radius:2px;background:'+COLORS[j%5]+';width:'+(j===0?'100':Math.max(15,Math.round(100-j*18)))+'%"></div></div>';
+    }).join('');
+  } else desksPanel.style.display='none';
   var sx=${LPAD}+d.xp*${PW};
   hl.setAttribute('x1',sx);hl.setAttribute('x2',sx);hl.setAttribute('opacity','0.5');
   hd.setAttribute('cx',sx);hd.setAttribute('cy',d.y);hd.setAttribute('opacity','1');
   tip.style.display='block';
   var wW=wrap.offsetWidth;
   var pxX=(${LPAD}/1000)*wW+(d.xp*(${PW}/1000))*wW;
-  var tipW=tip.offsetWidth||150;
+  var tipW=tip.offsetWidth||200;
   tip.style.left=(pxX>wW*0.55?(pxX-tipW-10):(pxX+10))+'px';
 }
 function hide(){curI=-1;tip.style.display='none';hl.setAttribute('opacity','0');hd.setAttribute('opacity','0');}
