@@ -199,7 +199,7 @@ app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 // Page-view tracker — fire-and-forget, never blocks a request
 app.use((req, _res, next) => {
-  if (pool && req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/admin") && !req.path.startsWith("/billing") && !req.path.includes(".")) {
+  if (pool && req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/admin") && !req.path.startsWith("/billing") && req.path !== "/health" && !req.path.includes(".")) {
     const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 64);
     pool.query(
       `INSERT INTO visitor_logs (ip, path, user_agent, referer) VALUES ($1,$2,$3,$4)`,
@@ -14437,14 +14437,14 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM alert_subscriptions ORDER BY created_at DESC LIMIT 200`),
     safePool(`SELECT * FROM briefing_subscribers ORDER BY created_at DESC`),
     safePool(`SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' GROUP BY day ORDER BY day DESC`),
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health' GROUP BY day ORDER BY day DESC`),
     safePool(`SELECT path, COUNT(*)::int AS visits FROM visitor_logs
-    WHERE visited_at > NOW() - INTERVAL '7 days' GROUP BY path ORDER BY visits DESC LIMIT 15`),
+    WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health' GROUP BY path ORDER BY visits DESC LIMIT 15`),
     safePool(`SELECT ip, COUNT(*)::int AS visits, MAX(visited_at) AS last_seen
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != ''
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != '' AND path != '/health'
     GROUP BY ip ORDER BY visits DESC LIMIT 30`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours'`),
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'`),
     safePool(`SELECT COALESCE(SUM(amount),0)::int AS total_pence,COUNT(*)::int AS order_count,
       COALESCE(SUM(amount) FILTER(WHERE plan='payg'),0)::int AS payg_pence,
       COALESCE(SUM(amount) FILTER(WHERE plan='pro'),0)::int AS pro_pence,
@@ -14486,7 +14486,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     safePool(`SELECT event, meta_json, created_at, ip, user_agent
     FROM visitor_events ORDER BY created_at DESC LIMIT 100`),
     safePool(`SELECT ip, path, user_agent, visited_at
-    FROM visitor_logs ORDER BY visited_at DESC LIMIT 100`),
+    FROM visitor_logs WHERE path != '/health' ORDER BY visited_at DESC LIMIT 100`),
     safePool(`SELECT cl.comment_id, cl.ip, cl.created_at, c.author_name, c.body
     FROM comment_likes cl LEFT JOIN comments c ON c.id=cl.comment_id ORDER BY cl.created_at DESC LIMIT 100`),
     safePool(`SELECT id, category, title, buyer, source, status, value_amount, notice_date, deadline_date
