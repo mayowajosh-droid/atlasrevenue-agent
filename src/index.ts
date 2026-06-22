@@ -2463,6 +2463,9 @@ const SECTOR_CPV: Record<string, string[]> = {
   "research":         ["73100000", "73200000", "72316000"],   // R&D, business consultancy, data analysis
   "consulting":       ["73200000", "72224000", "72220000"],   // business consultancy, project management consulting, systems/tech consulting
   "training-skills":  ["80000000", "80500000", "80530000", "80521000", "80522000"], // education, training, vocational training, training programme, technical training
+  "transport":        ["60130000", "60112000", "60140000", "60100000"],             // public road transport, public bus, non-scheduled passenger transport, road transport
+  "recruitment":      ["79620000", "79621000", "79624000", "79625000"],             // supply of personnel, supply office staff, supply nursing, supply medical
+  "frameworks":       ["79000000", "72000000", "45000000"],                         // business services (broad), IT services (broad), construction works (broad)
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal): Promise<ProcurementData> {
@@ -2824,13 +2827,23 @@ function resolveSector(text: string): SectorResult {
     };
   }
 
+  if (t.includes("communications") || t.includes("public engagement") || t.includes("pr ") ||
+      t.includes("media relations") || t.includes("council communications") || t.includes("public health campaign") ||
+      t.includes("stakeholder engagement") || t.includes("consultation")) {
+    return {
+      key: "comms",
+      label: "Communications, PR & public engagement",
+      terms: ["communications", "PR", "public engagement", "media relations", "public health campaigns", "council communications", "print management", "stakeholder engagement", "consultation"]
+    };
+  }
+
   if (t.includes("marketing") || t.includes("creative") || t.includes("campaign") ||
-      t.includes("video") || t.includes("film") || t.includes("communications") ||
+      t.includes("video") || t.includes("film") ||
       t.includes("event production") || t.includes("drpg")) {
     return {
       key: "creative",
       label: "Creative / marketing production / events",
-      terms: ["marketing", "creative", "campaign", "video", "film", "communications", "event", "production", "digital content", "media services"]
+      terms: ["marketing", "creative", "campaign", "video", "film", "event", "production", "digital content", "media services"]
     };
   }
 
@@ -2860,6 +2873,35 @@ function resolveSector(text: string): SectorResult {
       key: "training-skills",
       label: "Education, training & skills",
       terms: ["education", "school", "academy", "training", "apprenticeship", "skills", "further education", "learning", "teaching", "curriculum", "NVQ", "CPD", "workforce development", "upskilling"]
+    };
+  }
+
+  if (t.includes("passenger transport") || t.includes("home to school") || t.includes("school transport") ||
+      t.includes("send transport") || t.includes("community transport") || t.includes("dial-a-ride") ||
+      t.includes("minibus") || t.includes("accessible transport")) {
+    return {
+      key: "transport",
+      label: "Passenger transport & SEND travel",
+      terms: ["passenger transport", "home to school transport", "SEND transport", "community transport", "minibus", "dial-a-ride", "accessible transport", "school transport", "taxi", "fleet management"]
+    };
+  }
+
+  if (t.includes("recruitment") || t.includes("staffing") || t.includes("agency worker") ||
+      t.includes("temporary staff") || t.includes("locum") || t.includes("supply teacher") ||
+      t.includes("managed service provider")) {
+    return {
+      key: "recruitment",
+      label: "Recruitment & temporary staffing",
+      terms: ["recruitment", "staffing", "agency workers", "temporary staff", "locum", "supply teacher", "managed service provider", "permanent placement", "nursing agency", "social work agency"]
+    };
+  }
+
+  if (t.includes("framework agreement") || t.includes("dynamic purchasing") || t.includes("dps") ||
+      t.includes("call-off") || t.includes("multi-provider") || t.includes("crown commercial")) {
+    return {
+      key: "frameworks",
+      label: "Frameworks & dynamic purchasing systems",
+      terms: ["framework agreement", "dynamic purchasing system", "DPS", "call-off", "multi-supplier", "Crown Commercial Service", "G-Cloud", "Digital Outcomes"]
     };
   }
 
@@ -4116,11 +4158,11 @@ const DESK_PROFILES: DeskProfile[] = [
       mainGoal: "find facilities management contracts"
     }),
     categories: [
-      { label: "Hard FM",             keywords: ["hard fm", "mechanical", "electrical", "boiler", "heating", "hvac", "lift"],                    subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
-      { label: "Soft FM",             keywords: ["soft fm", "cleaning", "catering", "security", "portering", "reception", "waste"],              subcategories: ["Cleaning","Catering","Security","Portering","Reception","Waste management","Mail room"] },
-      { label: "Managed Services",    keywords: ["total fm", "integrated fm", "outsourced fm", "facilities management", "facilities contract"],  subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
-      { label: "Energy Management",   keywords: ["energy management", "energy efficiency", "energy services", "utilities management", "utility metering", "carbon reduction"],   subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
-      { label: "Compliance & Safety", keywords: ["statutory compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing"],      subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
+      { label: "Hard FM",             keywords: ["hard fm", "mechanical", "electrical", "boiler", "heating", "hvac", "lift", "plumbing", "air conditioning"],  subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
+      { label: "Soft FM",             keywords: ["soft fm", "cleaning", "catering", "security", "portering", "reception", "helpdesk", "mailroom"],        subcategories: ["Cleaning","Catering","Security","Portering","Reception","Waste management","Mail room"] },
+      { label: "Managed Services",    keywords: ["total fm", "integrated fm", "facilities management", "facilities service", "building management", "estate management"], subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
+      { label: "Energy Management",   keywords: ["energy management", "energy efficiency", "utilities", "metering", "carbon reduction", "sustainability"], subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
+      { label: "Compliance & Safety", keywords: ["compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing", "fire risk"],    subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
     ]
   },
   {
@@ -4146,56 +4188,58 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "transport",
     label: "Transport & SEND",
     standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
-      mainServices: "passenger transport SEND home to school transport community transport special educational needs",
-      idealBuyers: "local authorities councils transport authorities",
-      mainGoal: "find passenger transport and SEND contracts"
+      mainServices: "passenger transport SEND transport home to school transport community transport taxi fleet management minibus accessible transport school transport bus services coach hire dial-a-ride",
+      idealBuyers: "local authorities county councils transport authorities combined authorities metropolitan boroughs",
+      mainGoal: "find passenger transport and SEND transport contracts"
     }),
     categories: [
-      { label: "SEND Transport",              keywords: ["send", "special educational needs", "home to school", "school transport", "children with"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
-      { label: "Passenger Transport",         keywords: ["passenger transport", "bus", "community transport", "minibus", "dial-a-ride"],               subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport"] },
-      { label: "Fleet & Vehicle Management",  keywords: ["fleet", "vehicle", "taxi", "accessible vehicle", "wheelchair"],                             subcategories: ["Fleet management","Taxi commissioning","Wheelchair-accessible vehicles","Vehicle maintenance"] },
-      { label: "Rail & Specialist",           keywords: ["rail", "coach", "specialist transport", "escort", "accompany"],                             subcategories: ["Rail contracts","Coach hire","Escorted journeys","School crossings"] },
+      { label: "SEND Transport",              keywords: ["send transport", "special educational", "home to school", "school transport", "sen transport", "school bus"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
+      { label: "Passenger Transport",         keywords: ["passenger transport", "bus service", "community transport", "minibus", "dial-a-ride", "public transport", "shuttle"], subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport"] },
+      { label: "Fleet & Vehicle Management",  keywords: ["fleet", "vehicle", "taxi", "wheelchair accessible", "transport contract", "vehicle hire"],  subcategories: ["Fleet management","Taxi commissioning","Wheelchair-accessible vehicles","Vehicle maintenance"] },
+      { label: "Rail & Specialist",           keywords: ["rail", "coach", "transport service", "escort", "patient transport", "non-emergency transport"], subcategories: ["Rail contracts","Coach hire","Escorted journeys","School crossings"] },
     ]
   },
   {
     slug: "recruitment",
     label: "Recruitment",
     standfirst: "Temporary and permanent staffing frameworks across the NHS, councils, and central government.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
-      mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider",
-      idealBuyers: "NHS trusts local councils central government departments",
+      mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider locum nursing agency supply teachers social work staffing IT contractors",
+      idealBuyers: "NHS trusts local authorities central government departments police forces fire services housing associations",
       mainGoal: "find recruitment and staffing contracts"
     }),
     categories: [
-      { label: "Clinical & Medical",    keywords: ["nursing", "medical", "doctor", "clinical", "healthcare professional", "locum"],         subcategories: ["Nursing","Medical locums","Allied health","Healthcare assistants","Band 5–7 nursing","Specialist clinical"] },
-      { label: "Social Work & Care",    keywords: ["social work", "social care", "care worker", "support worker", "children services"],     subcategories: ["Social workers","Children services","Adult social care","Support workers","AMHP","IRO"] },
-      { label: "Education Staffing",    keywords: ["teacher", "teaching", "supply teacher", "education", "school staff"],                  subcategories: ["Supply teaching","Teaching assistants","SEN support","School leadership","Education admin"] },
-      { label: "Admin & Corporate",     keywords: ["admin", "clerical", "office", "secretarial", "finance", "hr staff"],                   subcategories: ["Admin & clerical","Finance officers","HR professionals","Project coordinators","PA/EA"] },
-      { label: "Technical & IT",        keywords: ["it staff", "technical", "developer", "engineering", "digital"],                        subcategories: ["IT contractors","Software developers","Data analysts","Digital specialists","Engineers"] },
+      { label: "Clinical & Medical",    keywords: ["nursing", "locum", "healthcare staff", "clinical staff", "medical staff", "agency nurse", "healthcare assistant"],  subcategories: ["Nursing","Medical locums","Allied health","Healthcare assistants","Band 5–7 nursing","Specialist clinical"] },
+      { label: "Social Work & Care",    keywords: ["social work", "care staff", "support worker", "care worker", "social care staff"],                                 subcategories: ["Social workers","Children services","Adult social care","Support workers","AMHP","IRO"] },
+      { label: "Education Staffing",    keywords: ["teacher", "teaching", "supply staff", "education staff", "teaching assistant"],                                     subcategories: ["Supply teaching","Teaching assistants","SEN support","School leadership","Education admin"] },
+      { label: "Admin & Corporate",     keywords: ["administrative", "clerical", "interim", "temporary staff", "agency staff", "office staff"],                         subcategories: ["Admin & clerical","Finance officers","HR professionals","Project coordinators","PA/EA"] },
+      { label: "Technical & IT",        keywords: ["it contractor", "developer", "engineering staff", "digital staff", "technical staff"],                               subcategories: ["IT contractors","Software developers","Data analysts","Digital specialists","Engineers"] },
+      { label: "Recruitment Services",  keywords: ["recruitment", "staffing", "personnel", "managed service", "staff bank", "workforce"],                               subcategories: ["Managed service provision","Staff bank management","Master vendor","Neutral vendor","Recruitment process outsourcing","Workforce planning"] },
     ]
   },
   {
     slug: "frameworks",
     label: "Frameworks",
     standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
-      mainServices: "framework agreement dynamic purchasing system DPS call-off contract multi-provider",
-      idealBuyers: "Crown Commercial Service local authorities NHS central government",
-      mainGoal: "find framework and DPS opportunities"
+      mainServices: "framework agreement dynamic purchasing system DPS call-off multi-supplier Crown Commercial Service lot-based procurement multi-provider arrangement standing offer",
+      idealBuyers: "Crown Commercial Service local authorities NHS trusts central government combined authorities police forces",
+      mainGoal: "find framework agreements and DPS opportunities"
     }),
     categories: [
-      { label: "Construction Frameworks",         keywords: ["construction framework", "works framework", "jct", "nec"],                       subcategories: ["Works frameworks","NEC contracts","JCT frameworks","Minor works","Capital delivery"] },
-      { label: "Professional Services",           keywords: ["professional services", "consultancy framework", "advisory"],                    subcategories: ["Consultancy","Project management","Legal","Finance advisory","HR advisory"] },
-      { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "ict", "g-cloud", "digital outcomes"], subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
-      { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "purchase order"],          subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
-      { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market"],                                   subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
+      { label: "Construction Frameworks",         keywords: ["construction framework", "works framework", "building framework", "nec framework"],                 subcategories: ["Works frameworks","NEC contracts","JCT frameworks","Minor works","Capital delivery"] },
+      { label: "Professional Services",           keywords: ["professional services", "consultancy framework", "advisory framework", "managed service framework"], subcategories: ["Consultancy","Project management","Legal","Finance advisory","HR advisory"] },
+      { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "g-cloud", "digital outcomes", "ict framework"],         subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
+      { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "procurement framework"],                       subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
+      { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market", "open framework"],                                     subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
+      { label: "Framework Agreements",            keywords: ["framework", "call-off", "lot", "multi-supplier", "standing offer", "approved list"],                  subcategories: ["Single-supplier frameworks","Multi-supplier frameworks","Call-off arrangements","Lot-based procurement","Approved supplier lists","Pre-qualification"] },
     ]
   },
   {
@@ -4210,12 +4254,12 @@ const DESK_PROFILES: DeskProfile[] = [
       mainGoal: "find NHS and health commissioning contracts"
     }),
     categories: [
-      { label: "Acute & Hospital Services",         keywords: ["hospital", "acute trust", "secondary care", "nhs trust", "surgical", "diagnostics", "pathology"],         subcategories: ["Surgical services","Diagnostic imaging","Pathology","Outpatient services","Pharmacy supplies","Medical equipment","Hospital cleaning","Patient transport","Catering (acute)","Sterile services","Ward supplies","Prosthetics","Physiotherapy (acute)","Occupational therapy","Speech & language therapy"] },
-      { label: "Mental Health & Talking Therapies",  keywords: ["mental health", "talking therapies", "iapt", "counselling", "psychological", "wellbeing", "mhst"],        subcategories: ["IAPT/talking therapies","Crisis services","Community mental health teams","Child & adolescent mental health (CAMHS)","Eating disorders","Perinatal mental health","Forensic mental health","Mental health workforce","Supported accommodation (MH)","Recovery & employment support","Advocacy services"] },
-      { label: "Community & Primary Care",           keywords: ["primary care", "community health", "gp", "pcn", "primary care network", "district nursing", "health visiting"], subcategories: ["GP services","District nursing","Health visiting","Community physiotherapy","Community podiatry","Community cardiology","Primary care IT systems","Remote monitoring","Care navigation","Pharmacy (community)","Immunisation programmes","Cervical screening"] },
-      { label: "Public Health Commissioning",        keywords: ["public health", "health improvement", "prevention", "sexual health", "substance misuse", "tobacco", "obesity", "smoking cessation"], subcategories: ["Sexual health services","Stop smoking","Drug & alcohol services","Obesity & weight management","Health improvement programmes","Screening programmes","Epidemiology & surveillance","Healthy start schemes","Falls prevention","Social prescribing","Health inequalities"] },
-      { label: "Health Technology & Digital",        keywords: ["health technology", "nhs digital", "electronic patient record", "epr", "clinical system", "health informatics", "patient management"], subcategories: ["Electronic patient records (EPR)","Clinical decision support","Patient flow systems","NHS app integration","Wearables & remote monitoring","Health data analytics","Cyber security (NHS)","Clinical coding","Workforce management systems","Telemedicine","AI diagnostics"] },
-      { label: "Care Commissioning & Social Care",   keywords: ["care home", "residential care", "domiciliary", "supported living", "adult social care", "reablement", "extra care"], subcategories: ["Domiciliary care","Residential care homes","Nursing homes","Supported living","Extra care housing","Reablement services","Learning disability services","Autistic spectrum (residential)","Discharge-to-assess","Personal assistants","Direct payments support","Carer support services"] },
+      { label: "Acute & Hospital Services",         keywords: ["hospital", "acute", "nhs trust", "surgical", "diagnostics", "pathology", "clinical", "medical equipment", "pharmacy"],  subcategories: ["Surgical services","Diagnostic imaging","Pathology","Outpatient services","Pharmacy supplies","Medical equipment","Hospital cleaning","Patient transport","Catering (acute)","Sterile services","Ward supplies","Prosthetics","Physiotherapy (acute)","Occupational therapy","Speech & language therapy"] },
+      { label: "Mental Health & Talking Therapies",  keywords: ["mental health", "talking therapies", "iapt", "counselling", "psychological", "wellbeing", "therapy"],               subcategories: ["IAPT/talking therapies","Crisis services","Community mental health teams","Child & adolescent mental health (CAMHS)","Eating disorders","Perinatal mental health","Forensic mental health","Mental health workforce","Supported accommodation (MH)","Recovery & employment support","Advocacy services"] },
+      { label: "Community & Primary Care",           keywords: ["primary care", "community health", "gp practice", "district nursing", "health visiting", "pharmacy", "vaccination"], subcategories: ["GP services","District nursing","Health visiting","Community physiotherapy","Community podiatry","Community cardiology","Primary care IT systems","Remote monitoring","Care navigation","Pharmacy (community)","Immunisation programmes","Cervical screening"] },
+      { label: "Public Health Commissioning",        keywords: ["public health", "prevention", "sexual health", "substance misuse", "smoking", "obesity", "drug and alcohol", "screening"], subcategories: ["Sexual health services","Stop smoking","Drug & alcohol services","Obesity & weight management","Health improvement programmes","Screening programmes","Epidemiology & surveillance","Healthy start schemes","Falls prevention","Social prescribing","Health inequalities"] },
+      { label: "Health Technology & Digital",        keywords: ["health technology", "nhs digital", "patient record", "clinical system", "telehealth", "telemedicine", "health informatics"], subcategories: ["Electronic patient records (EPR)","Clinical decision support","Patient flow systems","NHS app integration","Wearables & remote monitoring","Health data analytics","Cyber security (NHS)","Clinical coding","Workforce management systems","Telemedicine","AI diagnostics"] },
+      { label: "Care Commissioning & Social Care",   keywords: ["care home", "residential care", "domiciliary", "supported living", "adult social care", "reablement", "nursing home", "extra care"], subcategories: ["Domiciliary care","Residential care homes","Nursing homes","Supported living","Extra care housing","Reablement services","Learning disability services","Autistic spectrum (residential)","Discharge-to-assess","Personal assistants","Direct payments support","Carer support services"] },
     ]
   },
   { slug: "digital", label: "Digital & IT", standfirst: "Cloud, software, cyber security, networks, and digital transformation across the NHS, councils, and central government.", live: true,
@@ -4264,12 +4308,12 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "energy", label: "Energy & Utilities", standfirst: "Energy procurement, decarbonisation, smart metering, EV charging, heat networks, and net zero strategy across the public estate.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "energy procurement decarbonisation solar heat pump retrofit smart metering EV charging net zero sustainability", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find energy and decarbonisation contracts" }),
     categories: [
-      { label: "Energy Procurement", keywords: ["energy procurement", "gas contract", "electricity contract", "utilities", "energy buying"], subcategories: ["Electricity supply","Gas supply","Energy framework","Flexible purchasing","Renewable energy","Energy brokering","Half-hourly metering","Water supply","Telecoms contracts","Fuel supply","Energy data management","Utility management"] },
-      { label: "Decarbonisation & Retrofit", keywords: ["decarbonisation", "retrofit", "solar", "heat pump", "insulation", "net zero", "low carbon"], subcategories: ["Solar PV","Heat pumps","Insulation works","LED upgrades","Voltage optimisation","Battery storage","EPC improvements","PAS 2035 retrofit","Net zero strategy","Carbon offsetting","Biomass heating","Fabric first retrofit"] },
-      { label: "Smart Metering & Monitoring", keywords: ["smart meter", "metering", "bms", "energy monitoring", "sub-metering", "iso 50001"], subcategories: ["Smart meters","AMR metering","BMS upgrades","Energy monitoring","Sub-metering","ISO 50001 support","Carbon reporting","Tariff optimisation","Real-time dashboards","Automated meter reading","M&T systems","Energy certificates"] },
-      { label: "EV Charging & Transport", keywords: ["ev charging", "electric vehicle", "charge point", "ulev", "zero emission"], subcategories: ["EV charge points","Public charging network","Fleet charging","Ultra-low emission","EV strategy","Charge point management","Rapid charging hubs","On-street charging","Fleet decarbonisation","E-bike infrastructure","EV grid balancing","Workplace charging"] },
-      { label: "Heat Networks & District Energy", keywords: ["heat network", "district heating", "communal heating", "heat interface", "dh scheme"], subcategories: ["Heat network design","District heating","Communal heating","Heat interface units","ESCO contracts","Biomass district","Network metering","Connection agreements","Hydraulic modelling","Heat offtake","Heat pumps (district)","Thermal storage"] },
-      { label: "Energy Consultancy", keywords: ["energy consultancy", "energy management", "carbon strategy", "sustainability", "energy audit"], subcategories: ["Energy audits","Carbon strategy","Sustainability reporting","SECR compliance","Energy management","Green fleet strategy","Climate action plans","Scope 3 emissions","Net zero roadmaps","Public sector decarbonisation","BREEAM assessment","Lifecycle carbon"] },
+      { label: "Energy Procurement", keywords: ["energy", "gas supply", "electricity", "utilities", "fuel", "renewable"], subcategories: ["Electricity supply","Gas supply","Energy framework","Flexible purchasing","Renewable energy","Energy brokering","Half-hourly metering","Water supply","Telecoms contracts","Fuel supply","Energy data management","Utility management"] },
+      { label: "Decarbonisation & Retrofit", keywords: ["decarbonisation", "retrofit", "solar", "heat pump", "insulation", "net zero", "low carbon", "carbon"], subcategories: ["Solar PV","Heat pumps","Insulation works","LED upgrades","Voltage optimisation","Battery storage","EPC improvements","PAS 2035 retrofit","Net zero strategy","Carbon offsetting","Biomass heating","Fabric first retrofit"] },
+      { label: "Smart Metering & Monitoring", keywords: ["smart meter", "metering", "bms", "energy monitoring", "sub-meter"], subcategories: ["Smart meters","AMR metering","BMS upgrades","Energy monitoring","Sub-metering","ISO 50001 support","Carbon reporting","Tariff optimisation","Real-time dashboards","Automated meter reading","M&T systems","Energy certificates"] },
+      { label: "EV Charging & Transport", keywords: ["ev charg", "electric vehicle", "charge point", "zero emission", "ulev"], subcategories: ["EV charge points","Public charging network","Fleet charging","Ultra-low emission","EV strategy","Charge point management","Rapid charging hubs","On-street charging","Fleet decarbonisation","E-bike infrastructure","EV grid balancing","Workplace charging"] },
+      { label: "Heat Networks & District Energy", keywords: ["heat network", "district heating", "communal heating", "biomass", "heat interface"], subcategories: ["Heat network design","District heating","Communal heating","Heat interface units","ESCO contracts","Biomass district","Network metering","Connection agreements","Hydraulic modelling","Heat offtake","Heat pumps (district)","Thermal storage"] },
+      { label: "Energy Consultancy", keywords: ["energy consultancy", "energy management", "carbon strategy", "sustainability", "energy audit", "climate"], subcategories: ["Energy audits","Carbon strategy","Sustainability reporting","SECR compliance","Energy management","Green fleet strategy","Climate action plans","Scope 3 emissions","Net zero roadmaps","Public sector decarbonisation","BREEAM assessment","Lifecycle carbon"] },
     ]
   },
   { slug: "security", label: "Security", standfirst: "Manned guarding, CCTV, access control, event security, and lone worker protection for public sector sites and estates.", live: true,
@@ -4330,12 +4374,12 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "comms", label: "Marketing & Comms", standfirst: "Public health campaigns, council communications, PR, print, digital marketing, and public engagement across the public sector.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "public health campaigns council communications PR media relations print design digital marketing engagement consultation", idealBuyers: "local authorities NHS trusts public health teams central government", mainGoal: "find communications and marketing contracts" }),
     categories: [
-      { label: "Public Health Campaigns", keywords: ["public health campaign", "health promotion", "behaviour change", "awareness campaign"], subcategories: ["Smoking cessation campaigns","Drug and alcohol campaigns","Sexual health campaigns","Mental health awareness","Obesity prevention","COVID communications","Vaccination campaigns","NHS recruitment","Emergency communications","Suicide prevention messaging","Physical activity promotion","NHS 111 awareness"] },
-      { label: "Council Communications", keywords: ["council communications", "resident communications", "public engagement comms", "council consultation"], subcategories: ["Resident newsletters","Council website","Digital communications","Annual report","Budget consultation","Resident surveys","Neighbourhood comms","Ward briefings","Corporate publications","Intranet","Social media (council)","Corporate branding"] },
-      { label: "PR & Media Relations", keywords: ["media relations", "press office", "public relations", "crisis comms", "reputation management"], subcategories: ["Press office","Spokesperson training","Crisis communications","Media monitoring","Stakeholder relations","Reputation management","Parliamentary affairs","Lobbying support","Social media PR","Broadcast PR","Press release writing","Media training"] },
-      { label: "Print & Design", keywords: ["print management", "graphic design", "signage", "wayfinding", "publication", "brand identity"], subcategories: ["Graphic design","Brand identity","Print management","Signage and wayfinding","Exhibition materials","Annual reports","Leaflets and posters","Accessibility design","Large-format print","Corporate stationery","Environmental graphics","Translation and print"] },
-      { label: "Digital Marketing & Media", keywords: ["digital marketing", "social media management", "seo", "paid media", "email marketing", "content strategy"], subcategories: ["Social media management","Paid search (PPC)","SEO","Email marketing","Content strategy","Video production","Animation","Podcasting","Influencer outreach","Digital analytics","Website development","App development"] },
-      { label: "Consultation & Engagement", keywords: ["public consultation", "community engagement", "stakeholder engagement", "co-production", "citizen engagement", "participatory"], subcategories: ["Public consultation","Co-production","Citizen assemblies","Online engagement","Face-to-face events","Accessibility engagement","Community engagement","Hard-to-reach groups","Equalities consultation","Feedback analysis","Deliberative research","Participatory budgeting"] },
+      { label: "Public Health Campaigns", keywords: ["campaign", "health promotion", "behaviour change", "awareness", "public health"], subcategories: ["Smoking cessation campaigns","Drug and alcohol campaigns","Sexual health campaigns","Mental health awareness","Obesity prevention","COVID communications","Vaccination campaigns","NHS recruitment","Emergency communications","Suicide prevention messaging","Physical activity promotion","NHS 111 awareness"] },
+      { label: "Council Communications", keywords: ["communications", "newsletter", "resident", "intranet", "corporate communications"], subcategories: ["Resident newsletters","Council website","Digital communications","Annual report","Budget consultation","Resident surveys","Neighbourhood comms","Ward briefings","Corporate publications","Intranet","Social media (council)","Corporate branding"] },
+      { label: "PR & Media Relations", keywords: ["media relations", "press office", "public relations", "crisis comms", "reputation"], subcategories: ["Press office","Spokesperson training","Crisis communications","Media monitoring","Stakeholder relations","Reputation management","Parliamentary affairs","Lobbying support","Social media PR","Broadcast PR","Press release writing","Media training"] },
+      { label: "Print & Design", keywords: ["print", "graphic design", "signage", "wayfinding", "publication", "branding", "design services"], subcategories: ["Graphic design","Brand identity","Print management","Signage and wayfinding","Exhibition materials","Annual reports","Leaflets and posters","Accessibility design","Large-format print","Corporate stationery","Environmental graphics","Translation and print"] },
+      { label: "Digital Marketing & Media", keywords: ["digital marketing", "social media", "website", "content", "video production", "marketing"], subcategories: ["Social media management","Paid search (PPC)","SEO","Email marketing","Content strategy","Video production","Animation","Podcasting","Influencer outreach","Digital analytics","Website development","App development"] },
+      { label: "Consultation & Engagement", keywords: ["consultation", "engagement", "stakeholder", "co-production", "citizen", "participatory"], subcategories: ["Public consultation","Co-production","Citizen assemblies","Online engagement","Face-to-face events","Accessibility engagement","Community engagement","Hard-to-reach groups","Equalities consultation","Feedback analysis","Deliberative research","Participatory budgeting"] },
     ]
   },
   { slug: "leisure", label: "Leisure & Culture", standfirst: "Leisure centre management, libraries, arts, parks, sports development, and heritage for councils and public bodies.", live: true,
@@ -4352,12 +4396,12 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "planning", label: "Planning & Regeneration", standfirst: "Planning consultancy, urban regeneration, economic development, heritage, transport planning, and land strategy for councils and combined authorities.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "planning consultancy urban regeneration economic development masterplanning heritage transport planning land development", idealBuyers: "local authorities combined authorities planning authorities Homes England", mainGoal: "find planning and regeneration contracts" }),
     categories: [
-      { label: "Planning Consultancy", keywords: ["planning consultancy", "planning application", "local plan", "development management", "neighbourhood planning", "planning policy", "planning appeal"], subcategories: ["Local plan support","Development management","Planning applications","Pre-application advice","Appeals","Planning policy","Infrastructure delivery","Community infrastructure levy","Neighbourhood planning","Planning enforcement","Viability assessments","EIA coordination"] },
-      { label: "Urban Regeneration", keywords: ["regeneration", "urban regeneration", "town centre", "masterplan", "place making", "urban renewal", "levelling up", "high street"], subcategories: ["Town centre regeneration","Masterplanning","Place making","High street recovery","Levelling Up programmes","UKSPF delivery","Heritage-led regeneration","Housing-led regeneration","Industrial site reclamation","Compulsory purchase","Vacant buildings","Business improvement districts"] },
-      { label: "Economic Development", keywords: ["economic development", "inward investment", "business support", "enterprise", "growth hub"], subcategories: ["Inward investment","Business support","Enterprise zones","Growth hubs","Employment land","Skills and employment","Business rates incentives","Trade missions","Economic impact","Supply chain development","Innovation hubs","Start-up support"] },
-      { label: "Heritage & Conservation", keywords: ["heritage conservation", "listed building", "historic", "building survey conservation", "conservation area"], subcategories: ["Heritage surveys","Conservation area appraisals","Listed building advice","Historic environment","Archaeology","Building recording","Heritage impact","SMR support","Historic landscape","War memorial restoration","Heritage at risk","Grant-aided works"] },
-      { label: "Transport Planning", keywords: ["transport planning", "transport assessment", "traffic", "active travel", "movement strategy"], subcategories: ["Transport assessment","Traffic modelling","Active travel plans","Parking strategy","Travel plans","LTP development","Bus strategy","Cycling and walking","Road safety audits","Transport impact assessment","Vision Zero","Freight strategy"] },
-      { label: "Property & Land", keywords: ["property disposal", "land disposal", "surplus land", "asset disposal", "property valuation", "compulsory purchase", "land development"], subcategories: ["Asset valuation","Compulsory purchase","Land disposal","Development appraisal","Estate strategy","Property acquisition","Lease management","Rating appeals","Asset register","Commercial property","Surplus land","Community asset transfer"] },
+      { label: "Planning Consultancy", keywords: ["planning", "local plan", "development management", "planning application", "planning policy"], subcategories: ["Local plan support","Development management","Planning applications","Pre-application advice","Appeals","Planning policy","Infrastructure delivery","Community infrastructure levy","Neighbourhood planning","Planning enforcement","Viability assessments","EIA coordination"] },
+      { label: "Urban Regeneration", keywords: ["regeneration", "town centre", "masterplan", "place making", "levelling up", "high street", "urban renewal"], subcategories: ["Town centre regeneration","Masterplanning","Place making","High street recovery","Levelling Up programmes","UKSPF delivery","Heritage-led regeneration","Housing-led regeneration","Industrial site reclamation","Compulsory purchase","Vacant buildings","Business improvement districts"] },
+      { label: "Economic Development", keywords: ["economic development", "inward investment", "business support", "enterprise zone", "growth hub"], subcategories: ["Inward investment","Business support","Enterprise zones","Growth hubs","Employment land","Skills and employment","Business rates incentives","Trade missions","Economic impact","Supply chain development","Innovation hubs","Start-up support"] },
+      { label: "Heritage & Conservation", keywords: ["heritage", "listed building", "historic", "conservation area", "archaeology"], subcategories: ["Heritage surveys","Conservation area appraisals","Listed building advice","Historic environment","Archaeology","Building recording","Heritage impact","SMR support","Historic landscape","War memorial restoration","Heritage at risk","Grant-aided works"] },
+      { label: "Transport Planning", keywords: ["transport planning", "transport assessment", "traffic", "active travel", "cycling", "parking"], subcategories: ["Transport assessment","Traffic modelling","Active travel plans","Parking strategy","Travel plans","LTP development","Bus strategy","Cycling and walking","Road safety audits","Transport impact assessment","Vision Zero","Freight strategy"] },
+      { label: "Property & Land", keywords: ["property", "land disposal", "surplus land", "valuation", "compulsory purchase", "asset management"], subcategories: ["Asset valuation","Compulsory purchase","Land disposal","Development appraisal","Estate strategy","Property acquisition","Lease management","Rating appeals","Asset register","Commercial property","Surplus land","Community asset transfer"] },
     ]
   },
   { slug: "justice", label: "Justice & Probation", standfirst: "Prison services, probation, community rehabilitation, electronic monitoring, court services, and youth justice commissioned by HMPPS and local authorities.", live: true,
@@ -4385,23 +4429,23 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "research", label: "Research & Evaluation", standfirst: "Social research, policy evaluation, public health research, data analytics, consultation, and market research for government and NHS bodies.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "social research policy evaluation public health research data analytics consultation market research epidemiology", idealBuyers: "central government NHS England local authorities research councils", mainGoal: "find research and evaluation contracts" }),
     categories: [
-      { label: "Social Research", keywords: ["social research", "qualitative research", "quantitative research", "survey", "research study"], subcategories: ["Qualitative research","Quantitative surveys","Longitudinal studies","Ethnographic research","Focus groups","Depth interviews","Research panels","Mystery shopping","Citizen surveys","Public attitude research","Co-design research","Rapid evidence review"] },
-      { label: "Policy Evaluation", keywords: ["policy evaluation", "programme evaluation", "impact assessment", "theory of change"], subcategories: ["Summative evaluation","Formative evaluation","Process evaluation","Economic evaluation","Impact assessment","Theory of change","Logic model development","Evaluation framework","Realist evaluation","Contribution analysis","SROI","Rapid evidence review"] },
-      { label: "Public Health Research", keywords: ["public health research", "epidemiology", "health surveillance", "needs assessment", "jsna"], subcategories: ["Epidemiological studies","Health needs assessment","JSNA support","Health inequalities research","Behavioural insights","Surveillance systems","Disease modelling","Screening evaluation","Preventive research","Pharmaceutical trials","Genomics","Health data linkage"] },
-      { label: "Data & Analytics", keywords: ["data analytics", "business intelligence", "data science", "predictive analytics", "dashboard"], subcategories: ["Data strategy","Business intelligence","Predictive modelling","Machine learning","Data visualisation","Power BI/Tableau","Open data","Statistical analysis","GIS analysis","Performance dashboards","Data governance","Data infrastructure"] },
-      { label: "Consultation & Participation", keywords: ["participatory research", "engagement research", "research participation", "deliberative", "citizens assembly"], subcategories: ["Deliberative panels","Citizens' assemblies","Online consultation platforms","Stakeholder mapping","Engagement strategy","Community research","Young people's participation","Hard-to-reach research","Equalities analysis","Accessibility research","JSNA consultation","Public panel management"] },
-      { label: "Market & Economic Research", keywords: ["market research", "economic analysis", "feasibility study", "cost benefit", "option appraisal"], subcategories: ["Feasibility studies","Cost-benefit analysis","Options appraisal","Market analysis","Demand forecasting","Competition analysis","Socioeconomic impact","ROI modelling","Wellbeing economics","Green Book appraisal","Economic modelling","Sector intelligence"] },
+      { label: "Social Research", keywords: ["research", "qualitative", "quantitative", "survey", "focus group", "interview"], subcategories: ["Qualitative research","Quantitative surveys","Longitudinal studies","Ethnographic research","Focus groups","Depth interviews","Research panels","Mystery shopping","Citizen surveys","Public attitude research","Co-design research","Rapid evidence review"] },
+      { label: "Policy Evaluation", keywords: ["evaluation", "impact assessment", "programme evaluation", "theory of change", "evidence review"], subcategories: ["Summative evaluation","Formative evaluation","Process evaluation","Economic evaluation","Impact assessment","Theory of change","Logic model development","Evaluation framework","Realist evaluation","Contribution analysis","SROI","Rapid evidence review"] },
+      { label: "Public Health Research", keywords: ["public health research", "epidemiology", "needs assessment", "health inequality", "jsna"], subcategories: ["Epidemiological studies","Health needs assessment","JSNA support","Health inequalities research","Behavioural insights","Surveillance systems","Disease modelling","Screening evaluation","Preventive research","Pharmaceutical trials","Genomics","Health data linkage"] },
+      { label: "Data & Analytics", keywords: ["data analytics", "business intelligence", "data science", "predictive", "dashboard", "statistical"], subcategories: ["Data strategy","Business intelligence","Predictive modelling","Machine learning","Data visualisation","Power BI/Tableau","Open data","Statistical analysis","GIS analysis","Performance dashboards","Data governance","Data infrastructure"] },
+      { label: "Consultation & Participation", keywords: ["deliberative", "citizens assembly", "engagement research", "participation", "co-design"], subcategories: ["Deliberative panels","Citizens' assemblies","Online consultation platforms","Stakeholder mapping","Engagement strategy","Community research","Young people's participation","Hard-to-reach research","Equalities analysis","Accessibility research","JSNA consultation","Public panel management"] },
+      { label: "Market & Economic Research", keywords: ["market research", "economic analysis", "feasibility", "cost benefit", "appraisal"], subcategories: ["Feasibility studies","Cost-benefit analysis","Options appraisal","Market analysis","Demand forecasting","Competition analysis","Socioeconomic impact","ROI modelling","Wellbeing economics","Green Book appraisal","Economic modelling","Sector intelligence"] },
     ]
   },
   { slug: "consulting", label: "Central Gov Consulting", standfirst: "Management consulting, digital transformation, programme delivery, policy development, and commercial advisory for central government departments.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "management consulting digital transformation programme delivery policy development operating model commercial advisory cabinet office", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England", mainGoal: "find central government consulting contracts" }),
     categories: [
-      { label: "Digital Transformation", keywords: ["digital transformation", "digitisation", "digital strategy", "digital government", "service redesign"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
-      { label: "Programme & Project Delivery", keywords: ["programme delivery", "project management", "pmo", "agile delivery", "prince2", "gateway review"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
-      { label: "Organisational Transformation", keywords: ["organisational transformation", "operating model", "restructuring", "shared services", "merger"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Succession planning","Target operating model","Benchmarking","OD consulting","Arm's-length body reform"] },
-      { label: "Policy Development", keywords: ["policy development", "policy design", "regulatory reform", "policy strategy", "white paper", "green paper", "ministerial"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
-      { label: "Commercial & Procurement Advisory", keywords: ["commercial advisory", "procurement advisory", "category management", "sourcing strategy"], subcategories: ["Category management","Strategic sourcing","Market engagement","Spend analysis","Commercial strategy","Contract management","Supplier development","Procurement transformation","Crown Commercial","Cabinet Office compliance","Make vs buy","Commercial assurance"] },
-      { label: "Financial & Economic Advisory", keywords: ["financial advisory", "economic advisory", "business case", "green book", "spending review"], subcategories: ["Business case development","Green Book","Infrastructure financing","Spending review support","Economic appraisal","Value-for-money assessment","Financial modelling","ROAMEF","Cost modelling","Public accounts support","Fiscal analysis","CDEL/RDEL management"] },
+      { label: "Digital Transformation", keywords: ["digital transformation", "digitisation", "digital strategy", "service redesign", "digital government"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
+      { label: "Programme & Project Delivery", keywords: ["programme", "project management", "pmo", "agile", "delivery", "gateway review"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
+      { label: "Organisational Transformation", keywords: ["transformation", "operating model", "restructuring", "shared services", "change management", "organisational"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Succession planning","Target operating model","Benchmarking","OD consulting","Arm's-length body reform"] },
+      { label: "Policy Development", keywords: ["policy", "regulatory", "strategy", "white paper", "green paper", "ministerial"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
+      { label: "Commercial & Procurement Advisory", keywords: ["commercial", "procurement advisory", "category management", "sourcing", "contract management"], subcategories: ["Category management","Strategic sourcing","Market engagement","Spend analysis","Commercial strategy","Contract management","Supplier development","Procurement transformation","Crown Commercial","Cabinet Office compliance","Make vs buy","Commercial assurance"] },
+      { label: "Financial & Economic Advisory", keywords: ["financial advisory", "business case", "green book", "spending review", "economic appraisal"], subcategories: ["Business case development","Green Book","Infrastructure financing","Spending review support","Economic appraisal","Value-for-money assessment","Financial modelling","ROAMEF","Cost modelling","Public accounts support","Fiscal analysis","CDEL/RDEL management"] },
     ]
   }
 ];
