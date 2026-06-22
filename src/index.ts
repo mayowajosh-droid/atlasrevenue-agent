@@ -7537,18 +7537,18 @@ ${chaseNowHtml}
   </div>
 </section>
 <section class="subscribe" id="subscribe">
-  <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;text-align:left">
+  <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start">
+    ${sampleCtaBlock("full")}
     <div>
       <div class="eyebrow">Join the briefing</div>
-      <h2 style="text-align:left">Intelligence before the tender.</h2>
-      <p style="text-align:left">One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
-      <form class="subform" id="briefing-form" style="justify-content:flex-start">
+      <h2>Intelligence before the tender.</h2>
+      <p>One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
+      <form class="subform" id="briefing-form">
         <input type="email" id="briefing-email" placeholder="you@firm.co.uk" aria-label="Email address" required>
         <button type="submit">Reserve</button>
       </form>
-      <div class="subnote" id="briefing-note" style="text-align:left">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
+      <div class="subnote" id="briefing-note">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
     </div>
-    ${sampleCtaBlock("full")}
     <script>
     document.getElementById(‘briefing-form’).addEventListener(‘submit’,function(e){
       e.preventDefault();
@@ -12160,7 +12160,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     <div class="dp-pulse-inner">
       <div class="dp-pulse-stat">
         <span class="dp-pulse-val">${escapeHtml(fmtBig(totalAwarded))}+</span>
-        <span class="dp-pulse-label">Market size (12m)</span>
+        <span class="dp-pulse-label">Market size (12 months)</span>
       </div>
       <div class="dp-pulse-stat">
         <span class="dp-pulse-val">${openNoticeCount}</span>
@@ -13219,23 +13219,23 @@ footer.hp-foot a:hover{color:#ECE6D6}
 footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1);margin-top:28px;padding-top:20px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:#6B6F65;flex-wrap:wrap;gap:10px}
 @media(max-width:880px){footer.hp-foot .wrap{grid-template-columns:1fr 1fr}.wrap{padding:0 24px}}
 @media(max-width:480px){.wrap{padding:0 14px}footer.hp-foot .wrap{grid-template-columns:1fr}}
-/* ── sample report CTA component (dark island on light page) ── */
-.scta{max-width:680px;margin:0 auto;background:#0B1018;border:1px solid #1E2A3A;position:relative;overflow:hidden}
-.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#A0522D,#22C55E,#A0522D)}
+/* ── sample report CTA component ── */
+.scta{max-width:680px;margin:0 auto;background:#0E2318;border:1px solid rgba(34,197,94,.12);position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
 .scta-inner{padding:32px 36px}
-.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#A0522D;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
-.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#E9EEF5;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
-.scta-p{font-size:13px;color:#B0BAC8;line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#ECE6D6;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:#9AA093;line-height:1.6;margin-bottom:20px;max-width:48em}
 .scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
-.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8893A4;padding:5px 0}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#9AA093;padding:5px 0}
 .scta-item::before{content:'\\2713';color:#22C55E;font-weight:700;font-size:12px}
 .scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.scta-btn{display:inline-flex;align-items:center;gap:8px;background:#A0522D;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
-.scta-btn:hover{background:#B8673A}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:opacity .15s}
+.scta-btn:hover{opacity:.88}
 .scta-btn::after{content:'\\2192';font-size:14px}
-.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#566273}
-.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#111A26;border-top:1px solid #1E2A3A;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#566273}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B6F65}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#0A1C12;border-top:1px solid rgba(34,197,94,.12);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#6B6F65}
 .scta--compact{max-width:none}
 .scta--compact .scta-inner{padding:24px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
 .scta--compact .scta-left{flex:1;min-width:200px}
@@ -13387,28 +13387,26 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
   desksPageToday.setHours(0, 0, 0, 0);
   const desksPage12mAgo = new Date(desksPageToday);
   desksPage12mAgo.setFullYear(desksPage12mAgo.getFullYear() - 1);
-  const DESK_OUTLIER_CAP = 2_000_000_000;
 
   const stats: DS[] = entries.map(({ profile, cached }) => {
     if (!cached) return { profile, openCount: 0, awardedCount: 0, totalValue: 0, uniqueBuyers: 0, topCats: [], cachedAt: null };
-    const openRaw = cached.data.contractsFinder.open ?? [];
+    const openRaw = dedupeNoticesSoft(
+      (cached.data.contractsFinder.open ?? []).concat(cached.data.findTender?.notices ?? [])
+    );
     const awardedRaw = cached.data.contractsFinder.awarded ?? [];
-    // open_now: must have deadline >= today
     const open = openRaw.filter(n => !n.deadlineDate || new Date(n.deadlineDate) >= desksPageToday);
-    // value_awarded_12m: last 12 months only, excl >£2bn outliers
     const awarded = awardedRaw.filter(n => {
       const d = n.awardedDate || n.publishedDate;
       return d && new Date(d) >= desksPage12mAgo;
     });
-    // buyer tracking uses all notices (all time)
-    const all = [...openRaw, ...awardedRaw];
-    const totalValue = awarded.reduce((s, n) => {
-      const v = n.awardedValue ?? 0;
-      return s + (v > 0 && v <= DESK_OUTLIER_CAP ? v : 0);
-    }, 0);
-    const uniqueBuyers = new Set(all.map(n => n.buyer).filter((b): b is string => !!b)).size;
-    const topCats = inferDeskCategories(awarded, profile.categories).filter(c => c.count > 0).sort((a, b) => b.value - a.value).slice(0, 3);
-    return { profile, openCount: open.length, awardedCount: awarded.length, totalValue, uniqueBuyers, topCats, cachedAt: cached.cached_at };
+    const outlierThreshold = computeOutlierThreshold(awarded.map(n => n.awardedValue ?? 0));
+    const validAwarded = awarded.filter(n => (n.awardedValue ?? 0) <= outlierThreshold);
+    const totalValue = validAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+    const uniqueBuyers = new Set(
+      [...open, ...validAwarded].map(n => n.buyer).filter((b): b is string => !!b && b !== "Not stated")
+    ).size;
+    const topCats = inferDeskCategories(validAwarded, profile.categories).filter(c => c.count > 0).sort((a, b) => b.value - a.value).slice(0, 3);
+    return { profile, openCount: open.length, awardedCount: validAwarded.length, totalValue, uniqueBuyers, topCats, cachedAt: cached.cached_at };
   });
   const sorted = [...stats].sort((a, b) => b.totalValue - a.totalValue);
   const grandTotal = stats.reduce((s, d) => s + d.totalValue, 0);
@@ -13445,7 +13443,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
         : "";
     const statsGrid = `
       <div class="dl-stats">
-        <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue)+"+" : "—"}</div><div class="dl-stat-lbl">Awarded Value</div></div>
+        <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue)+"+" : "—"}</div><div class="dl-stat-lbl">Awarded (12 months)</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.openCount > 0 ? d.openCount : "—"}</div><div class="dl-stat-lbl">Open Now</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.awardedCount > 0 ? d.awardedCount : "—"}</div><div class="dl-stat-lbl">Awarded</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.uniqueBuyers > 0 ? d.uniqueBuyers : "—"}</div><div class="dl-stat-lbl">Buyers</div></div>
@@ -13580,9 +13578,9 @@ ${pageShellHeader(null, authCtx)}
     <h1>UK Public-Sector<br>Contract Intelligence</h1>
     <p class="dl-hero-sub">Live procurement data across ${liveCount} active desks. Sourced from Contracts Finder and Find a Tender. Updated continuously.</p>
     <div class="dl-agg">
-      <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal)+"+" : "—"}</div><div class="dl-agg-lbl">Total Contract Value</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal)+"+" : "—"}</div><div class="dl-agg-lbl">Awarded Value (12 months)</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalOpen > 0 ? totalOpen.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Open Now</div></div>
-      <div class="dl-agg-stat"><div class="dl-agg-val">${totalAwarded > 0 ? totalAwarded.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Awarded</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${totalAwarded > 0 ? totalAwarded.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Awarded (12 months)</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalBuyers > 0 ? totalBuyers.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Buyers Tracked</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${liveCount}<span style="font-size:18px;opacity:.5">/${DESK_PROFILES.filter(d => d.live).length}</span></div><div class="dl-agg-lbl">Desks Live</div></div>
     </div>
@@ -13622,11 +13620,18 @@ function noticesPage(
       .filter(n => !isAggregatorBuyer(n.buyer || "") && !isOverseasNotice(n.title, n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
   ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
+  const cutoff12m = Date.now() - 365 * 24 * 3_600_000;
   const allAwarded = (data?.contractsFinder.awarded || [])
+    .filter(n => {
+      const d = n.awardedDate ? new Date(n.awardedDate).getTime() : (n.publishedDate ? new Date(n.publishedDate).getTime() : 0);
+      return d >= cutoff12m;
+    })
     .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
 
-  const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
-  const uniqueBuyers = new Set([...allOpen, ...allAwarded].map(n => n.buyer).filter(Boolean)).size;
+  const noticesOutlierThreshold = computeOutlierThreshold(allAwarded.map(n => n.awardedValue ?? 0));
+  const validAwardedNotices = allAwarded.filter(n => (n.awardedValue ?? 0) <= noticesOutlierThreshold);
+  const totalValue = validAwardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+  const uniqueBuyers = new Set([...allOpen, ...validAwardedNotices].map(n => n.buyer).filter((b): b is string => !!b && b !== "Not stated")).size;
 
   const boardOppContext: DeskOpportunityContext = {
     type: "desk",
@@ -13733,7 +13738,7 @@ ${pageShellHeader(profile, authCtx)}
     </div>
     <div class="ob-stat">
       <div class="ob-stat-num" style="color:#93C5FD">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue))+"+" : "—"}</div>
-      <div class="ob-stat-label">Awarded Value</div>
+      <div class="ob-stat-label">Awarded Value (12 months)</div>
     </div>
     <div class="ob-stat">
       <div class="ob-stat-num" style="color:#C5C9BC">${isCompiling ? "—" : String(uniqueBuyers)}</div>
@@ -13877,7 +13882,12 @@ function buyersPage(
   const isCompiling = cached === null;
 
   const allOpen  = dedupeNoticesSoft((data?.contractsFinder.open || []).concat(data?.findTender?.notices || []));
-  const allAwarded = data?.contractsFinder.awarded || [];
+  const buyerCutoff12m = Date.now() - 365 * 24 * 3_600_000;
+  const allAwarded = (data?.contractsFinder.awarded || []).filter(n => {
+    const d = n.awardedDate ? new Date(n.awardedDate).getTime() : (n.publishedDate ? new Date(n.publishedDate).getTime() : 0);
+    return d >= buyerCutoff12m;
+  });
+  const buyerOutlierThreshold = computeOutlierThreshold(allAwarded.map(n => n.awardedValue ?? 0));
   const allNotices = [...allAwarded, ...allOpen];
 
   type BuyerEntry = {
@@ -13897,11 +13907,14 @@ function buyersPage(
       buyerMap.set(n.buyer, e);
     }
     const isAwarded = n.status === "awarded" || allAwarded.includes(n as any);
-    if (isAwarded) { e.awardedCount++; e.totalSpend += n.awardedValue ?? 0; }
+    if (isAwarded) {
+      e.awardedCount++;
+      const v = n.awardedValue ?? 0;
+      if (v <= buyerOutlierThreshold) e.totalSpend += v;
+    }
     else e.openCount++;
     const d = new Date(n.publishedDate || n.awardedDate || "").getTime();
     if (!isNaN(d) && d > e.latestDate) e.latestDate = d;
-    // Map to desk categories
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
     for (const cat of profile.categories) {
       if (cat.keywords.some(kw => text.includes(kw))) {
@@ -14007,7 +14020,7 @@ ${pageShellHeader(profile, authCtx)}
       </div>
       <div class="pg-stat">
         <span class="pg-stat-val">${isCompiling ? "—" : totalSpend > 0 ? fmtMoney(totalSpend)+"+" : "—"}</span>
-        <span class="pg-stat-label">Total awarded spend</span>
+        <span class="pg-stat-label">Awarded spend (12 months)</span>
       </div>
       <div class="pg-stat">
         <span class="pg-stat-val">${isCompiling ? "—" : String(totalOpen)}</span>
