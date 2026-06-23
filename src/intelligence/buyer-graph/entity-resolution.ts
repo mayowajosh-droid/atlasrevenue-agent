@@ -4,20 +4,37 @@ import { upsertBuyerEntity, getBuyerEntity, upsertProcurementHistory, insertBuye
 import { fetchOfficers, fetchPscs, fetchCompanyProfile } from "./companies-house-officers.js";
 import { companiesHouseSearch } from "../../fetchers/companies-house.js";
 
-const GOV_PATTERNS: [RegExp, BuyerEntity["buyer_type"]][] = [
-  [/\b(council|borough|district|county|city of|unitary)\b/i, "local_authority"],
-  [/\b(nhs|health|hospital|clinical commissioning|icb|trust)\b/i, "nhs"],
-  [/\b(department|ministry|cabinet|hm |hmrc|mod |home office|dwp)\b/i, "central_gov"],
-  [/\b(housing association|registered provider|homes|habitat)\b/i, "housing"],
-  [/\b(university|college|school|academy|education|ofsted)\b/i, "education"],
-  [/\b(police|fire|ambulance|constabulary)\b/i, "police_fire"],
+const BUYER_PATTERNS: [RegExp, BuyerEntity["buyer_type"]][] = [
+  // Public sector — checked first
+  [/\b(council|borough|district|county|city of|unitary|parish|town council|combined authority)\b/i, "local_authority"],
+  [/\b(nhs|clinical commissioning|icb|integrated care)\b/i, "nhs"],
+  [/\b(hospital|foundation trust|mental health trust|community trust|ambulance trust)\b/i, "nhs"],
+  [/\b(department for|department of|ministry of|cabinet office|hm treasury|hmrc|home office|dwp|dvla|dvsa|dfe|dhsc|moj|mod |defra|fcdo|beis|hmcts)\b/i, "central_gov"],
+  [/\b(housing association|registered provider|almshouse|almshouses)\b/i, "housing"],
+  [/\b(university|college|school|academy trust|multi.academy|education authority|ofsted|sixth form)\b/i, "education"],
+  [/\b(police|constabulary|fire and rescue|fire service|ambulance service)\b/i, "police_fire"],
+  // Private sector by industry
+  [/\b(construction|build|civil engineering|contractor|scaffolding|demolition|groundwork|housebuilder|developer)\b/i, "construction"],
+  [/\b(digital|software|technology|tech|cyber|cloud|it services|data|ai |artificial intelligence|saas|systems integration)\b/i, "digital"],
+  [/\b(facilities management|fm |property services|estates|cleaning services|maintenance services|fm services)\b/i, "facilities"],
+  [/\b(transport|logistics|haulage|courier|fleet|rail|aviation|freight)\b/i, "transport"],
+  [/\b(recruitment|staffing|resourcing|talent|workforce solutions|employment agency|hr solutions)\b/i, "recruitment"],
+  [/\b(solicitors|law firm|legal services|barristers|chambers|lawyers|llp)\b/i, "legal"],
+  [/\b(accountants|audit|accounting|financial advisory|chartered accountants|tax advisory|actuarial)\b/i, "finance"],
+  [/\b(energy|utilities|renewables|solar|wind|gas|electricity|net zero|decarbonisation)\b/i, "energy"],
+  [/\b(security services|guarding|cctv|surveillance|access control|security solutions)\b/i, "security"],
+  [/\b(catering|food services|hospitality|vending|restaurant group)\b/i, "catering"],
+  [/\b(waste management|recycling|environmental services|waste collection)\b/i, "waste"],
+  [/\b(healthcare|medical|clinical|pharmacy|dental|optometry|care home|domiciliary)\b/i, "health"],
+  [/\b(social care|care services|support services|community interest|cic)\b/i, "social_care"],
+  [/\b(consulting|consultancy|advisory|management consultants|strategy)\b/i, "consulting"],
 ];
 
 function classifyBuyerType(name: string): BuyerEntity["buyer_type"] {
-  for (const [pattern, type] of GOV_PATTERNS) {
+  for (const [pattern, type] of BUYER_PATTERNS) {
     if (pattern.test(name)) return type;
   }
-  return "unknown";
+  return "company";
 }
 
 function normaliseBuyerName(name: string): string {
@@ -57,7 +74,8 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
   let address: string | null = null;
   let sicCodes: string[] = [];
 
-  if (buyerType === "company" || buyerType === "unknown") {
+  const PUBLIC_SECTOR_TYPES = new Set(["local_authority", "nhs", "central_gov", "police_fire"]);
+  if (!PUBLIC_SECTOR_TYPES.has(buyerType)) {
     const chResult = await companiesHouseSearch(buyerName);
     const match = chResult.matches.find(m =>
       normaliseBuyerName(m.companyName) === normalised ||

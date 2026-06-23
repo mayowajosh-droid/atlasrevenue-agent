@@ -16085,7 +16085,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
         <thead><tr><th>Organisation</th><th>Type</th><th>Total Contracts</th><th>Total Value</th><th>Last Seen</th></tr></thead>
         <tbody>${buyerList.map((b: any) => `<tr>
           <td style="font-weight:500;max-width:220px">${escapeHtml((b.name||"").slice(0,50))}</td>
-          <td><span class="pill" style="font-size:9px;text-transform:capitalize">${escapeHtml((b.buyer_type||"unknown").replace(/_/g," "))}</span></td>
+          <td>${(() => { const t = b.buyer_type||"unknown"; const pubTypes = new Set(["local_authority","nhs","central_gov","housing","education","police_fire"]); const colour = pubTypes.has(t) ? "" : "background:var(--brand-dim);color:var(--brand);border-color:var(--brand-border)"; return `<span class="pill" style="font-size:9px;text-transform:capitalize;${colour}">${escapeHtml(t.replace(/_/g," "))}</span>`; })()}</td>
           <td style="font-family:var(--mono);font-size:12px;text-align:center">${Number(b.total_awards||0).toLocaleString()}</td>
           <td style="font-family:var(--mono);font-size:12px">£${Number(b.total_award_value||0).toLocaleString()}</td>
           <td style="white-space:nowrap;font-family:var(--mono);font-size:11px">${b.last_seen ? String(b.last_seen).slice(0,10) : "—"}</td>

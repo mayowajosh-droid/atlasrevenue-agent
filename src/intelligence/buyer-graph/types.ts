@@ -8,7 +8,7 @@ export type BuyerEntity = {
   address: string | null;
   sic_codes: string[];
   website: string | null;
-  buyer_type: "local_authority" | "nhs" | "central_gov" | "housing" | "education" | "police_fire" | "company" | "unknown";
+  buyer_type: "local_authority" | "nhs" | "central_gov" | "housing" | "education" | "police_fire" | "construction" | "digital" | "facilities" | "transport" | "recruitment" | "legal" | "finance" | "energy" | "security" | "catering" | "waste" | "health" | "social_care" | "consulting" | "company" | "unknown";
   total_awards: number;
   total_award_value: number;
   first_seen: string;
