@@ -7633,9 +7633,9 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="hero-grad"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Market Intelligence Platform &middot; Public &amp; Private Sector</div>
-      <h1>The raw data is public.<br><em>The advantage is in the assembly.</em></h1>
-      <p class="lede">AtlasRevenue combines named decision-makers, verified contacts, pre-tender demand signals, and geographic opportunity mapping into a single intelligence layer &mdash; so your firm sees not just who is buying, but where demand is concentrating and where to expand next.</p>
+      <div class="eyebrow">Opportunity Radar &middot; Geographic Market Intelligence</div>
+      <h1>See where the demand is<br>before it <em>becomes a tender.</em></h1>
+      <p class="lede">We map named buyers, verified spend, and geographic opportunity signals across public and private markets so you know not just who to sell to, but exactly where to expand next.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="/scan">Run an intelligence scan</a>
         ${sampleLink}
