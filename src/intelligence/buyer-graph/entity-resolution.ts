@@ -63,7 +63,8 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
 
   const normalised = normaliseBuyerName(buyerName);
   const existing = await getBuyerEntity(normalised);
-  if (existing) return existing;
+  // Skip re-processing unless the type is still unresolved
+  if (existing && existing.buyer_type !== "unknown" && existing.buyer_type !== "company") return existing;
 
   const buyerType = classifyBuyerType(buyerName);
   const website = inferDomain(buyerName, buyerType);
