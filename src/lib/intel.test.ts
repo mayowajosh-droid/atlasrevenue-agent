@@ -79,7 +79,7 @@ describe("computeOutlierThreshold", () => {
   });
 });
 
-const SAMPLE_EDP = `# GovRevenue Scan: Acme Ltd
+const SAMPLE_EDP = `# AtlasRevenue Scan: Acme Ltd
 
 ## 1. Executive Decision Panel
 

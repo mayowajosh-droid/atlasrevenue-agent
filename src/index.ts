@@ -5394,7 +5394,7 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
     <div class="art-header-left">
       <a href="/" class="art-logo">
         <span class="art-logo-dot"></span>
-        <span class="art-logo-text">Gov<span>Revenue</span></span>
+        <span class="art-logo-text">Atlas<span>Revenue</span></span>
       </a>
       <nav class="art-header-nav">
         <a href="/desks">Desks</a>
@@ -5550,7 +5550,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
 <footer class="hp-foot">
   <div class="hp-wrap">
     <div class="fp-brand">
-      <div class="fp-logo"><span class="fp-logo-dot"></span><span class="fp-logo-text">Gov<span>Revenue</span></span></div>
+      <div class="fp-logo"><span class="fp-logo-dot"></span><span class="fp-logo-text">Atlas<span>Revenue</span></span></div>
       <p class="bl">Daily procurement intelligence for UK suppliers. We track Contracts Finder and Find a Tender so you can spend time winning, not searching.</p>
     </div>
     <div class="fp-cols">
@@ -5836,7 +5836,7 @@ ${featuredHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -6043,7 +6043,7 @@ ${adminArticleCss()}
     <div class="sb-brand">
       <div class="sb-logo-row">
         <span class="sb-dot"></span>
-        <span class="sb-logo">Gov<b>Revenue</b></span>
+        <span class="sb-logo">Atlas<b>Revenue</b></span>
         <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
       </div>
       <div class="sb-tag">Admin Panel</div>
@@ -6168,7 +6168,7 @@ ${adminArticleCss()}
     <div class="sb-brand">
       <div class="sb-logo-row">
         <span class="sb-dot"></span>
-        <span class="sb-logo">Gov<b>Revenue</b></span>
+        <span class="sb-logo">Atlas<b>Revenue</b></span>
         <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
       </div>
       <div class="sb-tag">Admin Panel</div>
@@ -6358,7 +6358,7 @@ ${adminArticleCss()}
     <div class="sb-brand">
       <div class="sb-logo-row">
         <span class="sb-dot"></span>
-        <span class="sb-logo">Gov<b>Revenue</b></span>
+        <span class="sb-logo">Atlas<b>Revenue</b></span>
         <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
       </div>
       <div class="sb-tag">Admin Panel</div>
@@ -7052,7 +7052,7 @@ function reportPage(scan: ScanRecord) {
 <body>
   <main class="page">
     <div class="topbar">
-      <a href="/" class="brand"><span class="brand-dot"></span>Gov<b>Revenue</b></a>
+      <a href="/" class="brand"><span class="brand-dot"></span>Atlas<b>Revenue</b></a>
       <div class="actions">
         <a class="btn" href="/api/scans/${scan.id}/report.pdf">Download PDF</a>
         <button type="button" class="btn secondary" onclick="window.print()">Browser Print</button>
@@ -7763,7 +7763,7 @@ ${chaseNowHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -8229,7 +8229,7 @@ app.get("/register", (req, res) => {
   const nextParam = next ? `?next=${encodeURIComponent(next)}` : "";
   res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create account — AtlasRevenue</title><style>${authCss}</style></head>
 <body>
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/login${nextParam}">Sign in</a></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/login${nextParam}">Sign in</a></nav>
 <div class="auth-wrap"><div class="auth-card">
 <div class="auth-card-label">New account</div>
 <h1>Create your account</h1>
@@ -8269,7 +8269,7 @@ app.get("/login", (req, res) => {
   const next = req.query.next ? encodeURIComponent(String(req.query.next)) : "";
   res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in — AtlasRevenue</title><style>${authCss}</style></head>
 <body>
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/register">Create account</a></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/register">Create account</a></nav>
 <div class="auth-wrap"><div class="auth-card">
 <div class="auth-card-label">Sign in</div>
 <h1>Welcome back</h1>
@@ -8323,7 +8323,7 @@ app.get("/account/setup", asyncRoute(async (req, res) => {
   }
   res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set your password — AtlasRevenue</title><style>${authCss}</style></head>
 <body><div class="auth-wrap"><div class="auth-box">
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div></nav>
 <h1 class="auth-title">Set your password</h1>
 <p class="auth-sub">Welcome to AtlasRevenue. Set a password for <strong>${escapeHtml(user.email)}</strong> to access your account.</p>
 ${err ? `<div class="auth-err">${err}</div>` : ""}
@@ -8689,7 +8689,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   <div class="gh-inner">
     <div class="gh-top">
       <div class="gh-brand">
-        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
       <div class="dash-auth-row">
@@ -9120,7 +9120,7 @@ body{display:block;background:var(--cream)}
 @media print{.cs-topbar,.cs-actions{display:none}.cs-card{border:none;padding:0}}
 </style>
 </head><body>
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
 <div class="cs-wrap">
 <div class="cs-topbar">
   <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Capability Statement</div></div>
@@ -9222,7 +9222,7 @@ body{display:block;background:var(--cream)}
 .note{background:var(--cream);border:1px solid var(--line);border-radius:6px;padding:14px 16px;font-size:13px;color:#6f5b50;margin-bottom:24px}
 </style>
 </head><body>
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
 <div class="oe-wrap">
 <div class="oe-topbar">
   <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Buyer Outreach Emails</div></div>
@@ -9311,7 +9311,7 @@ body{display:block;background:var(--cream)}
 .note{background:#fef9ec;border:1px solid #e8d18a;border-radius:6px;padding:14px 16px;font-size:13px;color:#7a5c00;margin-bottom:24px}
 </style>
 </head><body>
-<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
 <div class="fw-wrap">
 <div class="fw-topbar">
   <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Framework Pre-Qualification</div></div>
@@ -9788,7 +9788,7 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 </head>
 <body>
 <header>
-  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
+  <a href="/" class="logo"><span class="logo-dot"></span><span>Atlas<b>Revenue</b></span></a>
   <a href="/pricing" class="back">&larr; Plans</a>
 </header>
 <div class="page">
@@ -10184,7 +10184,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
   <span>Public record &middot; updated continuously</span>
 </div>
 <header><div class="mast">
-  <a class="logo" href="/"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a class="logo" href="/"><span class="logo-dot"></span>Atlas<b>Revenue</b></a>
   <a class="back" href="/">&#8592; Back to home</a>
 </div></header>
 <main class="page">
@@ -13729,7 +13729,7 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
     <div class="gh-top">
       <div class="gh-brand">
         <div class="gh-dot"></div>
-        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
+        <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
       </div>
       <nav class="gh-main-nav">
         <a href="/desks">Desks</a>
@@ -13750,7 +13750,7 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
 function pageShellFoot(): string {
   return `<footer class="pg-foot">
   <div class="pg-foot-inner">
-    <a href="/" style="font-family:var(--serif);font-size:17px;color:#ECE6D6;letter-spacing:0">Gov<span style="color:var(--brand)">Revenue</span></a>
+    <a href="/" style="font-family:var(--serif);font-size:17px;color:#ECE6D6;letter-spacing:0">Atlas<span style="color:var(--brand)">Revenue</span></a>
     <span>PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY</span>
     <a href="/scan" style="color:var(--brand)">Run a scan &rarr;</a>
   </div>
@@ -14581,7 +14581,7 @@ ${prior ? "" : ".no-prior{background:var(--surface);border:1px solid var(--borde
 </head>
 <body>
 <div class="page">
-  <div class="top-brand"><div class="top-brand-dot"></div><a href="/" class="top-brand-name">Gov<b>Revenue</b></a></div>
+  <div class="top-brand"><div class="top-brand-dot"></div><a href="/" class="top-brand-name">Atlas<b>Revenue</b></a></div>
   <div class="brand-label">Scan comparison</div>
   <h1>${escapeHtml(current.company_name)}</h1>
   <div class="sub">Latest: ${escapeHtml(formatDate(current.created_at))}${prior ? ` &nbsp;&middot;&nbsp; Previous: ${escapeHtml(formatDate(prior.created_at))}` : ""}</div>
@@ -15325,7 +15325,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
   <div class="sb-brand">
     <div class="sb-logo-row">
       <div class="sb-dot"></div>
-      <div class="sb-logo">Gov<span>Revenue</span></div>
+      <div class="sb-logo">Atlas<span>Revenue</span></div>
       <button onclick="closeSidebar()" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1;display:none" id="sb-close" aria-label="Close menu">✕</button>
     </div>
     <div class="sb-tag">Command Centre</div>
