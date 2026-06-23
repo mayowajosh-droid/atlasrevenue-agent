@@ -71,7 +71,7 @@ export async function notifyScanCompleted(input: ScanEmailInput) {
 
   await sendEmail({
     to: adminEmail,
-    subject: `GovRevenue scan completed: ${input.companyName}`,
+    subject: `AtlasRevenue scan completed: ${input.companyName}`,
     text: [
       `Scan completed for ${input.companyName}.`,
       `Scan ID: ${input.scanId}`,
@@ -84,9 +84,9 @@ export async function notifyScanCompleted(input: ScanEmailInput) {
   if (input.clientEmail) {
     await sendEmail({
       to: input.clientEmail,
-      subject: `Your GovRevenue scan is ready`,
+      subject: `Your AtlasRevenue scan is ready`,
       text: [
-        `Your GovRevenue scan for ${input.companyName} is ready.`,
+        `Your AtlasRevenue scan for ${input.companyName} is ready.`,
         "",
         `Report: ${reportUrl}`,
         `PDF: ${pdfUrl}`,
@@ -102,7 +102,7 @@ export async function notifyScanFailed(input: ScanEmailInput) {
 
   await sendEmail({
     to: env("ADMIN_EMAIL"),
-    subject: `GovRevenue scan failed: ${input.companyName}`,
+    subject: `AtlasRevenue scan failed: ${input.companyName}`,
     text: [
       `Scan failed for ${input.companyName}.`,
       `Scan ID: ${input.scanId}`,
@@ -152,7 +152,7 @@ export async function sendBriefingEmail(input: {
 
   await sendEmail({
     to: input.email,
-    subject: `GovRevenue weekly briefing — ${input.signals.length} open opportunities`,
+    subject: `AtlasRevenue weekly briefing — ${input.signals.length} open opportunities`,
     text: [
       `Weekly government procurement briefing`,
       ``,
@@ -171,9 +171,9 @@ export async function sendWelcomeEmail(email: string, plan: string, setupUrl: st
   const planLabel = plan === "payg" ? "Pay as you go" : plan === "agency" ? "Agency" : "Pro";
   await sendEmail({
     to: email,
-    subject: `You're in — set your GovRevenue password`,
+    subject: `You're in — set your AtlasRevenue password`,
     text: [
-      `Welcome to GovRevenue.`,
+      `Welcome to AtlasRevenue.`,
       ``,
       `Your ${planLabel} account has been created. Set your password to access your reports and account:`,
       ``,
@@ -181,7 +181,7 @@ export async function sendWelcomeEmail(email: string, plan: string, setupUrl: st
       ``,
       `This link expires in 7 days. If you have any questions, reply to this email.`,
       ``,
-      `— GovRevenue`
+      `— AtlasRevenue`
     ].join("\n")
   });
 }

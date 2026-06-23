@@ -1,9 +1,9 @@
 import {
-generateGovRevenueReport,
-  GovRevenueQualityGateError,
+generateAtlasRevenueReport,
+  AtlasRevenueQualityGateError,
   type CompanyIntake,
   type ProcurementRecord,
-} from "./lib/govrevenue/govrevenue-report-engine.js";
+} from "./lib/atlasrevenue/atlasrevenue-report-engine.js";
 import { EventEmitter } from "events";
 import "dotenv/config";
 import express from "express";
@@ -215,13 +215,13 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 // a frontier model writes materially better ones), falling back to OpenAI otherwise.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
-const JWT_SECRET = process.env.JWT_SECRET || "govrevenue-jwt-secret-change-in-prod";
+const JWT_SECRET = process.env.JWT_SECRET || "atlasrevenue-jwt-secret-change-in-prod";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || "";
 const STRIPE_AGENCY_PRICE_ID = process.env.STRIPE_AGENCY_PRICE_ID || "";
 const STRIPE_PAYG_PRICE_ID = process.env.STRIPE_PAYG_PRICE_ID || "";
-const BASE_URL = process.env.BASE_URL || "https://govrevenue-agent-production.up.railway.app";
+const BASE_URL = process.env.BASE_URL || "https://atlasrevenue-agent-production.up.railway.app";
 const REDIS_URL = process.env.REDIS_URL || null;
 const RUN_WEB = process.env.RUN_WEB !== "false";
 const RUN_WORKER = process.env.RUN_WORKER !== "false";
@@ -265,15 +265,15 @@ const redisConnection = REDIS_URL
   : null;
 
 const scanQueue = redisConnection
-  ? new Queue("govrevenue-scans", { connection: redisConnection as any })
+  ? new Queue("atlasrevenue-scans", { connection: redisConnection as any })
   : null;
 
 const alertQueue = redisConnection
-  ? new Queue("govrevenue-alerts", { connection: redisConnection as any })
+  ? new Queue("atlasrevenue-alerts", { connection: redisConnection as any })
   : null;
 
 const signalQueue = redisConnection
-  ? new Queue("govrevenue-signals", { connection: redisConnection as any })
+  ? new Queue("atlasrevenue-signals", { connection: redisConnection as any })
   : null;
 
 type AsyncRouteHandler = (
@@ -3563,7 +3563,7 @@ function evidenceDashboard(scan: ScanRecord) {
 
 function buildPrompt(input: z.infer<typeof intakeSchema>, data: ProcurementData) {
   return `
-You are GovRevenue Agent, a sharp UK public-sector revenue intelligence analyst.
+You are AtlasRevenue Agent, a sharp UK public-sector revenue intelligence analyst.
 
 This is a paid commercial scan. It must feel like a practical revenue map, not a generic AI report.
 
@@ -3603,7 +3603,7 @@ ZERO SELF-REFERENCE — hard constraint:
 Remove from your output any sentence that:
 - Names or references this scan, this report, this dashboard, or this analysis
 - Explains what the report is doing ("This section analyses...", "The following table shows...", "The goal of this report is...")
-- Describes how data was gathered ("We pulled X records from...", "The trust filter identified...", "GovRevenue indexed...")
+- Describes how data was gathered ("We pulled X records from...", "The trust filter identified...", "AtlasRevenue indexed...")
 Every word must be commercial intelligence directed at the client. Not process description.
 
 LOAD-BEARING NUMBERS — hard constraint:
@@ -3632,7 +3632,7 @@ Return clean Markdown only.
 
 Use this exact structure:
 
-# GovRevenue Scan: [Company Name]
+# AtlasRevenue Scan: [Company Name]
 
 ## 1. Executive Decision Panel
 Open with the OPENING THESIS paragraph, then give the decision panel with these exact fields:
@@ -3876,7 +3876,7 @@ async function callClaudeReport(prompt: string): Promise<string> {
     const message = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
       max_tokens: 8000,
-      system: "You are GovRevenue's senior UK public-sector procurement analyst. Follow the user's instructions exactly. Return only the finished report as clean GitHub-flavored Markdown — no preamble, no sign-off, no commentary outside the report itself.",
+      system: "You are AtlasRevenue's senior UK public-sector procurement analyst. Follow the user's instructions exactly. Return only the finished report as clean GitHub-flavored Markdown — no preamble, no sign-off, no commentary outside the report itself.",
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] as any
     }, { signal });
@@ -4025,7 +4025,7 @@ function startScanWorker() {
   }
 
   const worker = new Worker(
-    "govrevenue-scans",
+    "atlasrevenue-scans",
     async job => {
       const { id, input } = job.data || {};
       if (!id || !input) throw new Error("Invalid scan job payload.");
@@ -4135,7 +4135,7 @@ function startAlertWorker() {
   }
 
   const worker = new Worker(
-    "govrevenue-alerts",
+    "atlasrevenue-alerts",
     async job => {
       const { subscriptionId } = job.data || {};
       if (!subscriptionId) throw new Error("Invalid alert job payload.");
@@ -4230,7 +4230,7 @@ function startBriefingWorker() {
     return;
   }
 
-  const briefingQueue = new Queue("govrevenue-briefing", { connection: redisConnection as any });
+  const briefingQueue = new Queue("atlasrevenue-briefing", { connection: redisConnection as any });
   briefingQueue.add(
     "weekly-briefing",
     {},
@@ -4245,7 +4245,7 @@ function startBriefingWorker() {
   ).catch(err => console.error("[briefing] failed to schedule job", err));
 
   const worker = new Worker(
-    "govrevenue-briefing",
+    "atlasrevenue-briefing",
     async () => { await runBriefingAlerts(); },
     { connection: redisConnection as any, concurrency: 1 }
   );
@@ -4284,7 +4284,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Capital works, refurbishment and estates services across the public sector.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "construction project management estate management building refurbishment capital works planned maintenance",
       idealBuyers: "local authorities housing associations NHS trusts",
       mainGoal: "find construction and estate management contracts"
@@ -4306,7 +4306,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Hard and soft FM, mechanical and electrical maintenance, and managed services across the public estate.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "facilities management hard FM soft FM mechanical electrical maintenance managed services",
       idealBuyers: "local authorities NHS trusts central government",
       mainGoal: "find facilities management contracts"
@@ -4324,7 +4324,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Schools, further education, skills and training procurement across local authorities, academy trusts, DfE and colleges.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "education training apprenticeship skills workforce development school academy further education college adult learning NVQ CPD teaching employability coaching upskilling SEND special educational needs",
       idealBuyers: "local authorities academy trusts Department for Education further education colleges universities multi-academy trusts combined authorities",
       mainGoal: "find education training and skills contracts"
@@ -4343,7 +4343,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "passenger transport SEND transport home to school transport community transport taxi fleet management minibus accessible transport school transport bus services coach hire dial-a-ride",
       idealBuyers: "local authorities county councils transport authorities combined authorities metropolitan boroughs",
       mainGoal: "find passenger transport and SEND transport contracts"
@@ -4361,7 +4361,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Temporary and permanent staffing frameworks across the NHS, councils, and central government.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider locum nursing agency supply teachers social work staffing IT contractors",
       idealBuyers: "NHS trusts local authorities central government departments police forces fire services housing associations",
       mainGoal: "find recruitment and staffing contracts"
@@ -4381,7 +4381,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "framework agreement dynamic purchasing system DPS call-off multi-supplier Crown Commercial Service lot-based procurement multi-provider arrangement standing offer",
       idealBuyers: "Crown Commercial Service local authorities NHS trusts central government combined authorities police forces",
       mainGoal: "find framework agreements and DPS opportunities"
@@ -4401,7 +4401,7 @@ const DESK_PROFILES: DeskProfile[] = [
     standfirst: "NHS trusts, integrated care boards, community health, mental health, and public health commissioning across England.",
     live: true,
     pinnedProfile: intakeSchema.parse({
-      companyName: "GovRevenue Desk",
+      companyName: "AtlasRevenue Desk",
       mainServices: "NHS healthcare services integrated care clinical commissioning mental health community health public health primary care GP services",
       idealBuyers: "NHS trusts integrated care boards ICBs NHS England clinical commissioning groups public health teams",
       mainGoal: "find NHS and health commissioning contracts"
@@ -4415,7 +4415,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "digital", label: "Digital & IT", standfirst: "Cloud, software, cyber security, networks, and digital transformation across the NHS, councils, and central government.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "IT services software development cloud hosting cyber security network infrastructure managed IT services hardware procurement telecoms connectivity", idealBuyers: "NHS trusts local authorities central government HMRC DVLA", mainGoal: "find IT and digital procurement contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "IT services software development cloud hosting cyber security network infrastructure managed IT services hardware procurement telecoms connectivity", idealBuyers: "NHS trusts local authorities central government HMRC DVLA", mainGoal: "find IT and digital procurement contracts" }),
     categories: [
       { label: "Cloud & Hosting", keywords: ["cloud", "hosting", "g-cloud", "saas", "iaas", "paas", "azure", "aws"], subcategories: ["Cloud hosting","SaaS licensing","IaaS platforms","Azure / AWS","Disaster recovery","Managed cloud","Backup & storage","CDN services","Virtual desktop","Data centre colocation","Cloud migration","Hybrid cloud"] },
       { label: "Software & Licensing", keywords: ["software", "licence", "crm", "erp system", "mis system", "software platform", "case management system"], subcategories: ["ERP systems","CRM platforms","MIS systems","HR software","Finance systems","Document management","Case management","GIS systems","Asset management software","Email & productivity","Planning software","Workforce management"] },
@@ -4426,7 +4426,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "social-care", label: "Adult Social Care", standfirst: "Domiciliary care, residential placements, learning disability, reablement, and carer support commissioned by councils and ICBs.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "adult social care domiciliary care residential care learning disability reablement supported living carer support", idealBuyers: "local authorities councils integrated care boards NHS England", mainGoal: "find adult social care commissioning contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "adult social care domiciliary care residential care learning disability reablement supported living carer support", idealBuyers: "local authorities councils integrated care boards NHS England", mainGoal: "find adult social care commissioning contracts" }),
     categories: [
       { label: "Domiciliary & Home Care", keywords: ["domiciliary", "home care", "personal care", "home help", "care at home"], subcategories: ["Personal care","Domestic assistance","Medication support","Companionship","Night sits","Live-in care","Reablement support","Emergency home care","Direct payments support","Carers' assessments","Overnight care","Sensory impairment support"] },
       { label: "Residential & Nursing Care", keywords: ["residential care", "nursing home", "care home", "residential placement", "elderly care"], subcategories: ["Residential placements","Nursing placements","Dementia specialist","End-of-life care","Respite residential","EMI beds","Enhanced nursing","Intermediate residential","Frailty services","Specialist residential"] },
@@ -4437,7 +4437,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "childrens", label: "Children's Services", standfirst: "Early years, fostering, CAMHS, child protection, short breaks, and youth services commissioned by local authorities.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "children services early years fostering adoption CAMHS child protection youth services short breaks safeguarding", idealBuyers: "local authorities children's services departments family hubs NHS trusts", mainGoal: "find children's services commissioning contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "children services early years fostering adoption CAMHS child protection youth services short breaks safeguarding", idealBuyers: "local authorities children's services departments family hubs NHS trusts", mainGoal: "find children's services commissioning contracts" }),
     categories: [
       { label: "Early Years & Childcare", keywords: ["early years", "childcare", "nursery", "sure start", "family hub", "children centre"], subcategories: ["Childcare sufficiency","Nursery provision","Family hubs","Children's centres","Two-year-old funding","Early intervention","Parent support","Home learning","Speech therapy (EY)","Portage","Stay & play","Perinatal support"] },
       { label: "Fostering & Adoption", keywords: ["fostering", "adoption", "foster carer", "looked after children", "kinship", "permanence"], subcategories: ["Foster carer recruitment","Foster carer support","Adoption services","Kinship care","SGO support","Therapeutic support","Post-adoption support","Residential (LAC)","Semi-independent (LAC)","Reunification support","Independent fostering","Virtual school"] },
@@ -4448,7 +4448,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "waste", label: "Waste & Environment", standfirst: "Waste collection, recycling, street cleansing, grounds maintenance, and environmental monitoring for councils and public bodies.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "waste collection recycling street cleansing grounds maintenance environmental monitoring composting", idealBuyers: "local authorities district councils county councils waste authorities", mainGoal: "find waste management and environmental services contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "waste collection recycling street cleansing grounds maintenance environmental monitoring composting", idealBuyers: "local authorities district councils county councils waste authorities", mainGoal: "find waste management and environmental services contracts" }),
     categories: [
       { label: "Waste Collection & Logistics", keywords: ["waste collection", "refuse", "bin collection", "bulky waste", "clinical waste", "commercial waste"], subcategories: ["Domestic refuse","Recycling collection","Bulky waste","Clinical waste","Commercial waste","Food waste","Garden waste","Hazardous waste","Specialist collection","Skip hire","Fly-tip removal","Street litter bins"] },
       { label: "Recycling & Treatment", keywords: ["recycling", "treatment", "materials recovery", "mrf", "composting", "anaerobic digestion"], subcategories: ["Materials recovery facilities","Composting","Anaerobic digestion","Energy from waste","Glass processing","Metals recycling","Plastics processing","Electrical waste (WEEE)","Wood recycling","Textile reuse","Waste transfer stations","Sorting plants"] },
@@ -4458,7 +4458,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "energy", label: "Energy & Utilities", standfirst: "Energy procurement, decarbonisation, smart metering, EV charging, heat networks, and net zero strategy across the public estate.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "energy procurement decarbonisation solar heat pump retrofit smart metering EV charging net zero sustainability", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find energy and decarbonisation contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "energy procurement decarbonisation solar heat pump retrofit smart metering EV charging net zero sustainability", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find energy and decarbonisation contracts" }),
     categories: [
       { label: "Energy Procurement", keywords: ["energy", "gas supply", "electricity", "utilities", "fuel", "renewable"], subcategories: ["Electricity supply","Gas supply","Energy framework","Flexible purchasing","Renewable energy","Energy brokering","Half-hourly metering","Water supply","Telecoms contracts","Fuel supply","Energy data management","Utility management"] },
       { label: "Decarbonisation & Retrofit", keywords: ["decarbonisation", "retrofit", "solar", "heat pump", "insulation", "net zero", "low carbon", "carbon"], subcategories: ["Solar PV","Heat pumps","Insulation works","LED upgrades","Voltage optimisation","Battery storage","EPC improvements","PAS 2035 retrofit","Net zero strategy","Carbon offsetting","Biomass heating","Fabric first retrofit"] },
@@ -4469,7 +4469,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "security", label: "Security", standfirst: "Manned guarding, CCTV, access control, event security, and lone worker protection for public sector sites and estates.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "security guarding manned guarding CCTV access control event security lone worker key holding patrol", idealBuyers: "local authorities NHS trusts central government universities", mainGoal: "find security services contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "security guarding manned guarding CCTV access control event security lone worker key holding patrol", idealBuyers: "local authorities NHS trusts central government universities", mainGoal: "find security services contracts" }),
     categories: [
       { label: "Manned Guarding", keywords: ["manned guarding", "security guard", "static guard", "concierge security", "front of house"], subcategories: ["Static guarding","Mobile patrols","Concierge security","Front of house","Car park security","Site security","Night security","Customer service officers","Portering (security)","High-risk guarding","Gatehouse","Foot patrols"] },
       { label: "CCTV & Surveillance", keywords: ["cctv", "surveillance", "camera", "control room cctv", "video analytics", "monitoring"], subcategories: ["CCTV installation","Control room","Remote monitoring","Body-worn cameras","ANPR","Video analytics","Drone surveillance","Night vision","Town centre CCTV","Public space surveillance","PTZ cameras","Thermal imaging"] },
@@ -4480,7 +4480,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "catering", label: "Catering & Food", standfirst: "School meals, hospital catering, care home catering, prison catering, vending, and food equipment across the public sector.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "catering school meals hospital catering care home meals on wheels vending food services kitchen", idealBuyers: "local authorities NHS trusts schools academies prison service care homes", mainGoal: "find catering and food services contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "catering school meals hospital catering care home meals on wheels vending food services kitchen", idealBuyers: "local authorities NHS trusts schools academies prison service care homes", mainGoal: "find catering and food services contracts" }),
     categories: [
       { label: "School Meals & Education Catering", keywords: ["school meals", "school catering", "school kitchen", "breakfast club", "universal infant"], subcategories: ["Primary school meals","Secondary school meals","Universal infant free meals","Breakfast clubs","Kitchen management","Catering staff","Allergen management","Food education","Healthy school meals","Academy catering","School tuck shops","Packed lunch alternatives"] },
       { label: "Hospital & NHS Catering", keywords: ["hospital catering", "nhs catering", "patient meals", "ward food", "clinical nutrition"], subcategories: ["Patient meals","Ward trolley service","Cook-chill meals","Texture-modified meals","Clinical nutrition","Specialist diets","Cafe concessions","Staff restaurant","Vending (NHS)","Retail outlets (NHS)","Allergen control (NHS)","Bedside catering"] },
@@ -4491,7 +4491,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "legal", label: "Legal & Professional", standfirst: "Legal services, external audit, internal audit, HR advisory, and management consultancy for local authorities, NHS, and central government.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "legal services solicitor audit HR advisory procurement consultancy management consultancy compliance", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find legal and professional services contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "legal services solicitor audit HR advisory procurement consultancy management consultancy compliance", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find legal and professional services contracts" }),
     categories: [
       { label: "Legal Services", keywords: ["legal services", "solicitor", "barrister", "counsel", "litigation", "planning legal"], subcategories: ["Property and conveyancing","Planning and environment","Litigation","Employment law","Contract law","Information law (FOI/DPA)","Public law","Child law","Adult social care law","Procurement law","Regulatory","Debt recovery","GDPR legal","Equality law"] },
       { label: "Internal Audit & Risk", keywords: ["internal audit", "risk management", "counter fraud", "corporate governance", "assurance"], subcategories: ["Internal audit service","Counter fraud","Risk management","Corporate governance","Assurance mapping","Data quality audit","IT audit","Compliance monitoring","Anti-bribery compliance","Whistleblowing","Risk register","Internal controls"] },
@@ -4501,7 +4501,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "housing-support", label: "Housing & Homelessness", standfirst: "Homelessness prevention, rough sleeping, temporary accommodation, refuge, floating support, and housing development commissioned by councils.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "homelessness prevention rough sleeping temporary accommodation refuge floating support housing advice tenancy sustainment", idealBuyers: "local authorities district councils housing authorities combined authorities", mainGoal: "find housing support and homelessness contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "homelessness prevention rough sleeping temporary accommodation refuge floating support housing advice tenancy sustainment", idealBuyers: "local authorities district councils housing authorities combined authorities", mainGoal: "find housing support and homelessness contracts" }),
     categories: [
       { label: "Homelessness Prevention", keywords: ["homelessness prevention", "housing options", "housing advice", "eviction prevention", "tenancy sustainment"], subcategories: ["Housing advice","Tenancy sustainment","Eviction prevention","Rent deposit schemes","Mediation","Private sector access","Crisis intervention","Housing first","Rapid rehousing","Housing-related support","Private rented access","Prevention teams"] },
       { label: "Rough Sleeping & Outreach", keywords: ["rough sleeping", "street outreach", "no second night out", "winter pressures", "street homelessness"], subcategories: ["Street outreach","No Second Night Out","Winter shelter","Assessment hubs","Reconnection","Rough sleeper initiative","Assertive outreach","Harm reduction","Alcohol and drug support (RS)","Personalised budgets","Rough sleeper co-ordination","Satellite accommodation"] },
@@ -4512,7 +4512,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "finance", label: "Finance & Audit", standfirst: "External audit, insurance, treasury, payroll, debt recovery, and financial systems for local authorities, NHS bodies, and housing associations.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "external audit internal audit insurance treasury management payroll debt recovery financial systems", idealBuyers: "local authorities NHS trusts housing associations central government pension funds", mainGoal: "find finance and audit contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "external audit internal audit insurance treasury management payroll debt recovery financial systems", idealBuyers: "local authorities NHS trusts housing associations central government pension funds", mainGoal: "find finance and audit contracts" }),
     categories: [
       { label: "Insurance Services", keywords: ["insurance", "liability insurance", "property insurance", "public liability", "employer liability"], subcategories: ["Public liability","Employer liability","Property insurance","Fleet insurance","Professional indemnity","Cyber insurance","Engineering insurance","Directors and officers","Terrorism cover","Captive insurance","Personal accident","Travel insurance"] },
       { label: "Banking & Treasury", keywords: ["banking", "treasury", "cash management", "investment", "borrowing", "money market"], subcategories: ["Bank accounts","Cash management","Short-term investment","PWLB borrowing","Treasury management system","Money market funds","Pooled investments","Debt management","Financial forecasting","Banking framework","Deposit management","Currency hedging"] },
@@ -4523,7 +4523,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "comms", label: "Marketing & Comms", standfirst: "Public health campaigns, council communications, PR, print, digital marketing, and public engagement across the public sector.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "public health campaigns council communications PR media relations print design digital marketing engagement consultation", idealBuyers: "local authorities NHS trusts public health teams central government", mainGoal: "find communications and marketing contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "public health campaigns council communications PR media relations print design digital marketing engagement consultation", idealBuyers: "local authorities NHS trusts public health teams central government", mainGoal: "find communications and marketing contracts" }),
     categories: [
       { label: "Public Health Campaigns", keywords: ["campaign", "health promotion", "behaviour change", "awareness campaign", "health campaign"], subcategories: ["Smoking cessation campaigns","Drug and alcohol campaigns","Sexual health campaigns","Mental health awareness","Obesity prevention","COVID communications","Vaccination campaigns","NHS recruitment","Emergency communications","Suicide prevention messaging","Physical activity promotion","NHS 111 awareness"] },
       { label: "Council Communications", keywords: ["communications", "newsletter", "resident", "intranet", "corporate communications"], subcategories: ["Resident newsletters","Council website","Digital communications","Annual report","Budget consultation","Resident surveys","Neighbourhood comms","Ward briefings","Corporate publications","Intranet","Social media (council)","Corporate branding"] },
@@ -4534,7 +4534,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "leisure", label: "Leisure & Culture", standfirst: "Leisure centre management, libraries, arts, parks, sports development, and heritage for councils and public bodies.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "leisure management swimming pool sports centre library arts culture parks museums heritage sports development", idealBuyers: "local authorities district councils county councils leisure trusts", mainGoal: "find leisure and cultural services contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "leisure management swimming pool sports centre library arts culture parks museums heritage sports development", idealBuyers: "local authorities district councils county councils leisure trusts", mainGoal: "find leisure and cultural services contracts" }),
     categories: [
       { label: "Leisure Management", keywords: ["leisure management", "leisure centre", "swimming pool", "sports centre", "gym", "leisure trust"], subcategories: ["Leisure centre management","Swimming pools","Sports halls","Fitness suites","Outdoor athletics","Dual-use facilities","Community sports","Leisure trust transfer","Pricing and tariff","Health referral","Disability sport","Outdoor education"] },
       { label: "Library Services", keywords: ["library", "lending", "library service", "book purchasing", "reading", "information service"], subcategories: ["Library management","Mobile libraries","Book purchasing","Self-service kiosks","Library IT systems","Reading groups","Rhyme time","Digital inclusion","Home delivery","Archive services","Library buildings","Community library"] },
@@ -4545,7 +4545,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "planning", label: "Planning & Regeneration", standfirst: "Planning consultancy, urban regeneration, economic development, heritage, transport planning, and land strategy for councils and combined authorities.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "planning consultancy urban regeneration economic development masterplanning heritage transport planning land development", idealBuyers: "local authorities combined authorities planning authorities Homes England", mainGoal: "find planning and regeneration contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "planning consultancy urban regeneration economic development masterplanning heritage transport planning land development", idealBuyers: "local authorities combined authorities planning authorities Homes England", mainGoal: "find planning and regeneration contracts" }),
     categories: [
       { label: "Planning Consultancy", keywords: ["planning", "local plan", "development management", "planning application", "planning policy"], subcategories: ["Local plan support","Development management","Planning applications","Pre-application advice","Appeals","Planning policy","Infrastructure delivery","Community infrastructure levy","Neighbourhood planning","Planning enforcement","Viability assessments","EIA coordination"] },
       { label: "Urban Regeneration", keywords: ["regeneration", "town centre", "masterplan", "place making", "levelling up", "high street", "urban renewal"], subcategories: ["Town centre regeneration","Masterplanning","Place making","High street recovery","Levelling Up programmes","UKSPF delivery","Heritage-led regeneration","Housing-led regeneration","Industrial site reclamation","Compulsory purchase","Vacant buildings","Business improvement districts"] },
@@ -4556,7 +4556,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "justice", label: "Justice & Probation", standfirst: "Prison services, probation, community rehabilitation, electronic monitoring, court services, and youth justice commissioned by HMPPS and local authorities.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "probation prison rehabilitation community sentence electronic monitoring youth justice community safety", idealBuyers: "Ministry of Justice HMPPS probation service local authorities youth offending teams", mainGoal: "find justice and probation contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "probation prison rehabilitation community sentence electronic monitoring youth justice community safety", idealBuyers: "Ministry of Justice HMPPS probation service local authorities youth offending teams", mainGoal: "find justice and probation contracts" }),
     categories: [
       { label: "Prison & Custodial Services", keywords: ["prison", "custody", "hmps", "hmpps", "offender", "detainee", "secure unit"], subcategories: ["Prison management","Custodial services","Education (prison)","Healthcare (prison)","Catering (prison)","Rehabilitation programmes","Substance misuse (prison)","Mental health (prison)","Resettlement","Prison transport","Vocational training (prison)","Chaplaincy"] },
       { label: "Probation & Rehabilitation", keywords: ["probation", "rehabilitation", "community sentence", "offender management", "through the gate"], subcategories: ["Probation support","Community payback","Unpaid work","Resettlement support","Accommodation (CJS)","Through-the-gate","Employment (offenders)","Mentoring (offenders)","Peer support (CJS)","Domestic abuse perpetrators","Drug rehabilitation requirements","Alcohol treatment requirements"] },
@@ -4567,7 +4567,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "emergency", label: "Emergency Services", standfirst: "Police, fire and rescue, ambulance, control rooms, PPE, and emergency planning procurement for blue-light services and local resilience forums.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "police fire rescue ambulance emergency planning PPE control room command dispatch resilience", idealBuyers: "police forces fire and rescue services ambulance trusts Ministry of Justice Home Office", mainGoal: "find emergency services procurement contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "police fire rescue ambulance emergency planning PPE control room command dispatch resilience", idealBuyers: "police forces fire and rescue services ambulance trusts Ministry of Justice Home Office", mainGoal: "find emergency services procurement contracts" }),
     categories: [
       { label: "Police Procurement", keywords: ["police", "constabulary", "law enforcement", "custody suite", "detective", "police force"], subcategories: ["Police vehicles","Custody equipment","Forensics","Uniforms (police)","IT (police)","Body-worn cameras","Tasers","Communication systems","Firearms training","Interpreter services","Drones (police)","Surveillance equipment"] },
       { label: "Fire & Rescue", keywords: ["fire", "rescue", "fire service", "fire station", "fire appliance", "breathing apparatus"], subcategories: ["Fire appliances","Breathing apparatus","PPE (fire)","Fire station equipment","Training simulators","Aerial platforms","Water rescue","Hazmat","Drone (fire)","Control room (fire)","Rescue equipment","Thermal imaging (fire)"] },
@@ -4578,7 +4578,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "research", label: "Research & Evaluation", standfirst: "Social research, policy evaluation, public health research, data analytics, consultation, and market research for government and NHS bodies.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "social research policy evaluation public health research data analytics consultation market research epidemiology", idealBuyers: "central government NHS England local authorities research councils", mainGoal: "find research and evaluation contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "social research policy evaluation public health research data analytics consultation market research epidemiology", idealBuyers: "central government NHS England local authorities research councils", mainGoal: "find research and evaluation contracts" }),
     categories: [
       { label: "Social Research", keywords: ["social research", "qualitative research", "quantitative research", "research survey", "focus group", "depth interview"], subcategories: ["Qualitative research","Quantitative surveys","Longitudinal studies","Ethnographic research","Focus groups","Depth interviews","Research panels","Mystery shopping","Citizen surveys","Public attitude research","Co-design research","Rapid evidence review"] },
       { label: "Policy Evaluation", keywords: ["policy evaluation", "impact assessment", "programme evaluation", "theory of change", "evidence review"], subcategories: ["Summative evaluation","Formative evaluation","Process evaluation","Economic evaluation","Impact assessment","Theory of change","Logic model development","Evaluation framework","Realist evaluation","Contribution analysis","SROI","Rapid evidence review"] },
@@ -4589,7 +4589,7 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "consulting", label: "Central Gov Consulting", standfirst: "Management consulting, programme delivery, policy development, and commercial advisory for central government departments.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "management consulting strategy consulting programme delivery policy advisory operating model design organisational transformation commercial advisory spending review", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England", mainGoal: "find central government management consulting and advisory contracts" }),
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "management consulting strategy consulting programme delivery policy advisory operating model design organisational transformation commercial advisory spending review", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England", mainGoal: "find central government management consulting and advisory contracts" }),
     categories: [
       { label: "Digital Government & Strategy", keywords: ["digital government", "digitisation", "gds standards", "service redesign", "gov.uk", "digital leadership"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
       { label: "Programme & Project Delivery", keywords: ["programme management", "project management", "pmo", "gateway review", "programme delivery", "delivery assurance"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
@@ -4743,7 +4743,7 @@ function startSignalsWorker(): void {
       .catch(err => console.error("[signals] failed to queue startup run", err));
 
     const worker = new Worker(
-      "govrevenue-signals",
+      "atlasrevenue-signals",
       async () => { await refreshHomepageSignals(); },
       { connection: redisConnection as any, concurrency: 1, lockDuration: 7_200_000, stalledInterval: 120_000 }
     );
@@ -4907,7 +4907,7 @@ function premiumClosingHtml(scan: ScanRecord, parsedEdp?: ParsedEdp | null) {
           <span>Turn this scan into a 30-day buyer action campaign.</span>
         </div>
       </div>
-      <p class="close-note">GovRevenue helps businesses stop guessing at public-sector opportunities. The product turns buyer signals, contract records and readiness gaps into a focused revenue plan that teams can act on immediately.</p>
+      <p class="close-note">AtlasRevenue helps businesses stop guessing at public-sector opportunities. The product turns buyer signals, contract records and readiness gaps into a focused revenue plan that teams can act on immediately.</p>
       <p class="close-note" style="margin-top:8px;font-size:12px;color:var(--muted)">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
     </section>
   `;
@@ -5020,7 +5020,7 @@ function assessDataQuality(scan: ScanRecord) {
 }
 
 function stripReportTitleFromMarkdown(markdown: string): string {
-  return markdown.replace(/^#\s+GovRevenue\s+Scan:[^\n]*\n?/im, "");
+  return markdown.replace(/^#\s+AtlasRevenue\s+Scan:[^\n]*\n?/im, "");
 }
 
 // ── Article page ─────────────────────────────────────────────────────────────
@@ -5324,7 +5324,7 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
     const displayName = c.is_author_reply ? null
       : escapeHtml(c.guest_name || (c.author_email ?? "").split("@")[0] || "Anonymous");
     const authorLabel = c.is_author_reply
-      ? `<span class="art-comment-badge">GovRevenue</span>`
+      ? `<span class="art-comment-badge">AtlasRevenue</span>`
       : `<span class="art-comment-author">${displayName}</span>`;
     const likeHtml = c.is_author_reply
       ? `<span class="art-comment-author-heart">♥ ${c.like_count}</span>`
@@ -5363,9 +5363,9 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
   </form>
 </div>`;
 
-  const canonical = `https://govrevenue-agent-production.up.railway.app/articles/${escapeHtml(article.slug)}`;
+  const canonical = `https://atlasrevenue-agent-production.up.railway.app/articles/${escapeHtml(article.slug)}`;
   const ogImg = article.og_image || article.hero_image_url || "";
-  const seoTitle = article.seo_title || `${article.title} — GovRevenue`;
+  const seoTitle = article.seo_title || `${article.title} — AtlasRevenue`;
   const seoDesc = article.seo_description || article.dek || "";
 
   return `<!DOCTYPE html>
@@ -5430,7 +5430,7 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
       <div class="art-author">
         <div class="art-author-avatar">GR</div>
         <div>
-          <div class="art-author-name">GovRevenue Intelligence Desk</div>
+          <div class="art-author-name">AtlasRevenue Intelligence Desk</div>
           <div class="art-author-meta">${pubDate}${pubDate ? " &nbsp;·&nbsp; " : ""}${article.reading_time} min read</div>
         </div>
       </div>
@@ -5492,7 +5492,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
   <!-- RIGHT: rail -->
   <aside class="art-rail">
     <div class="rail-scan">
-      <div class="rail-scan-eyebrow">GovRevenue Intelligence</div>
+      <div class="rail-scan-eyebrow">AtlasRevenue Intelligence</div>
       <div class="rail-scan-text">Is your business positioned for this contract market?</div>
       <a href="/scan" class="rail-scan-btn">Run a free scan →</a>
     </div>
@@ -5527,7 +5527,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
 <section class="art-foot-cta">
   <div class="art-foot-cta-inner">
     <div>
-      <div class="art-foot-cta-tag">GovRevenue Intelligence</div>
+      <div class="art-foot-cta-tag">AtlasRevenue Intelligence</div>
       <h2 class="art-foot-cta-h">Spend time winning, not searching.</h2>
     </div>
     <a href="/scan" class="art-foot-cta-btn">Run a free scan →</a>
@@ -5564,7 +5564,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
       </div>
     </div>
   </div>
-  <div class="fp-legal"><div class="fp-legal-inner">&copy; ${new Date().getFullYear()} GovRevenue</div></div>
+  <div class="fp-legal"><div class="fp-legal-inner">&copy; ${new Date().getFullYear()} AtlasRevenue</div></div>
 </footer>
 <script>
 (function(){
@@ -5731,7 +5731,7 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Articles — GovRevenue</title>
+<title>Articles — AtlasRevenue</title>
 <meta name="description" content="Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.">
 <style>
 ${pageShellCss()}
@@ -5840,7 +5840,7 @@ ${featuredHtml}
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
-  <div class="legal"><span>&copy; ${new Date().getFullYear()} GovRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
+  <div class="legal"><span>&copy; ${new Date().getFullYear()} AtlasRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
 </div></footer>
 </body></html>`;
 }
@@ -6033,7 +6033,7 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Articles — Admin — GovRevenue</title>
+<title>Articles — Admin — AtlasRevenue</title>
 ${adminArticleCss()}
 </head>
 <body>
@@ -6158,7 +6158,7 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${isNew ? "New article" : escapeHtml(v.title ?? "Edit article")} — Admin — GovRevenue</title>
+<title>${isNew ? "New article" : escapeHtml(v.title ?? "Edit article")} — Admin — AtlasRevenue</title>
 ${adminArticleCss()}
 </head>
 <body>
@@ -6333,7 +6333,7 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
   </div>
   <div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px">
     <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/reply?token=${encodeURIComponent(token)}">
-      <textarea name="body" placeholder="Your reply (posts as GovRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--inter);font-size:13px;resize:vertical;outline:none;border-radius:5px"></textarea><br>
+      <textarea name="body" placeholder="Your reply (posts as AtlasRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--inter);font-size:13px;resize:vertical;outline:none;border-radius:5px"></textarea><br>
       <button class="a-btn a-btn-primary" type="submit" style="margin-top:6px;font-size:10px">Post reply</button>
     </form>
   </div>
@@ -6348,7 +6348,7 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Comment queue — Admin — GovRevenue</title>
+<title>Comment queue — Admin — AtlasRevenue</title>
 ${adminArticleCss()}
 </head>
 <body>
@@ -6420,7 +6420,7 @@ function waitingPage(scan: ScanRecord): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(scan.company_name)} &mdash; Scanning &mdash; GovRevenue</title>
+<title>${escapeHtml(scan.company_name)} &mdash; Scanning &mdash; AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -6462,7 +6462,7 @@ h1 b{color:var(--brand);font-weight:500}
 </head>
 <body>
 <div class="card">
-  <div class="brand"><span class="brand-dot"></span>GovRevenue &mdash; Intelligence Scan</div>
+  <div class="brand"><span class="brand-dot"></span>AtlasRevenue &mdash; Intelligence Scan</div>
   <h1>${isFailed ? "Scan failed for " : "Scanning for "}<b>${escapeHtml(scan.company_name)}</b></h1>
   <ul class="stage-list" id="stages">
     <li class="stage" id="s-fetching"><span class="dot"></span><span>Fetching procurement data from Contracts Finder &amp; Find a Tender</span></li>
@@ -6538,7 +6538,7 @@ function reportPage(scan: ScanRecord) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <title>${escapeHtml(scan.company_name)} &mdash; GovRevenue Scan</title>
+  <title>${escapeHtml(scan.company_name)} &mdash; AtlasRevenue Scan</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
@@ -7172,7 +7172,7 @@ function reportPage(scan: ScanRecord) {
           <option value="">Select outcome</option>
           <option value="shortlisted">Shortlisted opportunities from the report</option>
           <option value="submitted_bid">Submitted a bid based on the report</option>
-          <option value="won_contract">Won a contract found through GovRevenue</option>
+          <option value="won_contract">Won a contract found through AtlasRevenue</option>
           <option value="contacted_buyer">Contacted a buyer from the watchlist</option>
           <option value="applied_framework">Applied to a framework identified in the report</option>
           <option value="no_action">Haven't taken action yet</option>
@@ -7189,7 +7189,7 @@ function reportPage(scan: ScanRecord) {
           var m=document.getElementById("outcome-msg");
           if(!a){m.style.display="block";m.textContent="Please select an outcome.";m.style.color="var(--red)";return}
           try{navigator.sendBeacon("/api/track",new Blob([JSON.stringify({event:"scan_outcome",path:location.pathname,meta:{action:a,detail:d.slice(0,300),scanId:"${escapeHtml(scan.id)}"}})],{type:"application/json"}))}catch(x){}
-          m.style.display="block";m.textContent="Thanks — your feedback helps us improve GovRevenue.";m.style.color="var(--green)";
+          m.style.display="block";m.textContent="Thanks — your feedback helps us improve AtlasRevenue.";m.style.color="var(--green)";
           document.getElementById("outcome-form").style.display="none";
         });
       </script>
@@ -7211,7 +7211,7 @@ function reportPage(scan: ScanRecord) {
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
-    app: "govrevenue-agent",
+    app: "atlasrevenue-agent",
     database: pool ? "postgres" : "memory",
     queue: scanQueue ? "redis" : "in-process",
     storage: isPdfStorageConfigured() ? "s3" : "not-configured",
@@ -7385,7 +7385,7 @@ app.get("/", asyncRoute(async (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="UK public-sector revenue intelligence. Turn Contracts Finder and Find a Tender data into a commercial decision for your firm — in minutes.">
-<title>GovRevenue — Public-Sector Revenue Intelligence</title>
+<title>AtlasRevenue — Public-Sector Revenue Intelligence</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -7767,7 +7767,7 @@ ${chaseNowHtml}
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
-  <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
+  <div class="legal"><span>&copy; 2026 AtlasRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
 </div></footer>
 <script>
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -8037,7 +8037,7 @@ app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
 }));
 
 function briefingResultHtml(title: string, sub: string, ok: boolean): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} &mdash; GovRevenue</title>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} &mdash; AtlasRevenue</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -8055,7 +8055,7 @@ p{color:var(--muted);font-size:15px;line-height:1.6;margin-bottom:26px}
 <div class="badge">${ok ? "Briefing &middot; subscribed" : "Briefing"}</div>
 <h1>${escapeHtml(title)}</h1>
 <p>${escapeHtml(sub)}</p>
-<a class="act" href="/">Back to GovRevenue</a>
+<a class="act" href="/">Back to AtlasRevenue</a>
 </div></body></html>`;
 }
 
@@ -8227,7 +8227,7 @@ app.get("/register", (req, res) => {
   const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
   const next = req.query.next ? String(req.query.next) : "";
   const nextParam = next ? `?next=${encodeURIComponent(next)}` : "";
-  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create account — GovRevenue</title><style>${authCss}</style></head>
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create account — AtlasRevenue</title><style>${authCss}</style></head>
 <body>
 <nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/login${nextParam}">Sign in</a></nav>
 <div class="auth-wrap"><div class="auth-card">
@@ -8267,7 +8267,7 @@ app.get("/login", (req, res) => {
   if (user) { res.redirect("/account"); return; }
   const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
   const next = req.query.next ? encodeURIComponent(String(req.query.next)) : "";
-  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in — GovRevenue</title><style>${authCss}</style></head>
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in — AtlasRevenue</title><style>${authCss}</style></head>
 <body>
 <nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div><a href="/register">Create account</a></nav>
 <div class="auth-wrap"><div class="auth-card">
@@ -8321,11 +8321,11 @@ app.get("/account/setup", asyncRoute(async (req, res) => {
     res.type("html").send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Link expired</title><style>${authCss}</style></head><body><div class="auth-wrap"><div class="auth-box"><h1 class="auth-title">Link expired</h1><p class="auth-sub">This setup link has expired or already been used. <a href="/login">Sign in</a> or <a href="/register">create an account</a>.</p></div></div></body></html>`);
     return;
   }
-  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set your password — GovRevenue</title><style>${authCss}</style></head>
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set your password — AtlasRevenue</title><style>${authCss}</style></head>
 <body><div class="auth-wrap"><div class="auth-box">
 <nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div></nav>
 <h1 class="auth-title">Set your password</h1>
-<p class="auth-sub">Welcome to GovRevenue. Set a password for <strong>${escapeHtml(user.email)}</strong> to access your account.</p>
+<p class="auth-sub">Welcome to AtlasRevenue. Set a password for <strong>${escapeHtml(user.email)}</strong> to access your account.</p>
 ${err ? `<div class="auth-err">${err}</div>` : ""}
 <form method="POST" action="/account/setup">
 <input type="hidden" name="token" value="${escapeHtml(token)}">
@@ -8681,7 +8681,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Intelligence Dashboard &#8212; GovRevenue</title>
+<title>Intelligence Dashboard &#8212; AtlasRevenue</title>
 <style>${pageShellCss()}${dashCss}</style>
 </head>
 <body>
@@ -8713,7 +8713,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 
 <div class="pg-mast">
   <div class="pg-mast-inner">
-    <div class="pg-crumb"><a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
+    <div class="pg-crumb"><a href="/">AtlasRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
     <h1>Intelligence Dashboard</h1>
     <div class="pg-stats">
       <div class="pg-stat"><span class="pg-stat-val">${userScans.length || `<a href="/scan" style="color:var(--brand);text-decoration:none;font-size:14px">Run first scan &rarr;</a>`}</span><span class="pg-stat-label">${userScans.length ? "Scans run" : "Get started"}</span></div>
@@ -8726,16 +8726,16 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 
 <div class="pg-body">
 <div class="pg-body-inner">
-${welcome ? `<div class="flash-ok">Account created &#8212; welcome to GovRevenue. Run your first intelligence scan to get started.</div>` : ""}
+${welcome ? `<div class="flash-ok">Account created &#8212; welcome to AtlasRevenue. Run your first intelligence scan to get started.</div>` : ""}
 ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite unlocked.</div>` : ""}
 
 ${userScans.length === 0 ? `
 <div class="onb-hero">
   <div class="onb-hero-inner">
     <div class="onb-hero-content">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Welcome to GovRevenue</div>
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Welcome to AtlasRevenue</div>
       <h2 style="font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:14px;line-height:1.3">See government demand before it becomes a tender</h2>
-      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">GovRevenue scans Contracts Finder and Find a Tender against your company profile. In under 5 minutes you get a 10-section intelligence report: which buyers are spending, where the money is going, and whether your firm can win.</p>
+      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">AtlasRevenue scans Contracts Finder and Find a Tender against your company profile. In under 5 minutes you get a 10-section intelligence report: which buyers are spending, where the money is going, and whether your firm can win.</p>
       <div class="onb-steps">
         <div class="onb-step"><span class="onb-step-num">1</span><span class="onb-step-text">Tell us about your company</span></div>
         <div class="onb-step"><span class="onb-step-num">2</span><span class="onb-step-text">We scan live procurement data</span></div>
@@ -9333,7 +9333,7 @@ body{display:block;background:var(--cream)}
 // ── Legal & info pages ──
 
 function legalPage(title: string, body: string, req: express.Request): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} — GovRevenue</title>
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} — AtlasRevenue</title>
 <style>${pageShellCss()}
 .lp-wrap{max-width:780px;margin:0 auto;padding:56px 48px 80px}
 .lp-h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,40px);font-weight:400;letter-spacing:-.02em;color:var(--text);margin-bottom:12px}
@@ -9368,10 +9368,10 @@ app.get("/privacy", (req, res) => {
 <p>We do not sell, rent, or share your data with third parties. Your scan inputs are never used to train AI models.</p>
 
 <h2>Public data sources</h2>
-<p>Every data point in a GovRevenue report comes from publicly available procurement records: <a href="https://www.contractsfinder.service.gov.uk">Contracts Finder</a> (Crown Commercial Service) and the <a href="https://www.find-tender.service.gov.uk">Find a Tender Service</a> (Cabinet Office). We do not scrape private databases or access restricted systems.</p>
+<p>Every data point in a AtlasRevenue report comes from publicly available procurement records: <a href="https://www.contractsfinder.service.gov.uk">Contracts Finder</a> (Crown Commercial Service) and the <a href="https://www.find-tender.service.gov.uk">Find a Tender Service</a> (Cabinet Office). We do not scrape private databases or access restricted systems.</p>
 
 <h2>Data retention</h2>
-<p>Scan data is retained for 12 months from the scan date. You can request deletion of your data at any time by emailing <a href="mailto:privacy@govrevenue.co.uk">privacy@govrevenue.co.uk</a>.</p>
+<p>Scan data is retained for 12 months from the scan date. You can request deletion of your data at any time by emailing <a href="mailto:privacy@atlasrevenue.co.uk">privacy@atlasrevenue.co.uk</a>.</p>
 
 <h2>Your rights (UK GDPR)</h2>
 <p>You have the right to access, correct, or delete your personal data. You may also request a copy of your data in a portable format. To exercise any of these rights, contact us at the email above.</p>
@@ -9380,40 +9380,40 @@ app.get("/privacy", (req, res) => {
 <p>Payment processing is handled by <a href="https://stripe.com">Stripe</a>. We never see or store your card details. Stripe's privacy policy applies to payment data.</p>
 
 <h2>Contact</h2>
-<p>For privacy questions: <a href="mailto:privacy@govrevenue.co.uk">privacy@govrevenue.co.uk</a></p>
+<p>For privacy questions: <a href="mailto:privacy@atlasrevenue.co.uk">privacy@atlasrevenue.co.uk</a></p>
 `, req));
 });
 
 app.get("/terms", (req, res) => {
   res.type("html").send(legalPage("Terms of Service", `
 <h2>The service</h2>
-<p>GovRevenue provides commercial intelligence reports based on publicly available UK procurement data. Reports are generated by AI analysis of public records and are intended as decision-support tools, not as legal or financial advice.</p>
+<p>AtlasRevenue provides commercial intelligence reports based on publicly available UK procurement data. Reports are generated by AI analysis of public records and are intended as decision-support tools, not as legal or financial advice.</p>
 
 <h2>Intelligence, not certainty</h2>
-<p>Every figure in a GovRevenue report links back to a public notice published on Contracts Finder or the Find a Tender Service. However, procurement data can contain errors at source (incorrect values, duplicate entries, delayed publication). We cross-reference and filter where possible, but we cannot guarantee the accuracy of upstream government data.</p>
-<p>GovRevenue reports are intelligence products. They inform your decisions; they do not replace professional bid-writing, legal review, or due diligence.</p>
+<p>Every figure in a AtlasRevenue report links back to a public notice published on Contracts Finder or the Find a Tender Service. However, procurement data can contain errors at source (incorrect values, duplicate entries, delayed publication). We cross-reference and filter where possible, but we cannot guarantee the accuracy of upstream government data.</p>
+<p>AtlasRevenue reports are intelligence products. They inform your decisions; they do not replace professional bid-writing, legal review, or due diligence.</p>
 
 <h2>Accounts and payment</h2>
 <p>Pay As You Go scans are one-time purchases. Pro and Agency subscriptions renew monthly and can be cancelled at any time. Refunds are considered on a case-by-case basis within 14 days of purchase.</p>
 
 <h2>Acceptable use</h2>
-<p>You may use GovRevenue reports for your own business purposes. You may not resell reports, use automated tools to bulk-scrape our pages, or misrepresent GovRevenue data as your own research without attribution.</p>
+<p>You may use AtlasRevenue reports for your own business purposes. You may not resell reports, use automated tools to bulk-scrape our pages, or misrepresent AtlasRevenue data as your own research without attribution.</p>
 
 <h2>Limitation of liability</h2>
-<p>GovRevenue is provided "as is." We are not liable for business decisions made on the basis of our reports, or for errors in upstream government data. Our total liability is limited to the amount you paid for the relevant scan or subscription period.</p>
+<p>AtlasRevenue is provided "as is." We are not liable for business decisions made on the basis of our reports, or for errors in upstream government data. Our total liability is limited to the amount you paid for the relevant scan or subscription period.</p>
 
 <h2>Changes</h2>
 <p>We may update these terms. Material changes will be communicated by email to registered users.</p>
 
 <h2>Contact</h2>
-<p>For terms questions: <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a></p>
+<p>For terms questions: <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a></p>
 `, req));
 });
 
 app.get("/sources", (req, res) => {
   res.type("html").send(legalPage("Our Sources", `
 <h2>Where the data comes from</h2>
-<p>GovRevenue indexes two official UK government procurement platforms, updated hourly:</p>
+<p>AtlasRevenue indexes two official UK government procurement platforms, updated hourly:</p>
 
 <h3>Contracts Finder</h3>
 <p>Operated by the Crown Commercial Service. All UK public-sector contracts above £12,000 (central government) or £30,000 (sub-central) must be published here. We search via the official REST API (v2), filtered by keyword relevance and CPV classification codes per intelligence desk.</p>
@@ -9440,14 +9440,14 @@ app.get("/sources", (req, res) => {
 <p>Procurement aggregators (Crown Commercial Service, YPO, ESPO, Pagabo, Scape, NHS Supply Chain, and others) are filtered from buyer-level statistics to prevent a single framework operator from distorting the buyer concentration picture for a given desk.</p>
 
 <h2>Limitations</h2>
-<p>Government data can be incomplete: some contracts are published late, some awarded values are missing or incorrect, and below-threshold contracts may not appear at all. GovRevenue reports what is published, not what exists. This is intelligence, not certainty.</p>
+<p>Government data can be incomplete: some contracts are published late, some awarded values are missing or incorrect, and below-threshold contracts may not appear at all. AtlasRevenue reports what is published, not what exists. This is intelligence, not certainty.</p>
 `, req));
 });
 
 app.get("/roadmap", (req, res) => {
   const liveDesks = DESK_PROFILES.filter(d => d.live).length;
   res.type("html").send(legalPage("Product Roadmap", `
-<p style="font-size:16px;line-height:1.75;margin-bottom:32px">GovRevenue ships continuously. Here is what we have built, what we are building now, and where we are heading. This page is updated as priorities evolve.</p>
+<p style="font-size:16px;line-height:1.75;margin-bottom:32px">AtlasRevenue ships continuously. Here is what we have built, what we are building now, and where we are heading. This page is updated as priorities evolve.</p>
 
 <h2>Live now</h2>
 <ul>
@@ -9471,26 +9471,26 @@ app.get("/roadmap", (req, res) => {
 
 <h2>On the horizon</h2>
 <ul>
-<li><strong>API access</strong> — RESTful endpoints for integrating GovRevenue intelligence into your CRM, bid management tools, or internal dashboards</li>
+<li><strong>API access</strong> — RESTful endpoints for integrating AtlasRevenue intelligence into your CRM, bid management tools, or internal dashboards</li>
 <li><strong>Multi-region expansion</strong> — extending coverage beyond UK central and sub-central procurement to devolved administrations and international equivalents</li>
 <li><strong>Pipeline forecasting</strong> — predictive signals based on historical re-let patterns and buyer procurement cycles</li>
 <li><strong>Team collaboration</strong> — shared workspaces for agency-tier accounts with role-based access and internal notes on opportunities</li>
 </ul>
 
 <h2>Suggest a feature</h2>
-<p>GovRevenue is built by people who use it. If there is something you need that is not on this list, email <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a> and it will be read by the team building the product.</p>
+<p>AtlasRevenue is built by people who use it. If there is something you need that is not on this list, email <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a> and it will be read by the team building the product.</p>
 `, req));
 });
 
 app.get("/api-docs", (req, res) => {
   res.type("html").send(legalPage("API Documentation", `
-<p style="font-size:16px;line-height:1.75;margin-bottom:32px">GovRevenue provides a JSON API for integrating procurement intelligence into your CRM, bid management tools, or internal dashboards. The API is available on <strong>Agency</strong> plans and above.</p>
+<p style="font-size:16px;line-height:1.75;margin-bottom:32px">AtlasRevenue provides a JSON API for integrating procurement intelligence into your CRM, bid management tools, or internal dashboards. The API is available on <strong>Agency</strong> plans and above.</p>
 
 <h2>Authentication</h2>
-<p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Agency accounts — contact <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a> to request access.</p>
+<p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Agency accounts — contact <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a> to request access.</p>
 
 <h2>Base URL</h2>
-<p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">https://govrevenue-agent-production.up.railway.app</code></p>
+<p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">https://atlasrevenue-agent-production.up.railway.app</code></p>
 
 <h2>Endpoints</h2>
 
@@ -9532,10 +9532,10 @@ app.get("/api-docs", (req, res) => {
 <p>API access is rate-limited to 60 requests per minute per API key. Scan creation is limited to 10 per hour.</p>
 
 <h2>Webhooks (coming soon)</h2>
-<p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a>.</p>
+<p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a>.</p>
 
 <h2>Need help?</h2>
-<p>For API support, integration guidance, or to request access: <a href="mailto:hello@govrevenue.co.uk">hello@govrevenue.co.uk</a></p>
+<p>For API support, integration guidance, or to request access: <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a></p>
 `, req));
 });
 
@@ -9545,7 +9545,7 @@ app.get("/pricing", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — GovRevenue</title>
+<title>Pricing — AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .pr-wrap{max-width:960px;margin:0 auto;padding:0 32px}
@@ -9644,7 +9644,7 @@ ${pageShellHeader(null, getAuthUser(req))}
         <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
         <li><span class="tick">&#10003;</span> Quarterly portfolio review call</li>
       </ul>
-      <a href="mailto:hello@govrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
+      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
       <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
     </div>
   </div>
@@ -9668,7 +9668,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="faq-item">
       <div class="faq-q">Is this a guarantee I&rsquo;ll win contracts?</div>
-      <div class="faq-a">No. GovRevenue is intelligence, not certainty. We surface what the public record shows and give you a structured assessment of fit. Winning still depends on your bid quality, track record, and pricing. We help you stop chasing the wrong ones.</div>
+      <div class="faq-a">No. AtlasRevenue is intelligence, not certainty. We surface what the public record shows and give you a structured assessment of fit. Winning still depends on your bid quality, track record, and pricing. We help you stop chasing the wrong ones.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q">Can I cancel or unsubscribe?</div>
@@ -9734,7 +9734,7 @@ app.get("/checkout", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Order — GovRevenue</title>
+<title>Order — AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 :root{
@@ -9825,7 +9825,7 @@ app.get("/scan/sample", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sample Report: Brightwell FM Ltd &mdash; GovRevenue</title>
+<title>Sample Report: Brightwell FM Ltd &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .sr-ribbon{background:rgba(180,146,78,.06);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -10029,7 +10029,7 @@ ${pageShellHeader(null, authCtx)}
     <div class="sr-qa"><span style="color:var(--muted)">Aggregator buyers filtered</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; Active</span></div>
     <div class="sr-qa"><span style="color:var(--muted)">Data freshness</span><span style="font-family:var(--mono);font-weight:600">Contracts Finder: &lt;24h &middot; FTS: &lt;48h</span></div>
     <div style="margin-top:16px;padding:14px;background:var(--surface-2);border:1px solid var(--border-2);font-size:12px;color:var(--muted);line-height:1.6">
-      <strong style="color:var(--text-mid)">Caveat:</strong> This report is based on publicly available procurement data. Award values are as published by the contracting authority and may differ from final contract values. GovRevenue provides intelligence, not certainty.
+      <strong style="color:var(--text-mid)">Caveat:</strong> This report is based on publicly available procurement data. Award values are as published by the contracting authority and may differ from final contract values. AtlasRevenue provides intelligence, not certainty.
     </div>
   </div>
 
@@ -10080,7 +10080,7 @@ app.get("/scan", (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Submit your company profile and get a structured commercial intelligence report against UK public procurement data in minutes.">
-<title>Run a Scan &mdash; GovRevenue</title>
+<title>Run a Scan &mdash; AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -10382,7 +10382,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
       </div>
 
       <div class="submit-row">
-        <button type="submit" class="btn-submit">${auth ? "Run GovRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
+        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
         <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
         <div style="margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Public record only &middot; Intelligence, not certainty</div>
       </div>
@@ -10820,7 +10820,7 @@ svg.addEventListener('mouseleave',hide);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live Signals — GovRevenue</title>
+<title>Live Signals — AtlasRevenue</title>
 <style>${pageShellCss()}
 /* ── signals page ── */
 .sig-outer{max-width:1320px;margin:0 auto;padding:0 48px}
@@ -11161,7 +11161,7 @@ app.get("/charts", asyncRoute(async (req, res) => {
     ? `<strong>${escapeHtml(deskBreak[0].label)}</strong> (${fmtBnShort(deskBreak[0].total_m)}), <strong>${escapeHtml(deskBreak[1].label)}</strong> (${fmtBnShort(deskBreak[1].total_m)}) and <strong>${escapeHtml(deskBreak[2].label)}</strong> (${fmtBnShort(deskBreak[2].total_m)})`
     : topDesk ? `<strong>${escapeHtml(topDesk.label)}</strong> (${fmtBnShort(topDesk.total_m)})` : '';
   const topBuyerPara = topBuyers.length > 0
-    ? `The highest-volume contracting authority by indexed spend was <strong>${escapeHtml(topBuyers[0].buyer)}</strong>, with ${topBuyers[0].cnt} notices totalling £${topBuyers[0].total_val}m over the period (GovRevenue, 2026).${topBuyers.length >= 3 ? ` Alongside ${escapeHtml(topBuyers[1].buyer)} and ${escapeHtml(topBuyers[2].buyer)}, a compact cohort of high-volume authorities drives a disproportionate share of category spend — consistent with the framework-incumbent dynamics documented by the National Audit Office (2023). Buyer concentration data of this resolution transforms undifferentiated market signals into targetable accounts.` : ''}`
+    ? `The highest-volume contracting authority by indexed spend was <strong>${escapeHtml(topBuyers[0].buyer)}</strong>, with ${topBuyers[0].cnt} notices totalling £${topBuyers[0].total_val}m over the period (AtlasRevenue, 2026).${topBuyers.length >= 3 ? ` Alongside ${escapeHtml(topBuyers[1].buyer)} and ${escapeHtml(topBuyers[2].buyer)}, a compact cohort of high-volume authorities drives a disproportionate share of category spend — consistent with the framework-incumbent dynamics documented by the National Audit Office (2023). Buyer concentration data of this resolution transforms undifferentiated market signals into targetable accounts.` : ''}`
     : `Buyer-level data was not resolvable for the observation period; a minimum signal volume across multiple desks is required for statistically robust buyer ranking.`;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -11169,15 +11169,15 @@ app.get("/charts", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>UK Public Sector Procurement Spend Analysis 2026 — GovRevenue</title>
+<title>UK Public Sector Procurement Spend Analysis 2026 — AtlasRevenue</title>
 <meta name="description" content="Live intelligence on ${fmtBnShort(totalAnnualM)} in UK public procurement. ${totalNotices.toLocaleString()} notices tracked across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Open pipeline ${fmtBnShort(openPipelineM)}. Updated hourly from Contracts Finder and Find a Tender.">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="article">
 <meta property="og:title" content="${fmtBnShort(totalAnnualM)} in UK Public Contracts — Live Procurement Intelligence">
 <meta property="og:description" content="${totalNotices.toLocaleString()} procurement notices tracked. ${fmtBnShort(openPipelineM)} open pipeline. ${closing30} contracts closing in the next 30 days.">
-<meta property="og:url" content="https://govrevenue-agent-production.up.railway.app/charts">
-<link rel="canonical" href="https://govrevenue-agent-production.up.railway.app/charts">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across ${DESK_PROFILES.filter(d => d.live).length} procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://govrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"GovRevenue","url":"https://govrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
+<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/charts">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/charts">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across ${DESK_PROFILES.filter(d => d.live).length} procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://atlasrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"AtlasRevenue","url":"https://atlasrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
 <style>${pageShellCss()}
 /* ── charts / intelligence page ── */
 strong{font-weight:700}
@@ -11468,10 +11468,10 @@ ${deskBreak.length > 0 ? `
 </section>
 ` : ""}
 
-<section class="proof-sec" aria-label="How companies use GovRevenue">
+<section class="proof-sec" aria-label="How companies use AtlasRevenue">
   <div class="proof-wrap">
     <div class="sec-eye" style="text-align:center">From scan to shortlist</div>
-    <h2 class="sec-h" style="text-align:center;font-size:clamp(22px,2.6vw,34px);margin-bottom:8px">What a GovRevenue scan actually produces</h2>
+    <h2 class="sec-h" style="text-align:center;font-size:clamp(22px,2.6vw,34px);margin-bottom:8px">What a AtlasRevenue scan actually produces</h2>
     <p style="text-align:center;color:var(--t3);font-size:15px;max-width:600px;margin:0 auto 44px;line-height:1.7">A facilities management firm ran a scan. Here is what the report surfaced — and what they did with it.</p>
     <div class="proof-grid">
       <div class="proof-card rv">
@@ -11516,9 +11516,9 @@ ${deskBreak.length > 0 ? `
           <div class="brief-tag">Market Snapshot</div>
           <h3 class="brief-h">Here is where UK government money is going right now</h3>
           <div class="brief-body">
-            <p>The UK public sector awarded <strong>${fmtBn(totalAnnualM)}</strong> in contracts over the past 12 months — ${totalNotices.toLocaleString()} procurement notices indexed and scored by GovRevenue (2026) in real time from Contracts Finder and Find a Tender. That works out to <strong>${fmtBnShort(avgMonthlyM)} every single month</strong> leaving government and flowing into businesses across every category from construction to digital services.</p>
+            <p>The UK public sector awarded <strong>${fmtBn(totalAnnualM)}</strong> in contracts over the past 12 months — ${totalNotices.toLocaleString()} procurement notices indexed and scored by AtlasRevenue (2026) in real time from Contracts Finder and Find a Tender. That works out to <strong>${fmtBnShort(avgMonthlyM)} every single month</strong> leaving government and flowing into businesses across every category from construction to digital services.</p>
             <div class="pull"><p>Right now, ${fmtBnShort(openPipelineM)} in contracts are open and accepting bids. These are not historic deals. They are live opportunities with deadlines this week and next month.</p></div>
-            <p>Across ${totalOpenCount.toLocaleString()} active tenders, the immediately addressable commercial opportunity in UK public sector procurement is concrete and measurable. GovRevenue scores each notice by sector, value band, and buyer profile every hour — surfacing what matters before the deadline closes.</p>
+            <p>Across ${totalOpenCount.toLocaleString()} active tenders, the immediately addressable commercial opportunity in UK public sector procurement is concrete and measurable. AtlasRevenue scores each notice by sector, value band, and buyer profile every hour — surfacing what matters before the deadline closes.</p>
           </div>
         </div>
       </div>
@@ -11568,7 +11568,7 @@ ${deskBreak.length > 0 ? `
           <h3 class="brief-h">${closing30.toLocaleString()} contracts are closing in the next 30 days</h3>
           <div class="brief-body">
             <p>The near-term window is concrete: <strong>${closing30.toLocaleString()} notices closing within 30 days</strong> and <strong>${closing60.toLocaleString()} within 60 days</strong>. These are live procurement opportunities with published deadlines, buyer contact details, and submission requirements available in public right now.</p>
-            <p>GovRevenue scans this data every hour and scores each notice against your company profile — surfacing the ones worth bidding, the buyers worth calling, and the frameworks worth getting onto before the next round closes. The open pipeline is <strong>${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders</strong>. Your scan takes two minutes.</p>
+            <p>AtlasRevenue scans this data every hour and scores each notice against your company profile — surfacing the ones worth bidding, the buyers worth calling, and the frameworks worth getting onto before the next round closes. The open pipeline is <strong>${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders</strong>. Your scan takes two minutes.</p>
             <div class="pull"><p>${closing30.toLocaleString()} open contracts. 30 days. The window is concrete and it is closing.</p></div>
           </div>
         </div>
@@ -11579,7 +11579,7 @@ ${deskBreak.length > 0 ? `
 
     <div class="brief-refs">
       <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em;line-height:1.9">
-        GovRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Available at: govrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
+        AtlasRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Available at: atlasrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
       </p>
     </div>
   </div>
@@ -12218,7 +12218,7 @@ function categoryDrillPage(
 
   return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(cat.label)} — ${escapeHtml(profile.label)} — GovRevenue</title>
+<title>${escapeHtml(cat.label)} — ${escapeHtml(profile.label)} — AtlasRevenue</title>
 ${pageShellCss()}
 <style>
 .cd-wrap{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
@@ -12869,7 +12869,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(profile.label)} &mdash; GovRevenue Desk</title>
+<title>${escapeHtml(profile.label)} &mdash; AtlasRevenue Desk</title>
 <style>
 ${pageShellCss()}
 :root{--paper:#fff;--paper-2:var(--surface);--ink:var(--text);--slate:var(--muted);--accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);}
@@ -13219,7 +13219,7 @@ ${analyticsHtml}
   </div>
 </div>
 ${sampleCtaBlock("compact")}
-<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
+<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; AtlasRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 AtlasRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
 </html>`;
@@ -13319,7 +13319,7 @@ function subPage(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(subLabel)} &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<title>${escapeHtml(subLabel)} &mdash; ${escapeHtml(profile.label)} &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .sub-mast{padding:52px 0 44px;background:radial-gradient(120% 160% at 80% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6}
@@ -13510,7 +13510,7 @@ ${pageShellHeader(profile, authCtx)}
   </div>
 </div>
 ${sampleCtaBlock("compact")}
-<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
+<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; AtlasRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 AtlasRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
 </html>`;
@@ -13698,7 +13698,7 @@ function sampleCtaBlock(variant: "full" | "compact" = "full"): string {
   return `<div class="scta" style="margin:40px auto">
   <div class="scta-inner">
     <div class="scta-eyebrow">Sample intelligence report</div>
-    <div class="scta-h">See exactly what GovRevenue delivers</div>
+    <div class="scta-h">See exactly what AtlasRevenue delivers</div>
     <p class="scta-p">A full 10-section procurement scan built from live public-sector data. No sign-up required.</p>
     <div class="scta-grid">
       <div class="scta-item">Executive Decision Panel</div>
@@ -13766,7 +13766,7 @@ function pageShellFoot(): string {
     <a href="/api-docs" style="color:var(--muted);text-decoration:none">API</a>
   </div>
 </footer>
-<div class="pg-copy">&copy; ${new Date().getFullYear()} GovRevenue &mdash; Intelligence, not certainty.</div>
+<div class="pg-copy">&copy; ${new Date().getFullYear()} AtlasRevenue &mdash; Intelligence, not certainty.</div>
 <script>
 (function(){var q=[];function t(e,m){if(q.length>20)return;q.push(1);try{navigator.sendBeacon('/api/track',new Blob([JSON.stringify({event:e,path:location.pathname,meta:m||null})],{type:'application/json'}))}catch(x){}}
 t('page_view',{ref:document.referrer.slice(0,200)});
@@ -13781,7 +13781,7 @@ function notFoundHtml(message: string, authCtx?: { email: string; tier: UserTier
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Not found &mdash; GovRevenue</title>
+<title>Not found &mdash; AtlasRevenue</title>
 <style>${pageShellCss()}</style>
 </head>
 <body>
@@ -13789,7 +13789,7 @@ ${pageShellHeader(null, authCtx)}
 <main style="padding:80px 40px;max-width:1320px;margin:0 auto">
   <p style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px">404 &mdash; Not Found</p>
   <h1 style="font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px;color:var(--text)">${escapeHtml(message)}</h1>
-  <a href="/" style="font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-2);padding-bottom:2px">&larr; Back to GovRevenue</a>
+  <a href="/" style="font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-2);padding-bottom:2px">&larr; Back to AtlasRevenue</a>
 </main>
 ${pageShellFoot()}
 </body>
@@ -13918,7 +13918,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>All Intelligence Desks — GovRevenue</title>
+<title>All Intelligence Desks — AtlasRevenue</title>
 <meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.filter(d => d.live).length} industry desks. Live data from Contracts Finder and Find a Tender.">
 <style>
 ${pageShellCss()}
@@ -14097,7 +14097,7 @@ function noticesPage(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Opportunity Board &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<title>Opportunity Board &mdash; ${escapeHtml(profile.label)} &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 /* ── Bridge tokens for opportunity engine ── */
@@ -14291,7 +14291,7 @@ ${pageShellFoot()}
   render();
 })();
 </script>
-<div style="text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);padding:16px 0 20px;border-top:1px solid var(--border)"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border-2)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Public record only.</div>
+<div style="text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);padding:16px 0 20px;border-top:1px solid var(--border)"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border-2)">&larr; AtlasRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 AtlasRevenue &middot; Public record only.</div>
 </body>
 </html>`;
 }
@@ -14392,7 +14392,7 @@ function buyersPage(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Buyer Intelligence &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<title>Buyer Intelligence &mdash; ${escapeHtml(profile.label)} &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .bi-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:28px;flex-wrap:wrap}
@@ -14536,7 +14536,7 @@ function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Compare &mdash; ${escapeHtml(current.company_name)} &mdash; GovRevenue</title>
+<title>Compare &mdash; ${escapeHtml(current.company_name)} &mdash; AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -14673,7 +14673,7 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
       }
     });
 
-    const filename = `${scan.company_name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_govrevenue_scan.pdf`;
+    const filename = `${scan.company_name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_atlasrevenue_scan.pdf`;
     const pdfBuffer = Buffer.from(pdf);
 
     if (isPdfStorageConfigured()) {
@@ -14716,7 +14716,7 @@ app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
     return;
   }
 
-  const filename = `${scan.company_name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_govrevenue_scan.md`;
+  const filename = `${scan.company_name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_atlasrevenue_scan.md`;
   res.setHeader("Content-Type", "text/markdown; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(scan.report_markdown);
@@ -15135,7 +15135,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GovRevenue — Admin</title>
+<title>AtlasRevenue — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -16060,7 +16060,7 @@ app.get("/unsubscribe/:id", asyncRoute(async (req, res) => {
 <div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
   <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
   <p>Weekly alerts for <strong>${escapeHtml(sub.company_name)}</strong> have been cancelled.</p>
-  <p><a href="/" style="color:#1d6b4f">Back to GovRevenue</a></p>
+  <p><a href="/" style="color:#1d6b4f">Back to AtlasRevenue</a></p>
 </div>
 </body></html>`);
 }));
@@ -16079,7 +16079,7 @@ app.get("/unsubscribe-briefing/:id", asyncRoute(async (req, res) => {
 <div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
   <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
   <p>You have been removed from the weekly procurement briefing.</p>
-  <p><a href="/" style="color:#1d6b4f">Back to GovRevenue</a></p>
+  <p><a href="/" style="color:#1d6b4f">Back to AtlasRevenue</a></p>
 </div>
 </body></html>`);
 }));
@@ -16638,10 +16638,10 @@ app.post("/admin/articles/comments/:id/reply", requireAdmin, asyncRoute(async (r
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: process.env.FROM_EMAIL ?? "noreply@govrevenue.co.uk",
+        from: process.env.FROM_EMAIL ?? "noreply@atlasrevenue.co.uk",
         to: commenterEmail,
-        subject: `GovRevenue replied to your comment on "${article.title}"`,
-        html: `<p>GovRevenue replied to your comment on <a href="https://govrevenue-agent-production.up.railway.app/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
+        subject: `AtlasRevenue replied to your comment on "${article.title}"`,
+        html: `<p>AtlasRevenue replied to your comment on <a href="https://atlasrevenue-agent-production.up.railway.app/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
       }).catch(() => {});
     }
   }
@@ -16674,7 +16674,7 @@ initDb()
 
     if (RUN_WEB) {
       app.listen(PORT, () => {
-        console.log(`[server] GovRevenue Agent running on port ${PORT}`);
+        console.log(`[server] AtlasRevenue Agent running on port ${PORT}`);
         // Warm up live desk caches on startup — staggered to avoid hammering Contracts Finder.
         // Compiles one desk every 8s; 24 desks ≈ 3min total, well within rate limits.
         const liveDesks = DESK_PROFILES.filter(d => d.live);

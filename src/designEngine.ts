@@ -561,10 +561,10 @@ export function renderWorldClassDashboard(trust: TrustLayer) {
 
     <section class="apple-report-system">
       <div class="apple-hero">
-        <p class="apple-kicker">GovRevenue intelligence layer</p>
+        <p class="apple-kicker">AtlasRevenue intelligence layer</p>
         <h2>Evidence, value and route-to-revenue in one commercial signal map.</h2>
         <p class="apple-lede">
-          This dashboard is generated from structured procurement records and the GovRevenue trust filter.
+          This dashboard is generated from structured procurement records and the AtlasRevenue trust filter.
           It separates raw pull volume from relevant opportunities, source-backed evidence and addressable value.
           The goal is not decoration; the goal is to make the commercial path obvious in seconds.
         </p>
@@ -593,7 +593,7 @@ export function renderWorldClassDashboard(trust: TrustLayer) {
             <h3>What the visuals mean</h3>
           </div>
           <p>
-            A high pull count is not the same as a market opportunity. GovRevenue filters noisy procurement data
+            A high pull count is not the same as a market opportunity. AtlasRevenue filters noisy procurement data
             into relevant records, then separates verified source-backed evidence from inferred signals and strategic targets.
           </p>
           <p>

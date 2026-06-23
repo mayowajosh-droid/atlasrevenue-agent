@@ -1,9 +1,9 @@
-# GovRevenue Agent — Project Instructions
+# AtlasRevenue Agent — Project Instructions
 
 UK public-sector procurement intelligence tool. Companies submit a profile → agent scans Contracts Finder + Find a Tender → LLM generates a structured commercial report → PDF export.
 
-**Live URL:** https://govrevenue-agent-production.up.railway.app
-**GitHub:** mayowajosh-droid/govrevenue-agent (main branch → Railway auto-deploy)
+**Live URL:** https://atlasrevenue-agent-production.up.railway.app
+**GitHub:** mayowajosh-droid/atlasrevenue-agent (main branch → Railway auto-deploy)
 
 ---
 
@@ -39,7 +39,7 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 |---|---|
 | `src/index.ts` | Everything: routes, data pull, scoring, HTML rendering, PDF, worker (~7,500 lines) |
 | `src/designEngine.ts` | ECharts SSR dashboard SVGs rendered into reports |
-| `src/lib/govrevenue/govrevenue-report-engine.ts` | Imported but NOT called — do not delete, do not call without understanding it first |
+| `src/lib/atlasrevenue/atlasrevenue-report-engine.ts` | Imported but NOT called — do not delete, do not call without understanding it first |
 | `src/lib/pdfStorage.ts` | S3 PDF upload |
 | `src/lib/emailNotifications.ts` | Resend scan-complete/scan-failed emails |
 
@@ -84,7 +84,7 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 
 ## Known debt — don't make worse, fix when touching
 
-- **`govrevenue-report-engine.ts` unused** — Stage A migration target: use its scorer as preprocessing before `buildPrompt()` so the LLM gets structured data, not raw notices. Stage B: replace `reportPage()` with a typed struct renderer. Do not call it without reading it first.
+- **`atlasrevenue-report-engine.ts` unused** — Stage A migration target: use its scorer as preprocessing before `buildPrompt()` so the LLM gets structured data, not raw notices. Stage B: replace `reportPage()` with a typed struct renderer. Do not call it without reading it first.
 - **Desk page data visualisation gap** — desk pages have no analytical charts (spend by buyer, open vs awarded breakdown, category trend). This is the biggest remaining product gap; treat it as a feature build, not a quick fix.
 - **Short keyword substring matching** — keywords ≤4 chars ("erp", "soc", "mis") match substrings in unrelated words. Partially addressed by expanding specific terms. Remaining fix: word-boundary regex for short keywords.
 
@@ -139,7 +139,7 @@ Searches are keyword-driven with a parallel CPV-code pass per sector (`SECTOR_CP
 | Next | **Framework pre-qualification assistant** — identify open frameworks, eligibility check, checklist |
 | Next | **Scan-to-bid-pack** — capability statement + outreach email from top 3 routes |
 | Next | **Desk page data visualisation** — spend trends, buyer concentration, category movement charts |
-| Future | **govrevenue-report-engine Stage A** — wire engine scorer as preprocessing before LLM prompt |
+| Future | **atlasrevenue-report-engine Stage A** — wire engine scorer as preprocessing before LLM prompt |
 
 ---
 

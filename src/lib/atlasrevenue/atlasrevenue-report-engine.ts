@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
- * GovRevenue Report Engine
+ * AtlasRevenue Report Engine
  * Trust-first procurement intelligence engine.
  *
  * Fixes:
@@ -212,12 +212,12 @@ export interface ReportModel {
   qa: QaResult;
 }
 
-export class GovRevenueQualityGateError extends Error {
+export class AtlasRevenueQualityGateError extends Error {
   public readonly qa: QaResult;
 
   constructor(qa: QaResult) {
-    super(`GovRevenue quality gate failed: ${qa.errors.join(" | ")}`);
-    this.name = "GovRevenueQualityGateError";
+    super(`AtlasRevenue quality gate failed: ${qa.errors.join(" | ")}`);
+    this.name = "AtlasRevenueQualityGateError";
     this.qa = qa;
   }
 }
@@ -761,7 +761,7 @@ const GENERIC_CONFIG: SectorConfig = {
   routeTemplates: [],
 };
 
-export function generateGovRevenueReport(input: {
+export function generateAtlasRevenueReport(input: {
   intake: CompanyIntake;
   rawRecords: ProcurementRecord[];
   strict?: boolean;
@@ -858,7 +858,7 @@ export function generateGovRevenueReport(input: {
   const model: ReportModel = { ...baseModel, qa };
 
   if (strict && !qa.passed) {
-    throw new GovRevenueQualityGateError(qa);
+    throw new AtlasRevenueQualityGateError(qa);
   }
 
   return { model, html, qa };
@@ -1665,7 +1665,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${escapeHtml(intake.companyName)} — GovRevenue Scan</title>
+<title>${escapeHtml(intake.companyName)} — AtlasRevenue Scan</title>
 <style>
   :root {
     --ink: #1f1512;
@@ -1953,7 +1953,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
 <body>
 <main class="page">
   <section class="cover">
-    <h1>GovRevenue Scan</h1>
+    <h1>AtlasRevenue Scan</h1>
     <p class="lede">
       Commercial public-sector opportunity scan for <strong>${escapeHtml(
         intake.companyName,
@@ -2060,7 +2060,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
 
   <h2>Evidence Gap Checklist</h2>
   <p>
-    These items must be verified before aggressive bid decisions. A GovRevenue scan should never pretend unknown capacity is confirmed.
+    These items must be verified before aggressive bid decisions. A AtlasRevenue scan should never pretend unknown capacity is confirmed.
   </p>
   ${renderEvidenceGapTable(model.evidenceGaps)}
 
@@ -2103,7 +2103,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
   ${renderSourceAppendix(model.relevantRecords)}
 
   <div class="footer">
-    GovRevenue is commercial intelligence, not legal, procurement or financial advice.
+    AtlasRevenue is commercial intelligence, not legal, procurement or financial advice.
     Human verification is required before bid decisions. No outcome is guaranteed.
   </div>
 </main>

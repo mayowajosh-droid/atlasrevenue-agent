@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/mayowathefirst/Desktop/atlasrevenue-agent && git status --porcelain | grep -q . && git add -A && git commit -m \"auto: sync changes [skip ci]\" && git push origin main || true",
+            "statusMessage": "Syncing changes to Railway..."
+          }
+        ]
+      }
+    ]
+  }
+}
