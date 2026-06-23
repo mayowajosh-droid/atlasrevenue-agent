@@ -51,6 +51,12 @@ import {
   type HomepageTeaserSignal,
   type ChaseStats as OppChaseStats,
 } from "./lib/opportunityEngine.js";
+import { initBuyerGraphTables, bulkIngestBuyers, buildBuyerProfile, findBuyersByName, getTopBuyers, getBuyerEntityById } from "./intelligence/buyer-graph/index.js";
+import { initEmailDiscoveryTables, getContactsForBuyer, discoverContactsForBuyer } from "./intelligence/email-discovery/index.js";
+import { initEarlySignalsTables, getLatestEarlySignals, getEarlySignalsByDesk, refreshEarlySignals } from "./intelligence/early-signals/index.js";
+import { initLifecycleTables, bulkTrackNotices, getLifecycleSummary, getRecentTransitions, getLifecycleByDesk } from "./intelligence/lifecycle/index.js";
+import { initCanonicalTables } from "./core/entities/db.js";
+
 type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
 type UserRecord = {
@@ -3963,6 +3969,12 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
     });
 
     console.log(`[scan] completed ${id}`);
+
+    if (pool) {
+      const allNotices = [...(data.contractsFinder?.open || []), ...(data.contractsFinder?.awarded || []), ...(data.findTender?.notices || [])];
+      bulkIngestBuyers(allNotices).catch(() => {});
+      bulkTrackNotices(allNotices).catch(() => {});
+    }
   } catch (err: any) {
     clearTimeout(fetchTimeout);
     const isTimeout = err?.name === "AbortError";
@@ -4712,6 +4724,14 @@ async function refreshHomepageSignals(): Promise<void> {
       const newOnes = await upsertSignals(signals);
       allNew.push(...newOnes);
       console.log(`[signals] ${cat.key}: upserted ${signals.length} (${newOnes.length} new)`);
+      if (pool && relevant.length > 0) {
+        bulkIngestBuyers(relevant, cat.key).then(n => {
+          if (n > 0) console.log(`[buyer-graph] ${cat.key}: resolved ${n} buyers`);
+        }).catch(() => {});
+        bulkTrackNotices(relevant, cat.key).then(r => {
+          if (r.newEntries > 0 || r.transitions > 0) console.log(`[lifecycle] ${cat.key}: ${r.newEntries} new, ${r.transitions} transitions`);
+        }).catch(() => {});
+      }
     } catch (err: any) {
       console.error(`[signals] ${cat.key} refresh failed: ${err?.message}`);
       captureError(err, { signalRefresh: { category: cat.key } });
@@ -8002,6 +8022,72 @@ app.get("/api/scans/:id/stream", (req, res) => {
     clearInterval(poll);
   });
 });
+
+// ── Intelligence API routes ──────────────────────────────────────────────────
+
+app.get("/api/buyers", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  if (q) {
+    const results = await findBuyersByName(q);
+    res.json({ buyers: results });
+  } else {
+    const top = await getTopBuyers(20);
+    res.json({ buyers: top });
+  }
+}));
+
+app.get("/api/buyers/:id", asyncRoute(async (req, res) => {
+  const profile = await buildBuyerProfile(req.params.id);
+  if (!profile) { res.status(404).json({ error: "Buyer not found" }); return; }
+  res.json(profile);
+}));
+
+app.get("/api/buyers/:id/contacts", requireAuth, asyncRoute(async (req, res) => {
+  const contacts = await getContactsForBuyer(req.params.id);
+  res.json({ contacts });
+}));
+
+app.post("/api/buyers/:id/discover-contacts", requireAdmin, asyncRoute(async (req, res) => {
+  const entity = await getBuyerEntityById(req.params.id);
+  if (!entity) { res.status(404).json({ error: "Buyer not found" }); return; }
+  const count = await discoverContactsForBuyer(entity);
+  res.json({ discovered: count });
+}));
+
+app.get("/api/early-signals", requireAuth, asyncRoute(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const signals = await getLatestEarlySignals(limit);
+  res.json({ signals });
+}));
+
+app.get("/api/early-signals/desk/:slug", requireAuth, asyncRoute(async (req, res) => {
+  const signals = await getEarlySignalsByDesk(req.params.slug);
+  res.json({ signals });
+}));
+
+app.post("/api/early-signals/refresh", requireAdmin, asyncRoute(async (_req, res) => {
+  const signals = await refreshEarlySignals();
+  res.json({ refreshed: signals.length, signals });
+}));
+
+app.get("/api/lifecycle/summary", requireAuth, asyncRoute(async (_req, res) => {
+  const summary = await getLifecycleSummary();
+  res.json({ summary });
+}));
+
+app.get("/api/lifecycle/transitions", requireAuth, asyncRoute(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const transitions = await getRecentTransitions(limit);
+  res.json({ transitions });
+}));
+
+app.get("/api/lifecycle/desk/:category", requireAuth, asyncRoute(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const entries = await getLifecycleByDesk(req.params.category, limit);
+  res.json({ entries });
+}));
+
+// ── End Intelligence API routes ──────────────────────────────────────────────
 
 app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
   const [deskSigs, count24h] = await Promise.all([
@@ -14761,6 +14847,11 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     scansByDayRes,
     gradeDistRes,
     activeSubCountRes,
+    buyerStatsRes, buyerListRes,
+    contactStatsRes, contactListRes,
+    earlySignalStatsRes, earlySignalListRes,
+    lifecycleStatsRes, lifecycleListRes,
+    lifecycleTransitionCountRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -14880,6 +14971,15 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM scans WHERE status='completed' AND report_markdown IS NOT NULL
     GROUP BY grade`),
     safePool(`SELECT COUNT(*)::int AS cnt FROM alert_subscriptions WHERE active = true`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT buyer_type)::int AS types, MAX(last_seen) AS last_seen FROM buyer_entities`),
+    safePool(`SELECT id, name, buyer_type, address, total_awards, total_award_value, last_seen FROM buyer_entities ORDER BY total_award_value DESC NULLS LAST LIMIT 50`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER(WHERE verified=true)::int AS verified, COUNT(DISTINCT buyer_entity_id)::int AS entities, COUNT(DISTINCT domain)::int AS domains FROM buyer_contacts`),
+    safePool(`SELECT bc.email, bc.name, bc.role, bc.confidence_score, bc.verified, bc.domain, bc.source, bc.discovered_at, be.name AS org_name FROM buyer_contacts bc LEFT JOIN buyer_entities be ON be.id=bc.buyer_entity_id ORDER BY bc.confidence_score DESC LIMIT 50`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER(WHERE significance='high')::int AS high, COUNT(*) FILTER(WHERE source='ons')::int AS ons, COUNT(*) FILTER(WHERE source='land_registry')::int AS lr FROM early_signals`),
+    safePool(`SELECT source, indicator, region, period, change_pct, significance, narrative, fetched_at FROM early_signals ORDER BY fetched_at DESC LIMIT 50`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT stage)::int AS stages, COUNT(*)::int FILTER(WHERE stage='open_tender') AS open, COUNT(*)::int FILTER(WHERE stage='awarded') AS awarded FROM opportunity_lifecycle`),
+    safePool(`SELECT buyer, title, stage, maturity_score, desk_category, stage_entered_at, source_url FROM opportunity_lifecycle ORDER BY stage_entered_at DESC LIMIT 50`),
+    safePool(`SELECT COUNT(*)::int AS total FROM lifecycle_transitions`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -14918,6 +15018,16 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const scansByDayDb    = scansByDayRes.rows        as any[];
   const gradeDistDb     = gradeDistRes.rows         as any[];
   const dbActiveSubCount = Number((activeSubCountRes.rows[0] as any)?.cnt || 0);
+
+  const buyerStats  = (buyerStatsRes.rows[0] as any) || {};
+  const buyerList   = buyerListRes.rows as any[];
+  const contactStats = (contactStatsRes.rows[0] as any) || {};
+  const contactList  = contactListRes.rows as any[];
+  const earlySignalStats = (earlySignalStatsRes.rows[0] as any) || {};
+  const earlySignalList  = earlySignalListRes.rows as any[];
+  const lifecycleStats   = (lifecycleStatsRes.rows[0] as any) || {};
+  const lifecycleList    = lifecycleListRes.rows as any[];
+  const lifecycleTransitionCount = Number((lifecycleTransitionCountRes.rows[0] as any)?.total || 0);
 
   // Build article-likes lookup map by article_id
   const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
@@ -15350,6 +15460,11 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comments${Number(commentStats.pending||0)>0?` <span class="sb-count" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)">${commentStats.pending}</span>`:""}</a>
     <a href="#assets" class="sb-link">Assets &amp; Revisions</a>
     <a href="#redirects" class="sb-link">Slug Redirects <span class="sb-count">${slugRedirects.length}</span></a>
+    <div class="sb-group">Intelligence</div>
+    <a href="#buyers" class="sb-link">Buyer Entities <span class="sb-count">${Number(buyerStats.total||0).toLocaleString()}</span></a>
+    <a href="#contacts" class="sb-link">Contacts <span class="sb-count">${Number(contactStats.total||0).toLocaleString()}</span></a>
+    <a href="#early-signals" class="sb-link">Early Signals <span class="sb-count">${Number(earlySignalStats.total||0).toLocaleString()}</span></a>
+    <a href="#lifecycle" class="sb-link">Lifecycle <span class="sb-count">${Number(lifecycleStats.total||0).toLocaleString()}</span></a>
     <div class="sb-group">Admin</div>
     <a href="#audit" class="sb-link">Audit Log <span class="sb-count">${auditLog.length}</span></a>
     <a href="#deskcache" class="sb-link">Desk Cache <span class="sb-count">${deskCache.length}</span></a>
@@ -15945,6 +16060,156 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all desk caches?')">
     <button class="a-btn a-btn-ok" type="submit">↻ Rebuild all desk caches</button>
   </form>
+</section>
+<div class="gap"></div>
+
+<!-- §I1 BUYER ENTITIES -->
+<section class="section" id="buyers">
+  <div class="s-head">
+    <div>
+      <div class="s-title">Buyer Entities</div>
+      <div class="s-sub">${Number(buyerStats.total||0).toLocaleString()} organisations resolved · ${Number(buyerStats.types||0)} buyer types</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="/api/buyers" target="_blank" class="a-btn">JSON API</a>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(buyerStats.total||0).toLocaleString()}</div><div class="mc-lbl">Total Entities</div></div>
+    <div class="metric-card"><div class="mc-val">${Number(buyerStats.types||0)}</div><div class="mc-lbl">Buyer Types</div></div>
+    <div class="metric-card"><div class="mc-val" style="font-size:13px">${buyerStats.last_seen ? String(buyerStats.last_seen).slice(0,10) : "—"}</div><div class="mc-lbl">Last Seen</div></div>
+  </div>
+  ${buyerList.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No buyer entities yet — runs after first signal refresh</div>`
+    : `<div style="overflow-x:auto"><table class="a-tbl">
+        <thead><tr><th>Organisation</th><th>Type</th><th>Total Contracts</th><th>Total Value</th><th>Last Seen</th></tr></thead>
+        <tbody>${buyerList.map((b: any) => `<tr>
+          <td style="font-weight:500;max-width:220px">${escapeHtml((b.name||"").slice(0,50))}</td>
+          <td><span class="pill" style="font-size:9px;text-transform:capitalize">${escapeHtml((b.buyer_type||"unknown").replace(/_/g," "))}</span></td>
+          <td style="font-family:var(--mono);font-size:12px;text-align:center">${Number(b.total_awards||0).toLocaleString()}</td>
+          <td style="font-family:var(--mono);font-size:12px">£${Number(b.total_award_value||0).toLocaleString()}</td>
+          <td style="white-space:nowrap;font-family:var(--mono);font-size:11px">${b.last_seen ? String(b.last_seen).slice(0,10) : "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §I2 CONTACTS -->
+<section class="section" id="contacts">
+  <div class="s-head">
+    <div>
+      <div class="s-title">Buyer Contacts</div>
+      <div class="s-sub">${Number(contactStats.total||0).toLocaleString()} discovered · ${Number(contactStats.verified||0)} verified · ${Number(contactStats.domains||0)} domains</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <form method="POST" action="/api/early-signals/refresh?token=${encodeURIComponent(token)}" style="display:inline">
+        <button class="a-btn" type="submit" style="font-size:10px">↻ Refresh Early Signals</button>
+      </form>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(contactStats.total||0).toLocaleString()}</div><div class="mc-lbl">Total Contacts</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--green)">${Number(contactStats.verified||0).toLocaleString()}</div><div class="mc-lbl">Verified</div></div>
+    <div class="metric-card"><div class="mc-val">${Number(contactStats.entities||0).toLocaleString()}</div><div class="mc-lbl">Buyer Orgs</div></div>
+    <div class="metric-card"><div class="mc-val">${Number(contactStats.domains||0).toLocaleString()}</div><div class="mc-lbl">Domains</div></div>
+  </div>
+  ${contactList.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No contacts yet — triggered via POST /api/buyers/:id/discover-contacts</div>`
+    : `<div style="overflow-x:auto"><table class="a-tbl">
+        <thead><tr><th>Email</th><th>Name</th><th>Org</th><th>Role</th><th>Source</th><th>Score</th><th>Verified</th><th>Discovered</th></tr></thead>
+        <tbody>${contactList.map((c: any) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml(c.email||"")}</td>
+          <td style="font-size:12px">${escapeHtml(c.name||"—")}</td>
+          <td style="font-size:11px;max-width:160px">${escapeHtml((c.org_name||"").slice(0,40))}</td>
+          <td style="font-size:11px;text-transform:capitalize">${escapeHtml((c.role||"—").replace(/_/g," "))}</td>
+          <td><span class="pill" style="font-size:9px">${escapeHtml(c.source||"")}</span></td>
+          <td style="font-family:var(--mono);font-size:12px;text-align:center;font-weight:600">${c.confidence_score||0}</td>
+          <td style="text-align:center">${c.verified ? `<span style="color:var(--green)">✓</span>` : `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="white-space:nowrap;font-family:var(--mono);font-size:10px">${c.discovered_at ? String(c.discovered_at).slice(0,10) : "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §I3 EARLY SIGNALS -->
+<section class="section" id="early-signals">
+  <div class="s-head">
+    <div>
+      <div class="s-title">Early Signals</div>
+      <div class="s-sub">${Number(earlySignalStats.total||0).toLocaleString()} signals · ${Number(earlySignalStats.high||0)} high significance · ${Number(earlySignalStats.ons||0)} ONS · ${Number(earlySignalStats.lr||0)} Land Registry</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="/api/early-signals" target="_blank" class="a-btn">JSON API</a>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(earlySignalStats.total||0).toLocaleString()}</div><div class="mc-lbl">Total Signals</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:#e87979">${Number(earlySignalStats.high||0)}</div><div class="mc-lbl">High Significance</div></div>
+    <div class="metric-card"><div class="mc-val">${Number(earlySignalStats.ons||0)}</div><div class="mc-lbl">ONS Signals</div></div>
+    <div class="metric-card"><div class="mc-val">${Number(earlySignalStats.lr||0)}</div><div class="mc-lbl">Land Registry</div></div>
+  </div>
+  ${earlySignalList.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No early signals yet — POST /api/early-signals/refresh to seed</div>`
+    : `<div style="overflow-x:auto"><table class="a-tbl">
+        <thead><tr><th>Source</th><th>Indicator</th><th>Region</th><th>Period</th><th>Change %</th><th>Significance</th><th>Narrative</th><th>Fetched</th></tr></thead>
+        <tbody>${earlySignalList.map((s: any) => {
+          const sig = String(s.significance||"low");
+          const sigColor = sig === "high" ? "#e87979" : sig === "medium" ? "#B4924E" : "var(--muted)";
+          const changePct = s.change_pct != null ? `${Number(s.change_pct) > 0 ? "+" : ""}${Number(s.change_pct).toFixed(1)}%` : "—";
+          return `<tr>
+            <td><span class="pill" style="font-size:9px;text-transform:uppercase">${escapeHtml(s.source||"")}</span></td>
+            <td style="font-family:var(--mono);font-size:11px">${escapeHtml((s.indicator||"").replace(/_/g," "))}</td>
+            <td style="font-size:12px">${escapeHtml(s.region||"")}</td>
+            <td style="font-family:var(--mono);font-size:11px">${escapeHtml(s.period||"")}</td>
+            <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:${Number(s.change_pct||0)>0?"var(--green)":"#e87979"}">${changePct}</td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:${sigColor};text-transform:uppercase;font-weight:600">${escapeHtml(sig)}</span></td>
+            <td style="font-size:11px;max-width:240px;white-space:normal;line-height:1.4">${escapeHtml((s.narrative||"").slice(0,120))}</td>
+            <td style="white-space:nowrap;font-family:var(--mono);font-size:10px">${s.fetched_at ? String(s.fetched_at).slice(0,10) : "—"}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §I4 LIFECYCLE -->
+<section class="section" id="lifecycle">
+  <div class="s-head">
+    <div>
+      <div class="s-title">Procurement Lifecycle</div>
+      <div class="s-sub">${Number(lifecycleStats.total||0).toLocaleString()} opportunities tracked · ${Number(lifecycleStats.open||0)} open tender · ${Number(lifecycleStats.awarded||0)} awarded · ${lifecycleTransitionCount} transitions</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="/api/lifecycle/summary" target="_blank" class="a-btn">Summary JSON</a>
+      <a href="/api/lifecycle/transitions" target="_blank" class="a-btn">Transitions JSON</a>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(lifecycleStats.total||0).toLocaleString()}</div><div class="mc-lbl">Tracked</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--brand)">${Number(lifecycleStats.open||0)}</div><div class="mc-lbl">Open Tender</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--green)">${Number(lifecycleStats.awarded||0)}</div><div class="mc-lbl">Awarded</div></div>
+    <div class="metric-card"><div class="mc-val">${lifecycleTransitionCount}</div><div class="mc-lbl">Transitions</div></div>
+  </div>
+  ${lifecycleList.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No lifecycle data yet — populates after signal refresh</div>`
+    : `<div style="overflow-x:auto"><table class="a-tbl">
+        <thead><tr><th>Buyer</th><th>Title</th><th>Stage</th><th>Maturity</th><th>Desk</th><th>Entered</th><th>Source</th></tr></thead>
+        <tbody>${lifecycleList.map((l: any) => {
+          const stage = String(l.stage||"unknown");
+          const stageColor = stage === "open_tender" ? "var(--brand)" : stage === "awarded" ? "var(--green)" : stage === "planning" ? "#B4924E" : "var(--muted)";
+          const maturity = Number(l.maturity_score||0);
+          const mbarColor = maturity >= 80 ? "var(--green)" : maturity >= 50 ? "var(--brand)" : "#B4924E";
+          const maturityBar = `<div style="display:flex;align-items:center;gap:6px"><div style="width:60px;height:5px;background:rgba(0,0,0,.1);border-radius:3px"><div style="width:${maturity}%;height:100%;background:${mbarColor};border-radius:3px"></div></div><span style="font-family:var(--mono);font-size:10px">${maturity}</span></div>`;
+          return `<tr>
+            <td style="font-size:11px;max-width:140px;font-weight:500">${escapeHtml((l.buyer||"").slice(0,40))}</td>
+            <td style="font-size:11px;max-width:200px;white-space:normal;line-height:1.3">${escapeHtml((l.title||"").slice(0,80))}</td>
+            <td><span style="font-family:var(--mono);font-size:9px;color:${stageColor};text-transform:uppercase;font-weight:600">${escapeHtml(stage.replace(/_/g," "))}</span></td>
+            <td>${maturityBar}</td>
+            <td style="font-family:var(--mono);font-size:10px">${escapeHtml(l.desk_category||"—")}</td>
+            <td style="white-space:nowrap;font-family:var(--mono);font-size:10px">${l.stage_entered_at ? String(l.stage_entered_at).slice(0,10) : "—"}</td>
+            <td>${l.source_url ? `<a href="${escapeHtml(l.source_url)}" target="_blank" class="a-btn" style="font-size:9px;padding:3px 7px">↗</a>` : `<span style="color:var(--muted)">—</span>`}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>`}
 </section>
 <div class="gap"></div>
 
@@ -16658,6 +16923,11 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 });
 
 initDb()
+  .then(() => initBuyerGraphTables())
+  .then(() => initEmailDiscoveryTables())
+  .then(() => initEarlySignalsTables())
+  .then(() => initLifecycleTables())
+  .then(() => pool ? initCanonicalTables(pool) : Promise.resolve())
   .then(() => {
     // Railway split-runtime setup later:
     // web service: RUN_WEB=true, RUN_WORKER=false
