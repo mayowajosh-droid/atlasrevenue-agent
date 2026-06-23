@@ -22,6 +22,7 @@ export async function initBuyerGraphTables() {
       last_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    DROP INDEX IF EXISTS idx_buyer_entities_normalised;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_buyer_entities_normalised ON buyer_entities (normalised_name);
     CREATE INDEX IF NOT EXISTS idx_buyer_entities_company_number ON buyer_entities (company_number) WHERE company_number IS NOT NULL;
   `);
