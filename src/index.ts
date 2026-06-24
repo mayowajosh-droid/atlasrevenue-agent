@@ -5604,7 +5604,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
       </div>
       <div class="fp-col">
         <span class="fp-head">Intelligence</span>
-        <a href="/desks">All desks</a><a href="/signals">Live signals</a><a href="/intelligence">Executive view</a><a href="/scan/sample">Sample report</a>
+        <a href="/desks">All desks</a><a href="/signals">Live signals</a><a href="/atlas">Atlas</a><a href="/scan/sample">Sample report</a>
       </div>
     </div>
   </div>
@@ -8621,6 +8621,756 @@ app.get("/intelligence", asyncRoute(async (req, res) => {
 
   res.type("html").send(executiveIntelligencePage({ deskSummaries, topSignals, platformStats, recentAwards: recentAwards.slice(0, 12), authCtx }));
 }));
+
+// ── Map API — aggregate demand by district ────────────────────────────────────
+
+app.get("/api/map/data", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "roofing").trim().toLowerCase();
+  if (!pool) { res.json({ districts: [] }); return; }
+
+  // Awarded contracts by district (from canonical_ingest buyer field + title match)
+  const contractsR = await pool.query<{ district: string; count: string; total_value: string }>(
+    `SELECT
+       COALESCE(NULLIF(TRIM(buyer_region), ''), TRIM(buyer), 'Unknown') AS district,
+       COUNT(*) AS count,
+       COALESCE(SUM(value), 0) AS total_value
+     FROM canonical_ingest
+     WHERE LOWER(title) LIKE $1
+       AND status IN ('awarded', 'processed', 'pending')
+       AND fetched_at > now() - interval '18 months'
+     GROUP BY district
+     ORDER BY count DESC
+     LIMIT 150`,
+    [`%${q}%`]
+  ).catch(() => ({ rows: [] as any[] }));
+
+  // Planning applications by local authority (keyword match on description)
+  const planningR = await pool.query<{ district: string; count: string }>(
+    `SELECT local_authority AS district, COUNT(*) AS count
+     FROM planning_applications
+     WHERE (LOWER(description) LIKE $1 OR LOWER(applicant_name) LIKE $1)
+       AND local_authority IS NOT NULL
+       AND received_date > now() - interval '18 months'
+     GROUP BY local_authority
+     ORDER BY count DESC
+     LIMIT 150`,
+    [`%${q}%`]
+  ).catch(() => ({ rows: [] as any[] }));
+
+  // Merge both sets keyed by district name
+  const merged = new Map<string, { contracts: number; planning: number; value: number }>();
+
+  for (const r of contractsR.rows as any[]) {
+    const d = String(r.district || "").trim();
+    if (!d || d === "Unknown" || d.length < 3) continue;
+    const e = merged.get(d) || { contracts: 0, planning: 0, value: 0 };
+    e.contracts += parseInt(r.count || "0");
+    e.value += parseFloat(r.total_value || "0");
+    merged.set(d, e);
+  }
+  for (const r of planningR.rows as any[]) {
+    const d = String(r.district || "").trim();
+    if (!d || d.length < 3) continue;
+    const e = merged.get(d) || { contracts: 0, planning: 0, value: 0 };
+    e.planning += parseInt(r.count || "0");
+    merged.set(d, e);
+  }
+
+  const districts = [...merged.entries()]
+    .map(([name, v]) => ({ name, contracts: v.contracts, planning: v.planning, value: v.value, total: v.contracts + v.planning }))
+    .filter(d => d.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 120);
+
+  res.json({ query: q, districts, totalDistricts: districts.length });
+}));
+
+// ── Shared geo data ───────────────────────────────────────────────────────────
+
+const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
+    // England — London
+    "City of London": [51.5155, -0.0922], "Westminster": [51.4973, -0.1372], "Camden": [51.5292, -0.1426],
+    "Islington": [51.5362, -0.1033], "Hackney": [51.5451, -0.0553], "Tower Hamlets": [51.5099, -0.0059],
+    "Southwark": [51.4879, -0.0770], "Lambeth": [51.4571, -0.1231], "Wandsworth": [51.4571, -0.1919],
+    "Hammersmith and Fulham": [51.4927, -0.2339], "Kensington and Chelsea": [51.4991, -0.1938],
+    "Ealing": [51.5130, -0.3089], "Brent": [51.5673, -0.2713], "Barnet": [51.6252, -0.1517],
+    "Haringey": [51.5906, -0.1113], "Enfield": [51.6538, -0.0799], "Waltham Forest": [51.5908, -0.0134],
+    "Redbridge": [51.5590, 0.0741], "Havering": [51.5812, 0.2128], "Barking and Dagenham": [51.5607, 0.1557],
+    "Newham": [51.5077, 0.0469], "Greenwich": [51.4892, 0.0648], "Lewisham": [51.4452, -0.0209],
+    "Bromley": [51.4039, 0.0198], "Croydon": [51.3762, -0.0982], "Sutton": [51.3618, -0.1945],
+    "Merton": [51.4098, -0.1949], "Kingston upon Thames": [51.4085, -0.3064], "Richmond upon Thames": [51.4479, -0.3260],
+    "Hounslow": [51.4746, -0.3680], "Hillingdon": [51.5441, -0.4760], "Harrow": [51.5836, -0.3464],
+    // England — South East
+    "Brighton and Hove": [50.8429, -0.1313], "Canterbury": [51.2802, 1.0789], "Maidstone": [51.2720, 0.5290],
+    "Medway": [51.3963, 0.5392], "Tunbridge Wells": [51.1324, 0.2637], "Sevenoaks": [51.2777, 0.1877],
+    "Folkestone and Hythe": [51.0815, 1.1697], "Dover": [51.1279, 1.3134], "Thanet": [51.3651, 1.3898],
+    "Swale": [51.3372, 0.7441], "Tonbridge and Malling": [51.1969, 0.2762], "Dartford": [51.4441, 0.2170],
+    "Gravesham": [51.4417, 0.3688], "Shepway": [51.0815, 1.1697], "Rother": [50.8615, 0.5748],
+    "Eastbourne": [50.7687, 0.2874], "Hastings": [50.8543, 0.5730], "Lewes": [50.8739, 0.0094],
+    "Worthing": [50.8120, -0.3728], "Arun": [50.8370, -0.5486], "Adur": [50.8279, -0.2716],
+    "Horsham": [51.0620, -0.3257], "Mid Sussex": [50.9969, -0.1378], "Crawley": [51.1091, -0.1872],
+    "Chichester": [50.8376, -0.7792], "Oxford": [51.7520, -1.2577], "Reading": [51.4543, -0.9781],
+    "Slough": [51.5105, -0.5950], "Windsor and Maidenhead": [51.4806, -0.6226], "Wokingham": [51.4112, -0.8337],
+    "West Berkshire": [51.4296, -1.1442], "Bracknell Forest": [51.4154, -0.7535], "Southampton": [50.9097, -1.4044],
+    "Portsmouth": [50.7989, -1.0919], "Winchester": [51.0632, -1.3080], "Eastleigh": [50.9701, -1.3525],
+    "Fareham": [50.8563, -1.1764], "Gosport": [50.7946, -1.1384], "New Forest": [50.8941, -1.5968],
+    "Test Valley": [51.0632, -1.5143], "Basingstoke and Deane": [51.2665, -1.0876], "Hart": [51.2750, -0.9517],
+    "Rushmoor": [51.2912, -0.7513], "Surrey Heath": [51.3203, -0.7352], "Woking": [51.3168, -0.5600],
+    "Guildford": [51.2362, -0.5704], "Waverley": [51.1844, -0.6278], "Mole Valley": [51.2370, -0.3298],
+    "Reigate and Banstead": [51.2362, -0.2016], "Tandridge": [51.1750, -0.0629], "Elmbridge": [51.3597, -0.3663],
+    "Epsom and Ewell": [51.3352, -0.2686], "Runnymede": [51.3869, -0.5560], "Spelthorne": [51.4333, -0.4959],
+    // England — South West
+    "Bristol": [51.4545, -2.5879], "Bath and North East Somerset": [51.3781, -2.3597], "South Gloucestershire": [51.5265, -2.4728],
+    "North Somerset": [51.3879, -2.7761], "Plymouth": [50.3755, -4.1427], "Torbay": [50.4619, -3.5250],
+    "Exeter": [50.7184, -3.5339], "Devon": [50.7156, -3.5309], "Cornwall": [50.2660, -5.0527],
+    "Dorset": [50.7490, -2.3443], "Bournemouth": [50.7200, -1.8795], "Poole": [50.7155, -1.9872],
+    "Wiltshire": [51.3491, -1.9927], "Swindon": [51.5558, -1.7797], "Gloucestershire": [51.8642, -2.2380],
+    "Cheltenham": [51.8994, -2.0783], "Stroud": [51.7456, -2.2167], "Cotswold": [51.7308, -1.8436],
+    "Tewkesbury": [51.9886, -2.1597], "Forest of Dean": [51.7722, -2.5519], "Somerset": [51.1051, -2.9262],
+    // England — East of England
+    "Cambridge": [52.2053, 0.1218], "Peterborough": [52.5695, -0.2405], "Norwich": [52.6309, 1.2974],
+    "Ipswich": [52.0567, 1.1482], "Colchester": [51.8958, 0.8919], "Chelmsford": [51.7362, 0.4691],
+    "Southend-on-Sea": [51.5460, 0.7077], "Thurrock": [51.4940, 0.3529], "Luton": [51.8787, -0.4200],
+    "Bedford": [52.1363, -0.4650], "Milton Keynes": [52.0406, -0.7594], "Watford": [51.6565, -0.3960],
+    "St Albans": [51.7550, -0.3360], "Hertsmere": [51.6536, -0.2380], "Three Rivers": [51.6464, -0.4219],
+    "Dacorum": [51.7625, -0.4444], "Welwyn Hatfield": [51.8024, -0.2232], "North Hertfordshire": [51.9279, -0.2547],
+    "East Hertfordshire": [51.8702, 0.0145], "Broxbourne": [51.7465, -0.0218], "Stevenage": [51.9002, -0.2019],
+    "Harlow": [51.7783, 0.1464], "Braintree": [51.8780, 0.5500], "Uttlesford": [51.9576, 0.2353],
+    "Epping Forest": [51.6966, 0.1116], "Brentwood": [51.6215, 0.3050], "Basildon": [51.5773, 0.4900],
+    "Rochford": [51.5840, 0.7072], "Castle Point": [51.5506, 0.6866], "Maldon": [51.7301, 0.6763],
+    "Tendring": [51.8581, 1.1746], "Babergh": [52.0219, 0.9731], "Mid Suffolk": [52.1866, 1.1204],
+    "Suffolk Coastal": [52.0726, 1.3883], "Waveney": [52.4639, 1.7237], "Forest Heath": [52.3433, 0.5625],
+    "St Edmundsbury": [52.2439, 0.7129], "South Norfolk": [52.5073, 1.2178], "Broadland": [52.6739, 1.3698],
+    "Great Yarmouth": [52.6078, 1.7292], "North Norfolk": [52.8579, 1.1819], "King's Lynn and West Norfolk": [52.7520, 0.3979],
+    "Breckland": [52.5680, 0.8907], "South Cambridgeshire": [52.1559, 0.0759], "East Cambridgeshire": [52.3432, 0.2617],
+    "Fenland": [52.5273, -0.0729], "Huntingdonshire": [52.3310, -0.1833],
+    // England — East Midlands
+    "Leicester": [52.6369, -1.1398], "Nottingham": [52.9548, -1.1581], "Derby": [52.9225, -1.4746],
+    "Lincoln": [53.2307, -0.5406], "Northampton": [52.2405, -0.9027],
+    "Chesterfield": [53.2350, -1.4210], "Mansfield": [53.1471, -1.1954], "Newark and Sherwood": [53.0762, -0.8028],
+    "Rushcliffe": [52.9026, -1.1050], "Gedling": [52.9890, -1.0820], "Broxtowe": [52.9702, -1.2447],
+    "Ashfield": [53.0166, -1.2590], "Basford": [52.9822, -1.1741], "Erewash": [52.8937, -1.2880],
+    "Amber Valley": [52.9932, -1.4579], "South Derbyshire": [52.7818, -1.5533], "High Peak": [53.3649, -1.8699],
+    "Derbyshire Dales": [53.1001, -1.6693], "Bolsover": [53.2289, -1.2965], "Rutland": [52.6581, -0.6474],
+    "Blaby": [52.5674, -1.1912], "Harborough": [52.4765, -0.9222], "Hinckley and Bosworth": [52.5413, -1.3630],
+    "Melton": [52.7731, -0.8867], "North West Leicestershire": [52.7264, -1.3714], "Oadby and Wigston": [52.5984, -1.0972],
+    "Corby": [52.4933, -0.6967], "Daventry": [52.2573, -1.1619], "East Northamptonshire": [52.3733, -0.6093],
+    "Kettering": [52.3978, -0.7226], "South Northamptonshire": [52.1208, -1.1249],
+    "Wellingborough": [52.3030, -0.6984],
+    // England — West Midlands
+    "Birmingham": [52.4862, -1.8904], "Wolverhampton": [52.5855, -2.1291], "Coventry": [52.4068, -1.5197],
+    "Dudley": [52.5088, -2.0870], "Sandwell": [52.5067, -2.0028], "Solihull": [52.4131, -1.7781],
+    "Walsall": [52.5864, -1.9826], "Stoke-on-Trent": [53.0027, -2.1794], "Worcester": [52.1927, -2.2200],
+    "Herefordshire": [52.0567, -2.7148], "Shrewsbury and Atcham": [52.7082, -2.7535], "Telford and Wrekin": [52.6766, -2.4469],
+    "Shropshire": [52.5985, -2.7385], "Warwick": [52.2823, -1.5849], "Stratford-on-Avon": [52.1916, -1.7074],
+    "North Warwickshire": [52.5653, -1.5997], "Nuneaton and Bedworth": [52.5241, -1.4709], "Rugby": [52.3710, -1.2642],
+    "Redditch": [52.3065, -1.9498], "Bromsgrove": [52.3375, -2.0609], "Malvern Hills": [52.1133, -2.3229],
+    "Wychavon": [52.0803, -1.9782], "Wyre Forest": [52.3892, -2.2278], "Cannock Chase": [52.6904, -2.0310],
+    "East Staffordshire": [52.8121, -1.6671], "Lichfield": [52.6813, -1.8274], "Newcastle-under-Lyme": [52.9993, -2.2276],
+    "South Staffordshire": [52.5549, -2.1697], "Stafford": [52.8076, -2.1177], "Staffordshire Moorlands": [53.0767, -1.9694],
+    "Tamworth": [52.6342, -1.6920],
+    // England — Yorkshire and Humber
+    "Leeds": [53.8008, -1.5491], "Sheffield": [53.3811, -1.4701], "Bradford": [53.7960, -1.7594],
+    "Hull": [53.7676, -0.3274], "York": [53.9600, -1.0873], "Rotherham": [53.4326, -1.3635],
+    "Barnsley": [53.5527, -1.4797], "Doncaster": [53.5228, -1.1285], "Calderdale": [53.7234, -1.8658],
+    "Kirklees": [53.5933, -1.7998], "Wakefield": [53.6833, -1.4977], "East Riding of Yorkshire": [53.8394, -0.4336],
+    "North East Lincolnshire": [53.5652, -0.0796], "North Lincolnshire": [53.6060, -0.5600],
+    "Harrogate": [53.9923, -1.5418], "Selby": [53.7826, -1.0708], "Scarborough": [54.2777, -0.4014],
+    "Ryedale": [54.1397, -0.7597], "Hambleton": [54.2973, -1.3475], "Richmondshire": [54.4038, -1.7286],
+    "Craven": [54.0057, -2.1007],
+    // England — North West
+    "Manchester": [53.4808, -2.2426], "Liverpool": [53.4084, -2.9916], "Salford": [53.4830, -2.2931],
+    "Stockport": [53.4083, -2.1494], "Bolton": [53.5780, -2.4282], "Bury": [53.5934, -2.2968],
+    "Oldham": [53.5409, -2.1114], "Rochdale": [53.6097, -2.1561], "Tameside": [53.4803, -2.0806],
+    "Trafford": [53.4595, -2.3332], "Wigan": [53.5444, -2.6376], "Knowsley": [53.4547, -2.8547],
+    "Sefton": [53.5035, -3.0075], "St Helens": [53.4541, -2.7366], "Halton": [53.3615, -2.7198],
+    "Warrington": [53.3900, -2.5970], "Cheshire East": [53.1615, -2.2193], "Cheshire West and Chester": [53.1906, -2.7424],
+    "Lancaster": [54.0466, -2.8007], "Preston": [53.7632, -2.7036], "Blackpool": [53.8175, -3.0357],
+    "Blackburn with Darwen": [53.7489, -2.4822], "Burnley": [53.7895, -2.2479], "Pendle": [53.8599, -2.1894],
+    "Ribble Valley": [53.8823, -2.3932], "Rossendale": [53.7038, -2.2993], "Hyndburn": [53.7525, -2.3773],
+    "Chorley": [53.6536, -2.6326], "South Ribble": [53.7250, -2.6820], "Fylde": [53.8228, -2.9300],
+    "Wyre": [53.8900, -2.9350], "West Lancashire": [53.5583, -2.8887],
+    // England — North East
+    "Newcastle upon Tyne": [54.9783, -1.6174], "Sunderland": [54.9066, -1.3814], "Middlesbrough": [54.5742, -1.2350],
+    "Gateshead": [54.9526, -1.6014], "South Tyneside": [54.9639, -1.4415], "North Tyneside": [55.0174, -1.4804],
+    "Stockton-on-Tees": [54.5660, -1.3208], "Hartlepool": [54.6919, -1.2125], "Darlington": [54.5264, -1.5530],
+    "Durham": [54.7761, -1.5738], "Redcar and Cleveland": [54.6025, -1.0697], "Northumberland": [55.2083, -1.9726],
+    // Wales
+    "Cardiff": [51.4816, -3.1791], "Swansea": [51.6214, -3.9436], "Newport": [51.5842, -2.9977],
+    "Rhondda Cynon Taf": [51.6489, -3.4280], "Caerphilly": [51.5781, -3.2191], "Bridgend": [51.5051, -3.5784],
+    "Vale of Glamorgan": [51.4010, -3.4813], "Neath Port Talbot": [51.6624, -3.8001], "Merthyr Tydfil": [51.7459, -3.3784],
+    "Blaenau Gwent": [51.7868, -3.1964], "Torfaen": [51.7002, -3.0440], "Monmouthshire": [51.8115, -2.7160],
+    "Powys": [52.3632, -3.3863], "Ceredigion": [52.2179, -3.9673], "Pembrokeshire": [51.8051, -4.9728],
+    "Carmarthenshire": [51.8567, -4.3120], "Wrexham": [53.0429, -3.0041],
+    "Flintshire": [53.1682, -3.1420], "Denbighshire": [53.1842, -3.4229], "Conwy": [53.2802, -3.8288],
+    "Gwynedd": [52.9270, -3.9855], "Anglesey": [53.2260, -4.2015],
+    // Scotland
+    "Glasgow": [55.8642, -4.2518], "Edinburgh": [55.9533, -3.1883], "Aberdeen": [57.1497, -2.0943],
+    "Dundee": [56.4620, -2.9707], "Inverness": [57.4778, -4.2247], "Perth": [56.3950, -3.4313],
+    "Stirling": [56.1166, -3.9369], "Falkirk": [56.0019, -3.7839], "Dunfermline": [56.0720, -3.4539],
+    "Paisley": [55.8466, -4.4236], "East Ayrshire": [55.4416, -4.2713], "North Ayrshire": [55.6352, -4.7218],
+    "South Ayrshire": [55.4579, -4.6314], "Highland": [57.4778, -4.2247], "Fife": [56.2082, -3.1495],
+    "South Lanarkshire": [55.5870, -3.7810], "North Lanarkshire": [55.8679, -3.9849], "East Lothian": [55.9490, -2.7765],
+    "Midlothian": [55.8267, -3.0836], "West Lothian": [55.9021, -3.5215], "Clackmannanshire": [56.1143, -3.7820],
+    // Northern Ireland
+    "Belfast": [54.5973, -5.9301], "Derry": [54.9958, -7.3074], "Armagh": [54.3503, -6.6528],
+    "Newry": [54.1751, -6.3402], "Lisburn": [54.5162, -6.0582], "Antrim": [54.7195, -6.2081],
+};
+
+// ── Atlas (geo intelligence command centre) ───────────────────────────────────
+
+app.get("/atlas", asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req);
+  const q = String(req.query.q || "roofing").trim();
+  res.type("html").send(atlasPage(q, authCtx));
+}));
+
+app.get("/map", (_req, res) => res.redirect(301, "/atlas"));
+
+function atlasPage(defaultQuery: string, authCtx?: { email: string; tier: UserTier } | null): string {
+  const authHtml = authCtx
+    ? `<a href="/account" class="atl-auth-lnk">Dashboard</a><a href="/logout" class="atl-auth-lnk">Sign out</a>`
+    : `<a href="/login" class="atl-auth-lnk">Sign in</a><a href="/scan" class="atl-auth-cta">Run a scan →</a>`;
+  const q = escapeHtml(defaultQuery);
+  const centroidsJson = JSON.stringify(DISTRICT_CENTROIDS);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Atlas — UK Geo Intelligence — AtlasRevenue</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+${pageShellCss()}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#090a0c}
+
+.atl-hdr{background:#0b0c0e;border-bottom:1px solid rgba(255,255,255,.07);padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:1001;position:relative}
+.atl-logo{font-family:var(--serif);font-size:18px;color:#ECE6D6;text-decoration:none;flex-shrink:0}
+.atl-logo b{color:var(--brand)}
+.atl-vr{width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0}
+.atl-page-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.3);flex-shrink:0}
+.atl-search-wrap{display:flex;flex:1;max-width:400px;gap:0;flex-shrink:0}
+.atl-search-wrap input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-right:none;color:#ECE6D6;font-family:var(--mono);font-size:11px;padding:7px 14px;outline:none;min-width:0;transition:border-color .15s}
+.atl-search-wrap input::placeholder{color:rgba(236,230,214,.25)}
+.atl-search-wrap input:focus{border-color:rgba(255,165,0,.45)}
+.atl-search-btn{background:var(--brand);color:#000;border:none;font-family:var(--mono);font-size:9px;font-weight:900;letter-spacing:.12em;padding:7px 14px;cursor:pointer;text-transform:uppercase;transition:opacity .15s;flex-shrink:0}
+.atl-search-btn:hover{opacity:.85}
+.atl-layers{display:flex;gap:4px;flex-shrink:0}
+.atl-layer{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);color:rgba(236,230,214,.45);font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 10px;cursor:pointer;transition:all .15s;user-select:none}
+.atl-layer:hover{border-color:rgba(255,165,0,.4);color:rgba(236,230,214,.8)}
+.atl-layer.on{background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.45);color:var(--brand)}
+.atl-presets{display:flex;gap:3px;flex-shrink:0}
+.atl-pill{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:rgba(236,230,214,.4);font-family:var(--mono);font-size:8px;letter-spacing:.05em;padding:4px 9px;cursor:pointer;transition:all .15s;white-space:nowrap;border-radius:2px}
+.atl-pill:hover{border-color:rgba(255,165,0,.5);color:rgba(236,230,214,.85);background:rgba(255,165,0,.05)}
+.atl-auth{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
+.atl-auth-lnk{font-family:var(--mono);font-size:9px;color:rgba(236,230,214,.4);text-decoration:none;letter-spacing:.06em;transition:color .15s}
+.atl-auth-lnk:hover{color:var(--brand)}
+.atl-auth-cta{background:var(--brand);color:#000;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;padding:5px 12px;text-decoration:none;text-transform:uppercase}
+
+.atl-body{flex:1;display:grid;grid-template-columns:1fr 296px;overflow:hidden;position:relative}
+#atlas-map{width:100%;height:100%;position:relative}
+
+/* Leaflet dark theme */
+.leaflet-container{background:#070809!important}
+.leaflet-control-attribution{background:rgba(0,0,0,.55)!important;color:rgba(255,255,255,.25)!important;font-size:8px!important}
+.leaflet-control-attribution a{color:rgba(255,255,255,.3)!important}
+.leaflet-control-zoom a{background:#141516!important;color:#ECE6D6!important;border-color:rgba(255,255,255,.1)!important;transition:background .15s!important}
+.leaflet-control-zoom a:hover{background:#1e1f21!important}
+.leaflet-popup-content-wrapper{background:#13141a;border:1px solid rgba(255,255,255,.1);border-radius:2px;box-shadow:0 8px 40px rgba(0,0,0,.7);padding:0}
+.leaflet-popup-content{color:#ECE6D6;font-family:var(--mono);font-size:11px;margin:0;line-height:1.6}
+.leaflet-popup-tip-container{display:none}
+.leaflet-popup-close-button{color:rgba(236,230,214,.4)!important;font-size:16px!important;top:6px!important;right:8px!important}
+
+/* Loading overlay */
+.atl-loader{position:absolute;inset:0;background:rgba(7,8,9,.75);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none;transition:opacity .4s;backdrop-filter:blur(3px)}
+.atl-loader.gone{opacity:0;pointer-events:none}
+.atl-spinner{width:18px;height:18px;border:2px solid rgba(255,165,0,.2);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.atl-loader-txt{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(236,230,214,.45)}
+
+/* Sidebar */
+.atl-side{background:#0b0c0e;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;overflow:hidden}
+.atl-side-top{padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.atl-side-eyebrow{font-family:var(--mono);font-size:7px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.25);margin-bottom:4px}
+.atl-side-q{font-family:var(--serif);font-size:14px;font-weight:600;color:#ECE6D6;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atl-kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.atl-kpi{background:#0b0c0e;padding:9px 14px}
+.atl-kpi-val{font-family:var(--mono);font-size:15px;font-weight:700;color:#ECE6D6;letter-spacing:-.02em;line-height:1}
+.atl-kpi-lbl{font-family:var(--mono);font-size:7px;letter-spacing:.15em;text-transform:uppercase;color:rgba(236,230,214,.28);margin-top:3px}
+.atl-legend{display:flex;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0;align-items:center}
+.atl-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.atl-legend-lbl{font-family:var(--mono);font-size:8px;color:rgba(236,230,214,.4);letter-spacing:.04em}
+.atl-rank-hd{padding:9px 14px 7px;font-family:var(--mono);font-size:7px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.25);border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
+.atl-rank-list{flex:1;overflow-y:auto}
+.atl-rank-list::-webkit-scrollbar{width:2px}
+.atl-rank-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
+.atl-rank-row{padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;transition:background .1s;display:grid;grid-template-columns:18px 1fr 48px 24px;align-items:center;gap:6px}
+.atl-rank-row:hover{background:rgba(255,255,255,.035)}
+.atl-rank-row.hi{background:rgba(255,165,0,.05);border-left:2px solid var(--brand)}
+.atl-rk-n{font-family:var(--mono);font-size:8px;color:rgba(236,230,214,.2);text-align:right}
+.atl-rk-name{font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atl-rk-bar{height:2px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
+.atl-rk-bar-f{height:100%;border-radius:1px;transition:width .5s}
+.atl-rk-ct{font-family:var(--mono);font-size:9px;color:rgba(236,230,214,.45);text-align:right}
+.atl-empty{padding:28px 16px;text-align:center;font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.25);line-height:1.9}
+
+/* Status bar */
+.atl-bar{height:30px;background:#070809;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 18px;gap:20px;flex-shrink:0}
+.atl-live{width:5px;height:5px;border-radius:50%;background:var(--brand);animation:blink 2.5s ease infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.atl-stat{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,230,214,.3);display:flex;gap:5px;align-items:center}
+.atl-stat b{color:rgba(236,230,214,.65);font-weight:700}
+.atl-bar-nav{margin-left:auto;display:flex;gap:14px}
+.atl-bar-nav a{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,230,214,.25);text-decoration:none;transition:color .15s}
+.atl-bar-nav a:hover{color:rgba(236,230,214,.7)}
+
+@media(max-width:900px){.atl-presets,.atl-side{display:none}.atl-body{grid-template-columns:1fr}}
+</style>
+</head>
+<body style="display:flex;flex-direction:column;height:100%">
+
+<div class="atl-hdr">
+  <a href="/" class="atl-logo">Atlas<b>Revenue</b></a>
+  <div class="atl-vr"></div>
+  <span class="atl-page-lbl">Atlas</span>
+  <div class="atl-search-wrap">
+    <input id="atl-q" type="text" value="${q}" placeholder="service keyword — roofing, IT, social care, energy…" autocomplete="off">
+    <button class="atl-search-btn" id="atl-go">Search</button>
+  </div>
+  <div class="atl-layers">
+    <span class="atl-layer on" data-layer="contracts">Contracts</span>
+    <span class="atl-layer on" data-layer="planning">Planning</span>
+  </div>
+  <div class="atl-presets">
+    <span class="atl-pill" data-q="roofing">Roofing</span>
+    <span class="atl-pill" data-q="construction">Construction</span>
+    <span class="atl-pill" data-q="social care">Social Care</span>
+    <span class="atl-pill" data-q="IT services">IT</span>
+    <span class="atl-pill" data-q="energy">Energy</span>
+    <span class="atl-pill" data-q="cleaning">Cleaning</span>
+    <span class="atl-pill" data-q="security">Security</span>
+    <span class="atl-pill" data-q="waste management">Waste</span>
+  </div>
+  <div class="atl-auth">${authHtml}</div>
+</div>
+
+<div class="atl-body">
+  <div id="atlas-map">
+    <div class="atl-loader" id="atl-ldr">
+      <div class="atl-spinner"></div>
+      <span class="atl-loader-txt">Scanning procurement records…</span>
+    </div>
+  </div>
+  <div class="atl-side">
+    <div class="atl-side-top">
+      <div class="atl-side-eyebrow">Demand profile</div>
+      <div class="atl-side-q" id="atl-side-q">${q}</div>
+    </div>
+    <div class="atl-kpis">
+      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-z">—</div><div class="atl-kpi-lbl">Districts</div></div>
+      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-c">—</div><div class="atl-kpi-lbl">Contracts</div></div>
+      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-p">—</div><div class="atl-kpi-lbl">Planning</div></div>
+      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-v">—</div><div class="atl-kpi-lbl">Est. value</div></div>
+    </div>
+    <div class="atl-legend">
+      <div class="atl-legend-dot" style="background:#ef4444"></div><span class="atl-legend-lbl">High demand</span>
+      <div class="atl-legend-dot" style="background:#f97316"></div><span class="atl-legend-lbl">Medium</span>
+      <div class="atl-legend-dot" style="background:#3b82f6"></div><span class="atl-legend-lbl">Low</span>
+    </div>
+    <div class="atl-rank-hd">Top demand zones</div>
+    <div class="atl-rank-list" id="atl-ranks">
+      <div class="atl-empty">Enter a keyword above<br>to map UK contract demand</div>
+    </div>
+  </div>
+</div>
+
+<div class="atl-bar">
+  <div class="atl-live"></div>
+  <div class="atl-stat">Zones: <b id="sb-z">—</b></div>
+  <div class="atl-stat">Contracts: <b id="sb-c">—</b></div>
+  <div class="atl-stat">Planning: <b id="sb-p">—</b></div>
+  <div class="atl-stat">Value: <b id="sb-v">—</b></div>
+  <div class="atl-bar-nav">
+    <a href="/desks">Desks</a>
+    <a href="/signals">Signals</a>
+    <a href="/articles">Articles</a>
+    <a href="/scan">Run a Scan</a>
+  </div>
+</div>
+
+<script>
+(function(){
+var C=${centroidsJson};
+var lyr={contracts:true,planning:true};
+var mkrs=[];
+var cur=null;
+
+var map=L.map('atlas-map',{center:[54.2,-2.5],zoom:6,zoomControl:true,attributionControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy;<a href="https://carto.com/">CARTO</a> &copy;<a href="https://openstreetmap.org/copyright">OSM</a>',
+  subdomains:'abcd',maxZoom:14,minZoom:4
+}).addTo(map);
+
+function fv(v){if(!v||v===0)return'—';if(v>=1e9)return'£'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'£'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'£'+(v/1e3).toFixed(0)+'K';return'£'+Math.round(v)}
+
+function clr(ratio){
+  if(ratio>.75)return'#ef4444';
+  if(ratio>.45)return'#f97316';
+  if(ratio>.2)return'#f59e0b';
+  if(ratio>.07)return'#84cc16';
+  return'#3b82f6';
+}
+
+function rad(ratio){return Math.max(5,Math.min(42,6+ratio*40));}
+
+function clearMkrs(){mkrs.forEach(function(m){map.removeLayer(m)});mkrs=[];}
+
+function render(data){
+  clearMkrs();
+  if(!data||!data.districts||!data.districts.length)return;
+  var max=data.districts[0].total||1;
+  data.districts.forEach(function(d){
+    var ll=C[d.name];
+    if(!ll)return;
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    if(tot===0)return;
+    var ratio=tot/max;
+    var color=clr(ratio);
+    var r=rad(ratio);
+
+    // Glow halo
+    var halo=L.circleMarker(ll,{radius:r+10,fillColor:color,color:color,weight:0,fillOpacity:0.07,interactive:false}).addTo(map);
+    mkrs.push(halo);
+    // Outer ring
+    var ring=L.circleMarker(ll,{radius:r+4,fillColor:'transparent',color:color,weight:1,opacity:0.25,fillOpacity:0,interactive:false}).addTo(map);
+    mkrs.push(ring);
+    // Core
+    var mk=L.circleMarker(ll,{radius:r,fillColor:color,color:color,weight:1.5,opacity:0.9,fillOpacity:0.5}).addTo(map);
+    mkrs.push(mk);
+
+    var lines='<div style="padding:14px 16px 12px"><div style="font-family:var(--serif);font-size:13px;color:#ECE6D6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)">'+d.name+'</div>';
+    if(lyr.contracts&&d.contracts>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Contracts</span><span style="color:#f59e0b;font-weight:700;font-size:11px">'+d.contracts+'</span></div>';
+    if(lyr.planning&&d.planning>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Planning apps</span><span style="color:#84cc16;font-weight:700;font-size:11px">'+d.planning+'</span></div>';
+    if(d.value>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Est. value</span><span style="color:rgba(236,230,214,.7);font-size:11px">'+fv(d.value)+'</span></div>';
+    lines+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)"><a href="/scan" style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);text-decoration:none">→ Scan this opportunity</a></div></div>';
+    mk.bindPopup(lines,{maxWidth:220,className:'atl-pop'});
+    mk.on('click',function(){hilite(d.name);});
+  });
+}
+
+function renderRanks(data){
+  var el=document.getElementById('atl-ranks');
+  if(!data||!data.districts||!data.districts.length){el.innerHTML='<div class="atl-empty">No matches found.<br>Try a broader keyword.</div>';return;}
+  var max=data.districts[0].total||1;
+  var html='';
+  data.districts.slice(0,40).forEach(function(d,i){
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    var pct=max>0?Math.round(tot/max*100):0;
+    var bar_color=clr(tot/max);
+    html+='<div class="atl-rank-row" data-n="'+d.name.replace(/"/g,'')+'" onclick="fd(\''+d.name.replace(/'/g,"\\'")+'\')">'+
+      '<span class="atl-rk-n">'+(i+1)+'</span>'+
+      '<span class="atl-rk-name">'+d.name+'</span>'+
+      '<div class="atl-rk-bar"><div class="atl-rk-bar-f" style="width:'+pct+'%;background:'+bar_color+'"></div></div>'+
+      '<span class="atl-rk-ct">'+tot+'</span>'+
+    '</div>';
+  });
+  el.innerHTML=html;
+}
+
+function updateKpis(data){
+  var ids=['kpi-z','kpi-c','kpi-p','kpi-v','sb-z','sb-c','sb-p','sb-v'];
+  if(!data||!data.districts){ids.forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='—';});return;}
+  var tc=data.districts.reduce(function(s,d){return s+d.contracts;},0);
+  var tp=data.districts.reduce(function(s,d){return s+d.planning;},0);
+  var tv=data.districts.reduce(function(s,d){return s+(d.value||0);},0);
+  var tz=data.districts.length;
+  document.getElementById('kpi-z').textContent=tz;
+  document.getElementById('kpi-c').textContent=tc;
+  document.getElementById('kpi-p').textContent=tp;
+  document.getElementById('kpi-v').textContent=fv(tv);
+  document.getElementById('sb-z').textContent=tz;
+  document.getElementById('sb-c').textContent=tc;
+  document.getElementById('sb-p').textContent=tp;
+  document.getElementById('sb-v').textContent=fv(tv);
+}
+
+function hilite(name){
+  document.querySelectorAll('.atl-rank-row').forEach(function(r){r.classList.remove('hi');});
+  var row=document.querySelector('.atl-rank-row[data-n="'+name.replace(/"/g,'')+'"]');
+  if(row){row.classList.add('hi');row.scrollIntoView({block:'nearest',behavior:'smooth'});}
+}
+
+window.fd=function(name){
+  var ll=C[name];
+  if(ll){map.flyTo(ll,10,{animate:true,duration:1});setTimeout(function(){hilite(name);},400);}
+};
+
+function doSearch(){
+  var q=document.getElementById('atl-q').value.trim();
+  if(!q)return;
+  document.getElementById('atl-side-q').textContent=q;
+  var ldr=document.getElementById('atl-ldr');
+  ldr.classList.remove('gone');
+  fetch('/api/map/data?q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      cur=data;
+      render(data);
+      renderRanks(data);
+      updateKpis(data);
+    })
+    .catch(function(){})
+    .finally(function(){ldr.classList.add('gone');});
+}
+
+document.querySelectorAll('.atl-layer').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var l=btn.dataset.layer;
+    lyr[l]=!lyr[l];
+    btn.classList.toggle('on',lyr[l]);
+    if(cur){render(cur);renderRanks(cur);updateKpis(cur);}
+  });
+});
+document.getElementById('atl-go').addEventListener('click',doSearch);
+document.getElementById('atl-q').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
+document.querySelectorAll('.atl-pill').forEach(function(p){
+  p.addEventListener('click',function(){
+    document.getElementById('atl-q').value=p.dataset.q;
+    doSearch();
+  });
+});
+
+doSearch();
+})();
+</script>
+</body>
+</html>`;
+}
+
+// ── Legacy map page (kept to handle remaining references) ─────────────────────
+
+function mapPage(defaultQuery: string, authCtx?: { email: string; tier: UserTier } | null): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demand Heatmap — AtlasRevenue</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+${pageShellCss()}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text)}
+.map-header{background:var(--hero-cta);padding:18px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.map-header-inner{max-width:1400px;margin:0 auto;padding:0 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.map-logo{font-family:var(--serif);font-size:20px;color:#ECE6D6;text-decoration:none;flex-shrink:0}
+.map-logo b{color:var(--brand)}
+.map-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(236,230,214,.45);margin-bottom:3px}
+.map-title{font-family:var(--serif);font-size:22px;color:#ECE6D6}
+.map-search{display:flex;gap:8px;flex:1;min-width:280px}
+.map-search input{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#ECE6D6;font-family:var(--mono);font-size:12px;padding:9px 14px;outline:none;min-width:0}
+.map-search input::placeholder{color:rgba(236,230,214,.35)}
+.map-search input:focus{border-color:var(--brand)}
+.map-search button{background:var(--brand);color:#000;border:none;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:9px 18px;cursor:pointer;white-space:nowrap}
+.map-search button:hover{opacity:.88}
+.map-wrap{display:grid;grid-template-columns:1fr 300px;height:calc(100vh - 140px)}
+#map{width:100%;height:100%}
+.map-sidebar{background:var(--surface);border-left:1px solid var(--border-2);display:flex;flex-direction:column;overflow:hidden}
+.map-sb-head{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.map-sb-title{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.map-sb-query{font-family:var(--serif);font-size:16px;color:var(--text)}
+.map-sb-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px}
+.map-sb-list{overflow-y:auto;flex:1}
+.map-sb-row{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.map-sb-row:hover{background:var(--surface-2)}
+.map-sb-row.active{background:rgba(180,146,78,.08);border-left:2px solid var(--brand)}
+.map-sb-rank{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:2px}
+.map-sb-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.map-sb-stats{display:flex;gap:10px;flex-wrap:wrap}
+.map-sb-stat{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.map-sb-stat span{color:var(--brand);font-weight:600}
+.map-sb-bar{height:3px;background:var(--border-2);border-radius:2px;margin-top:6px;overflow:hidden}
+.map-sb-fill{height:100%;background:var(--brand);border-radius:2px}
+.map-legend{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.map-legend-title{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.map-legend-scale{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.map-legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.map-legend-lbl{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.map-empty{padding:40px 16px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
+#map-status{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(16,42,30,.92);color:#ECE6D6;font-family:var(--mono);font-size:11px;padding:7px 16px;border:1px solid rgba(180,146,78,.3);z-index:1000;pointer-events:none;transition:opacity .3s}
+@media(max-width:700px){
+  .map-wrap{grid-template-columns:1fr;grid-template-rows:55vh auto;height:auto}
+  .map-sidebar{height:45vh;border-left:none;border-top:1px solid var(--border-2)}
+}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<div class="map-header">
+  <div class="map-header-inner">
+    <div>
+      <div class="map-eyebrow">Intelligence Layer</div>
+      <div class="map-title">Demand Heatmap</div>
+    </div>
+    <form class="map-search" id="search-form" onsubmit="return doSearch()">
+      <input id="query-input" type="text" placeholder="e.g. roofing, social care, IT services, highways…" value="${escapeHtml(defaultQuery)}" autocomplete="off">
+      <button type="submit">Search</button>
+    </form>
+  </div>
+</div>
+
+<div class="map-wrap" style="position:relative">
+  <div id="map"></div>
+  <div id="map-status" style="opacity:0">Loading…</div>
+  <div class="map-sidebar">
+    <div class="map-sb-head">
+      <div class="map-sb-title">Top Districts</div>
+      <div class="map-sb-query" id="sb-query">${escapeHtml(defaultQuery)}</div>
+      <div class="map-sb-meta" id="sb-meta">Loading…</div>
+    </div>
+    <div class="map-sb-list" id="sb-list">
+      <div class="map-empty">Enter a service type and click Search</div>
+    </div>
+    <div class="map-legend">
+      <div class="map-legend-title">Signal Intensity</div>
+      <div class="map-legend-scale">
+        <div class="map-legend-dot" style="background:#1d6b4f;width:8px;height:8px"></div><span class="map-legend-lbl">Low</span>
+        <div class="map-legend-dot" style="background:#B4924E;width:12px;height:12px"></div><span class="map-legend-lbl">Medium</span>
+        <div class="map-legend-dot" style="background:#c0392b;width:18px;height:18px"></div><span class="map-legend-lbl">High</span>
+        <div class="map-legend-dot" style="background:#7b0000;width:22px;height:22px"></div><span class="map-legend-lbl">Very High</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// District centroid lookup
+const CENTROIDS = ${JSON.stringify(DISTRICT_CENTROIDS)};
+
+// Leaflet map
+const map = L.map('map', { center: [54.0, -2.5], zoom: 6, zoomControl: true });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 18,
+}).addTo(map);
+
+let circleLayer = L.layerGroup().addTo(map);
+let activeCircle = null;
+
+function intensityColor(pct) {
+  if (pct >= 0.75) return '#7b0000';
+  if (pct >= 0.5)  return '#c0392b';
+  if (pct >= 0.25) return '#B4924E';
+  return '#1d6b4f';
+}
+
+function fmtVal(v) {
+  if (v >= 1e9) return '£' + (v/1e9).toFixed(1) + 'bn';
+  if (v >= 1e6) return '£' + (v/1e6).toFixed(1) + 'm';
+  if (v >= 1e3) return '£' + Math.round(v/1e3) + 'k';
+  return v > 0 ? '£' + Math.round(v) : '—';
+}
+
+function setStatus(msg, visible) {
+  const el = document.getElementById('map-status');
+  el.textContent = msg;
+  el.style.opacity = visible ? '1' : '0';
+}
+
+let lastData = [];
+
+function renderMap(districts) {
+  circleLayer.clearLayers();
+  lastData = districts;
+  const max = districts[0]?.total || 1;
+
+  districts.forEach((d, i) => {
+    const ll = CENTROIDS[d.name];
+    if (!ll) return;
+
+    const pct = d.total / max;
+    const radius = 8000 + pct * 42000;
+    const color = intensityColor(pct);
+
+    const circle = L.circle(ll, {
+      radius,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.38,
+      weight: 1.5,
+      opacity: 0.65,
+    });
+
+    circle.bindTooltip(\`
+      <b>\${d.name}</b><br>
+      \${d.contracts} contracts · \${d.planning} planning apps<br>
+      \${d.value > 0 ? fmtVal(d.value) + ' awarded' : ''}
+    \`, { sticky: true, className: 'map-tip' });
+
+    circle.on('click', () => highlightDistrict(i, d.name));
+    circle.addTo(circleLayer);
+  });
+}
+
+function renderSidebar(districts, query, total) {
+  document.getElementById('sb-query').textContent = query;
+  document.getElementById('sb-meta').textContent = total + ' districts matched';
+  const list = document.getElementById('sb-list');
+  if (districts.length === 0) {
+    list.innerHTML = '<div class="map-empty">No data found for this query.<br>Try: roofing · highways · social care · IT · cleaning</div>';
+    return;
+  }
+  const max = districts[0]?.total || 1;
+  list.innerHTML = districts.slice(0, 40).map((d, i) => {
+    const pct = Math.round((d.total / max) * 100);
+    return \`<div class="map-sb-row" id="row-\${i}" onclick="highlightDistrict(\${i}, '\${d.name.replace(/'/,"\\\\'")}')" data-lat="\${(CENTROIDS[d.name]||[0,0])[0]}" data-lon="\${(CENTROIDS[d.name]||[0,0])[1]}">
+      <div class="map-sb-rank">#\${i+1}</div>
+      <div class="map-sb-name">\${d.name}</div>
+      <div class="map-sb-stats">
+        <div class="map-sb-stat">\${d.contracts > 0 ? '<span>' + d.contracts + '</span> contracts' : ''}</div>
+        <div class="map-sb-stat">\${d.planning > 0 ? '<span>' + d.planning + '</span> planning' : ''}</div>
+        \${d.value > 0 ? '<div class="map-sb-stat"><span>' + fmtVal(d.value) + '</span></div>' : ''}
+      </div>
+      <div class="map-sb-bar"><div class="map-sb-fill" style="width:\${pct}%"></div></div>
+    </div>\`;
+  }).join('');
+}
+
+function highlightDistrict(i, name) {
+  document.querySelectorAll('.map-sb-row').forEach(r => r.classList.remove('active'));
+  const row = document.getElementById('row-' + i);
+  if (row) { row.classList.add('active'); row.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  const ll = CENTROIDS[name];
+  if (ll) map.flyTo(ll, 10, { duration: 0.8 });
+}
+
+async function doSearch() {
+  const q = document.getElementById('query-input').value.trim();
+  if (!q) return false;
+  setStatus('Searching…', true);
+  try {
+    const resp = await fetch('/api/map/data?q=' + encodeURIComponent(q));
+    const data = await resp.json();
+    renderMap(data.districts || []);
+    renderSidebar(data.districts || [], data.query || q, data.totalDistricts || 0);
+    setStatus('', false);
+    window.history.replaceState(null, '', '/map?q=' + encodeURIComponent(q));
+  } catch (e) {
+    setStatus('Error loading data', true);
+    setTimeout(() => setStatus('', false), 3000);
+  }
+  return false;
+}
+
+// Initial load
+doSearch();
+</script>
+</body>
+</html>`;
+}
 
 app.get("/buyers", asyncRoute(async (req, res) => {
   const q = String(req.query.q || "").trim();
@@ -14502,9 +15252,7 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
       <nav class="gh-main-nav">
         <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
-        <a href="/intelligence">Intelligence</a>
-        <a href="/buyers">Buyers</a>
-        <a href="/suppliers">Suppliers</a>
+        <a href="/atlas">Atlas</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
