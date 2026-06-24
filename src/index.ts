@@ -8869,7 +8869,6 @@ function atlasPage(defaultQuery: string, authCtx?: { email: string; tier: UserTi
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Atlas — UK Geo Intelligence — AtlasRevenue</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
 ${pageShellCss()}
 /* ── Atlas-specific styles ── */
@@ -9136,6 +9135,7 @@ ${pageShellHeader(null, authCtx)}
 
 ${pageShellFoot()}
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 (function(){
 var C=${centroidsJson};
