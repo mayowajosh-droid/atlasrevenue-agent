@@ -8057,8 +8057,81 @@ app.get("/", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="UK sector intelligence. Market signals from DVLA, Land Registry, Companies House, ONS and UKRI — alongside procurement data from Contracts Finder and Find a Tender. Detect demand before it surfaces as a tender.">
-<title>AtlasRevenue — UK Sector Intelligence</title>
+<meta name="description" content="Know exactly who wants what you sell. AtlasRevenue turns real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — into a demand map for your products and services, plus live public-sector contracts from Contracts Finder and Find a Tender. One scan. No guesses.">
+<meta name="keywords" content="UK market demand intelligence, B2B sales intelligence UK, who is buying, public sector contracts, Contracts Finder, Find a Tender, market signals, demand data UK, sales leads by sector">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#0A1C12">
+<title>AtlasRevenue — Know Who's Buying What You Sell | UK Demand &amp; Contract Intelligence</title>
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AtlasRevenue">
+<meta property="og:title" content="Know exactly who wants what you sell — before your competitors do.">
+<meta property="og:description" content="Real UK demand signals (DVLA, ONS, SMMT, Companies House) + live public contracts, in one scan. No guesses.">
+<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/">
+<meta property="og:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Know exactly who wants what you sell — AtlasRevenue">
+<meta name="twitter:description" content="Real UK demand signals + live public contracts in one scan. DVLA, ONS, SMMT, Companies House, Contracts Finder.">
+<meta name="twitter:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
+<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://atlasrevenue-agent-production.up.railway.app/#org",
+      "name": "AtlasRevenue",
+      "url": "https://atlasrevenue-agent-production.up.railway.app/",
+      "description": "UK demand and public-sector contract intelligence built on real government and market data.",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://atlasrevenue-agent-production.up.railway.app/#website",
+      "url": "https://atlasrevenue-agent-production.up.railway.app/",
+      "name": "AtlasRevenue",
+      "publisher": { "@id": "https://atlasrevenue-agent-production.up.railway.app/#org" }
+    },
+    {
+      "@type": "Product",
+      "name": "AtlasRevenue Intelligence Scan",
+      "description": "A commercial intelligence scan that maps real UK demand for your products and services and surfaces live public-sector contracts you can win.",
+      "brand": { "@id": "https://atlasrevenue-agent-production.up.railway.app/#org" },
+      "offers": {
+        "@type": "Offer",
+        "priceCurrency": "GBP",
+        "price": "29",
+        "availability": "https://schema.org/InStock",
+        "url": "https://atlasrevenue-agent-production.up.railway.app/scan"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does an AtlasRevenue scan actually show me?",
+          "acceptedAnswer": { "@type": "Answer", "text": "It maps real UK demand for what you sell — pulled from DVLA, ONS, SMMT, Land Registry and Companies House — and surfaces live public-sector contracts from Contracts Finder and Find a Tender. You get named buyers, demand signals with real numbers, the best routes to revenue, and a 90-day activation plan." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the data real or AI-generated guesses?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Real. Every demand signal is sourced from named UK datasets and authorities with the figure, geography and date attached. Nothing is invented. Where evidence is thin, the report says so." }
+        },
+        {
+          "@type": "Question",
+          "name": "I don't sell to government — is this still useful?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Choose the market-demand scan mode and AtlasRevenue focuses entirely on who buys your products or services, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with no procurement content at all." }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does it cost?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Scans start at £29 pay-as-you-go, with Pro and Agency subscriptions for ongoing weekly intelligence." }
+        }
+      ]
+    }
+  ]
+})}</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -8308,17 +8381,17 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="hero-grad"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Opportunity Radar &middot; Geographic Market Intelligence</div>
-      <h1>See where the demand is<br>before it <em>becomes a tender.</em></h1>
-      <p class="lede">We map named buyers, verified spend, and geographic opportunity signals across public and private markets so you know not just who to sell to, but exactly where to expand next.</p>
+      <div class="eyebrow">Real UK data &middot; Demand &amp; contract intelligence</div>
+      <h1>Know exactly who wants<br>what you sell <em>before your<br>competitors do.</em></h1>
+      <p class="lede">AtlasRevenue turns real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — into a demand map for your products and services, plus live public-sector contracts you can win. One scan. No guesses.</p>
       <div class="hero-actions">
-        <a class="btn-primary" href="/scan">Run an intelligence scan</a>
+        <a class="btn-primary" href="/scan">Run a scan &rarr;</a>
         ${sampleLink}
       </div>
       <div class="chips">
-        <div class="chip"><b>DVLA · Land Reg · ONS · UKRI</b> market signals</div>
-        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> live procurement signals</div>
-        <div class="chip">Regional demand mapping · 28 sectors</div>
+        <div class="chip"><b>Market demand</b> for what you sell</div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> live public contracts</div>
+        <div class="chip">Real data &middot; <b>zero guesses</b></div>
       </div>
     </div>
     <div class="hero-card-wrap">
@@ -8340,9 +8413,9 @@ ${pageShellHeader(null, homepageAuth)}
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
-      <div class="eyebrow">Sector intelligence signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
-      <h2>Detect demand before it surfaces as a tender.</h2>
-      <p>Recurring spend in a category is the leading indicator of where buyers are going next. We track it across five independent sources — DVLA vehicle flows, Land Registry completions, Companies House formations, ONS economic indicators, and government procurement records. The full picture, not just the contract notice.</p>
+      <div class="eyebrow">Demand signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
+      <h2>See demand building before anyone else acts on it.</h2>
+      <p>Recurring spend in a category is the leading indicator of where buyers are heading next. We track it across five independent UK sources — DVLA vehicle flows, Land Registry completions, Companies House formations, ONS economic indicators, and government procurement records — so you can move on demand while it is still forming, not after the market has priced it in.</p>
       <ul>
         ${chartBullets}
       </ul>
@@ -8360,6 +8433,42 @@ ${pageShellHeader(null, homepageAuth)}
       ${homeMktCardsHtml}
       <a href="/atlas" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">Explore Atlas intelligence &rarr;</a>
     </div>
+  </div>
+</section>
+<section style="background:var(--surface);border-bottom:1px solid var(--border)">
+  <div class="wrap" style="padding:72px 40px">
+    <div style="text-align:center;max-width:640px;margin:0 auto 48px">
+      <div class="eyebrow">Two ways to win</div>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:12px 0 14px;color:var(--text)">Whatever you sell, the demand is already in the data.</h2>
+      <p style="color:var(--muted);font-size:16px;line-height:1.6">Pick the scan that fits how you make money. Both are built on the same real UK datasets — and both end with a 90-day plan to act on what they find.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div style="background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--brand);padding:34px 32px;display:flex;flex-direction:column">
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:14px">Market demand intelligence</div>
+        <h3 style="font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.15;color:var(--text);margin-bottom:12px">For anyone selling a product or service</h3>
+        <p style="color:var(--text-mid);font-size:15px;line-height:1.6;margin-bottom:20px">Find out who is buying what you sell, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with named segments, real numbers, and a regional demand heat map.</p>
+        <ul style="list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:9px">
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>16+ sourced demand signals (DVLA, ONS, SMMT, Mintel)</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Buyer watchlist — named segments to approach now</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Money Map: fastest routes to first revenue</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Regional demand heat map + 90-day plan</li>
+        </ul>
+        <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Map my market demand &rarr;</a>
+      </div>
+      <div style="background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--hero-cta);padding:34px 32px;display:flex;flex-direction:column">
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:14px">Public-sector contracts</div>
+        <h3 style="font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.15;color:var(--text);margin-bottom:12px">For anyone selling to government</h3>
+        <p style="color:var(--text-mid);font-size:15px;line-height:1.6;margin-bottom:20px">Live tenders and awards from Contracts Finder and Find a Tender, scored against your firm — with a buyer watchlist, incumbent intelligence, bid-readiness grade, and the contracts worth chasing now.</p>
+        <ul style="list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:9px">
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Live open + awarded contracts in your sector</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Buyer watchlist + incumbent contract timeline</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Bid-readiness score &amp; do-not-chase list</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Framework routes + 90-day activation plan</li>
+        </ul>
+        <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Find contracts I can win &rarr;</a>
+      </div>
+    </div>
+    <p style="text-align:center;margin-top:24px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--faint)">Not sure? Run both in one scan — the default mode covers demand and contracts together.</p>
   </div>
 </section>
 ${chaseNowHtml}
@@ -8383,11 +8492,11 @@ ${chaseNowHtml}
   <div class="wrap">
     <div class="scan-strip-left">
       <div class="scan-strip-eyebrow">Intelligence scan &middot; 2&ndash;4 minutes</div>
-      <div class="scan-strip-hed">Know your position before you bid.</div>
-      <div class="scan-strip-sub">Tell us your services and region. We scan the public record and return a sourced commercial verdict &mdash; buyer watchlist, route-to-revenue map, and bid readiness score.</div>
+      <div class="scan-strip-hed">Stop guessing where your next revenue comes from.</div>
+      <div class="scan-strip-sub">Tell us what you sell and where you operate. We read real UK data and return a sourced commercial brief &mdash; demand signals, named buyers, route-to-revenue map, and a 90-day plan. From £29.</div>
     </div>
     <div class="scan-strip-right">
-      <a class="scan-strip-btn" href="/scan">Run a revenue scan &rarr;</a>
+      <a class="scan-strip-btn" href="/scan">Run a scan &rarr;</a>
       <a class="scan-strip-price" href="/pricing">See pricing &rarr;</a>
     </div>
   </div>
@@ -8396,15 +8505,39 @@ ${chaseNowHtml}
   <div class="wrap">
     <div>
       <div class="eyebrow">The product underneath</div>
-      <h2>One profile in.<br>A <em>sourced verdict</em> out.</h2>
-      <p>Submit your firm&rsquo;s services, region and contract range. The intelligence engine reads market signals across five independent sources, scores route-to-revenue fit, and returns a professional brief &mdash; every claim timestamped, sourced, and caveated.</p>
+      <h2>One profile in.<br>A <em>sourced plan</em> out.</h2>
+      <p>Tell us what you sell, who you sell to, and where. The engine pre-fetches real UK demand data, scores route-to-revenue fit, and returns a professional brief &mdash; every figure sourced, dated, and tied to a specific next action. No invented numbers.</p>
       <a class="btn-primary" href="/scan">Run your first scan</a>
     </div>
     <div class="steps">
-      <div class="step"><span class="n">01</span><span class="x"><b>Profile</b><small>Services &middot; region &middot; contract range &middot; evidence</small></span></div>
-      <div class="step"><span class="n">02</span><span class="x"><b>Scan</b><small>DVLA &middot; Land Registry &middot; ONS &middot; UKRI &middot; Contracts Finder</small></span></div>
-      <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Market demand &middot; buyer fit &middot; evidence grade &middot; route-to-revenue</small></span></div>
-      <div class="step"><span class="n">04</span><span class="x"><b>Verdict</b><small>Bid &middot; partner &middot; monitor &middot; prepare &middot; ignore</small></span></div>
+      <div class="step"><span class="n">01</span><span class="x"><b>Profile</b><small>What you sell &middot; who buys it &middot; where you operate</small></span></div>
+      <div class="step"><span class="n">02</span><span class="x"><b>Pull</b><small>DVLA &middot; ONS &middot; SMMT &middot; Land Registry &middot; Companies House &middot; Contracts Finder</small></span></div>
+      <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Demand strength &middot; buyer fit &middot; competition &middot; route-to-revenue</small></span></div>
+      <div class="step"><span class="n">04</span><span class="x"><b>Plan</b><small>Named buyers &middot; money map &middot; heat map &middot; 90-day actions</small></span></div>
+    </div>
+  </div>
+</section>
+<section style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="wrap" style="padding:72px 40px;max-width:840px">
+    <div style="text-align:center;margin-bottom:40px">
+      <div class="eyebrow">Straight answers</div>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.2vw,36px);line-height:1.12;letter-spacing:-.02em;margin:12px 0;color:var(--text)">Questions people ask before their first scan</h2>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0">
+      ${[
+        ["What does an AtlasRevenue scan actually show me?", "It maps real UK demand for what you sell — pulled from DVLA, ONS, SMMT, Land Registry and Companies House — and surfaces live public-sector contracts from Contracts Finder and Find a Tender. You get named buyers, demand signals with real numbers, the best routes to revenue, and a 90-day activation plan."],
+        ["Is the data real, or AI-generated guesses?", "Real. Every demand signal is sourced from a named UK dataset or authority with the figure, geography and date attached. Nothing is invented. Where the evidence is thin, the report says so plainly rather than padding it out."],
+        ["I don't sell to government — is this still for me?", "Yes. Choose the market-demand scan mode and AtlasRevenue focuses entirely on who buys your products or services, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with no procurement content at all."],
+        ["How long does a scan take?", "Two to four minutes. You submit a short profile, the engine pulls and scores the data, and your report is ready to read on screen or download as a PDF."],
+        ["How much does it cost?", "Scans start at £29 pay-as-you-go. Pro and Agency subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector."],
+      ].map(([q, a]) => `
+      <details style="border-bottom:1px solid var(--border-2);padding:18px 0">
+        <summary style="font-family:var(--sans);font-weight:600;font-size:17px;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px">${escapeHtml(q)}<span style="color:var(--brand);font-size:20px;font-weight:400">+</span></summary>
+        <p style="color:var(--text-mid);font-size:15px;line-height:1.65;margin-top:12px;max-width:64em">${escapeHtml(a)}</p>
+      </details>`).join("")}
+    </div>
+    <div style="text-align:center;margin-top:36px">
+      <a class="btn-primary" href="/scan" style="display:inline-block">Run a scan &rarr;</a>
     </div>
   </div>
 </section>
