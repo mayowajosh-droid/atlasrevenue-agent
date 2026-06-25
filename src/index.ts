@@ -9200,7 +9200,7 @@ function renderRanks(data){
     var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
     var pct=max>0?Math.round(tot/max*100):0;
     var bc=clr(tot/max);
-    html+='<div class="atl-rank-row" data-n="'+d.name.replace(/"/g,'')+'" onclick="fd(\''+d.name.replace(/'/g,"\\'")+'\')">'+
+    html+='<div class="atl-rank-row" data-n="'+d.name.replace(/"/g,'')+'" style="cursor:pointer">'+
       '<span class="atl-rk-n">'+(i+1)+'</span>'+
       '<span class="atl-rk-name">'+d.name+'</span>'+
       '<div class="atl-rk-bar"><div class="atl-rk-bar-f" style="width:'+pct+'%;background:'+bc+'"></div></div>'+
@@ -9223,7 +9223,7 @@ function renderHotspots(data){
     var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
     var pct=Math.round(tot/max*100);
     var bc=clr(tot/max);
-    html+='<div class="atl-hs-card" onclick="fd(\''+d.name.replace(/'/g,"\\'")+'\')">'+
+    html+='<div class="atl-hs-card" data-n="'+d.name.replace(/"/g,'')+'" style="cursor:pointer">'+
       '<div class="atl-hs-rank">#'+(i+1)+' demand zone</div>'+
       '<div class="atl-hs-name">'+d.name+'</div>'+
       '<div class="atl-hs-bar-wrap"><div class="atl-hs-bar" style="width:'+pct+'%;background:'+bc+'"></div></div>'+
@@ -9266,6 +9266,11 @@ window.fd=function(name){
     setTimeout(function(){hilite(name);},500);
   }
 };
+
+document.addEventListener('click',function(e){
+  var row=e.target.closest('.atl-rank-row,.atl-hs-card');
+  if(row){var n=row.getAttribute('data-n');if(n)window.fd(n);}
+});
 
 function hideLdr(){var ldr=document.getElementById('atl-ldr');if(ldr){ldr.classList.add('gone');ldr.style.display='none';}}
 
