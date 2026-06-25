@@ -13990,11 +13990,31 @@ app.get("/desk/:slug/category/:cat", asyncRoute(async (req, res) => {
 app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
-  const cached = await getDeskCache(profile.slug).catch(() => null);
+
+  const sectors = DESK_SECTORS[profile.slug] ?? [];
+  const sourcePriority = DESK_SOURCE_PRIORITY[profile.slug] ?? [];
+
+  const [cached, mktSnap] = await Promise.all([
+    getDeskCache(profile.slug).catch(() => null),
+    pool && sectors.length
+      ? generateMarketSignals(pool, { sectors, limit: 6 }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+
+  const rawMktSignals = mktSnap?.signals ?? [];
+  const noticeMktSignals = sourcePriority.length
+    ? [...rawMktSignals].sort((a, b) => {
+        const ai = sourcePriority.indexOf(a.source);
+        const bi = sourcePriority.indexOf(b.source);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+    : rawMktSignals;
+
   const buyerFilter = typeof req.query.buyer === "string" ? req.query.buyer : null;
-  res.type("html").send(noticesPage(profile, cached, buyerFilter, getAuthUser(req)));
+  res.type("html").send(noticesPage(profile, cached, buyerFilter, getAuthUser(req), noticeMktSignals));
 }));
 
 app.get("/desk/:slug/buyers", asyncRoute(async (req, res) => {
@@ -16102,16 +16122,17 @@ function noticesPage(
   profile: DeskProfile,
   cached: { data: ProcurementData; cached_at: string } | null,
   _buyerFilter: string | null = null,
-  authCtx?: { email: string; tier: UserTier } | null
+  authCtx?: { email: string; tier: UserTier } | null,
+  mktSignals: MarketSignal[] = []
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
 
-  const boardKw = profile.categories.flatMap(c => c.keywords);
+  // All cached open notices for this desk — already desk-scoped by compilation, no re-filter needed
   const allOpen = dedupeNoticesSoft(
     (data?.contractsFinder.open || [])
       .concat(data?.findTender?.notices || [])
-      .filter(n => !isAggregatorBuyer(n.buyer || "") && !isOverseasNotice(n.title, n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
+      .filter(n => !isAggregatorBuyer(n.buyer || "") && !isOverseasNotice(n.title, n.buyer || ""))
   ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const cutoff12m = Date.now() - 365 * 24 * 3_600_000;
@@ -16154,12 +16175,79 @@ function noticesPage(
   }).length;
 
 
+  // Market signals panel — 3 signals shown as demand context above the board
+  const noticeMktPanel = mktSignals.length > 0
+    ? `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(236,230,214,.1);border-radius:6px;padding:18px 24px;margin:24px 0 0;max-width:1400px;margin-left:auto;margin-right:auto">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(197,201,188,.45);margin-bottom:12px">Live Market Demand — ${escapeHtml(profile.label)}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          ${mktSignals.slice(0, 3).map(s => {
+            const chgBadge = s.changePercent != null
+              ? `<span style="font-family:var(--mono);font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px;${s.changePercent >= 0 ? "color:#4ade80;background:rgba(74,222,128,.12)" : "color:#f87171;background:rgba(248,113,113,.12)"}">${s.changePercent >= 0 ? "▲" : "▼"} ${Math.abs(s.changePercent).toFixed(1)}%</span>`
+              : "";
+            return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(236,230,214,.07);border-radius:4px;padding:12px 14px">
+              <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(197,201,188,.4);margin-bottom:6px">${escapeHtml(s.source)} · ${escapeHtml(s.geography)}</div>
+              <div style="font-size:13px;font-weight:600;color:#ECE6D6;margin-bottom:5px;line-height:1.3">${escapeHtml(s.stat)} ${chgBadge}</div>
+              <div style="font-size:11.5px;color:rgba(197,201,188,.65);line-height:1.5">${escapeHtml(s.implication)}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`
+    : "";
+
+  // Recent awards section — shown even when open notices = 0
+  const recentAwards = scoredAwarded.slice(0, 6);
+  const awardsSection = !isCompiling && recentAwards.length > 0
+    ? `<div style="margin:32px 0 0;padding:0 0 32px;border-bottom:1px solid var(--border)">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:10px">
+          <span style="width:6px;height:6px;border-radius:50%;background:#93C5FD;display:inline-block"></span>
+          RECENTLY AWARDED IN THIS SECTOR · Last 12 months
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 18px;max-width:56em;line-height:1.6">These contracts have been awarded — they show you <strong style="color:var(--text)">who is buying</strong>, <strong style="color:var(--text)">at what value</strong>, and <strong style="color:var(--text)">how often</strong>. Use them to identify warm buyers before the next round opens.</p>
+        <div id="nb-awards-grid" style="display:grid;gap:10px">
+          ${recentAwards.map(n => {
+            const awardDate = n.displayDate || (n.publishedDate ? new Date(n.publishedDate).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" }) : "—");
+            const val = n.displayValue || (n.awardedValue && n.awardedValue > 0 ? fmtMoney(n.awardedValue) : "—");
+            const buyer = n.buyer || "Unknown buyer";
+            return `<div style="border:1px solid var(--border);border-radius:6px;padding:14px 18px;display:flex;align-items:flex-start;gap:16px;background:var(--surface)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:5px">${escapeHtml(n.title || "")}</div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em">${escapeHtml(buyer)}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:#93C5FD">${escapeHtml(val)}</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.06em">AWARDED ${escapeHtml(awardDate)}</div>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        ${scoredAwarded.length > 6 ? `<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:14px 0 0">+${scoredAwarded.length - 6} more awards · <a href="/desk/${escapeHtml(profile.slug)}/buyers" style="color:var(--brand)">See all buyers &rarr;</a></p>` : ""}
+      </div>`
+    : "";
+
+  // What to do guidance — shown when open = 0
+  const noOpenGuide = !isCompiling && allOpen.length === 0
+    ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px 28px;margin:0 0 24px;display:flex;gap:20px;align-items:flex-start">
+        <div style="font-size:22px;flex-shrink:0">💡</div>
+        <div>
+          <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:6px">No open contracts right now — here's what to do</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">The market for <strong style="color:var(--text)">${escapeHtml(profile.label)}</strong> is active — ${totalValue > 0 ? `£${(totalValue / 1_000_000).toFixed(1)}m was awarded in the last 12 months across ${uniqueBuyers} buyers.` : `${uniqueBuyers > 0 ? uniqueBuyers + " buyers` are active in this sector" : "buyers are active in this sector."}`} Open contracts refresh frequently — typically weekly. The best move now is to run a fit check so you're ready to bid the moment something opens.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a href="/scan?desk=${escapeHtml(profile.slug)}" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--brand);color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none">Run Fit Check &rarr;</a>
+            <a href="/desk/${escapeHtml(profile.slug)}/buyers" style="font-family:var(--mono);font-size:11px;letter-spacing:.06em;border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:4px;text-decoration:none">View Buyers &rarr;</a>
+            <a href="/desk/${escapeHtml(profile.slug)}" style="font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);padding:8px 0;text-decoration:none">← Back to Desk</a>
+          </div>
+        </div>
+      </div>`
+    : "";
+
   const boardContent = isCompiling
     ? `<div class="nb-empty" style="padding:40px 32px;text-align:center">
         <strong>Compiling the public record.</strong> Run a scan while this desk warms up.<br><br>
         <a href="/scan" style="font-family:var(--mono);font-size:11px;color:var(--brand);text-decoration:underline">Run a fit check &rarr;</a>
        </div>`
-    : renderOpportunityBoardContent(scoredOpen, profile.slug, scoredAwarded);
+    : (allOpen.length > 0
+        ? renderOpportunityBoardContent(scoredOpen, profile.slug, scoredAwarded)
+        : noOpenGuide + awardsSection);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -16215,7 +16303,11 @@ ${pageShellHeader(profile, authCtx)}
       <span class="ob-crumb-active">Opportunity Board</span>
     </div>
     <h1>OPPORTUNITY BOARD &mdash; ${escapeHtml(profile.label.toUpperCase())}</h1>
-    <p class="ob-lede">Contracts you can chase now. Public notices scored against this desk profile.</p>
+    <p class="ob-lede">${allOpen.length > 0
+      ? `${allOpen.length} open contract${allOpen.length !== 1 ? "s" : ""} — scored and ranked for the ${escapeHtml(profile.label)} desk. Run a fit check to see your win probability on any notice.`
+      : `No open contracts right now — but the market is active. See recent awards and market signals below, then run a fit check to get ahead of the next round.`
+    }</p>
+    ${noticeMktPanel}
   </div>
   <div class="ob-stats">
     <div class="ob-stat">
