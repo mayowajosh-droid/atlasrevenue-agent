@@ -9679,14 +9679,83 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
     }
   }
 
-  const districts = [...merged.entries()]
-    .map(([name, v]) => ({ name, contracts: v.contracts, planning: v.planning, value: v.value, total: v.contracts + v.planning }))
+  // ── 4. Private-sector DEMAND layer (real market signals, not procurement) ─────
+  // This is what makes the map answer "where is the demand for what I sell?".
+  // A keyword routes to a real demand proxy: property completions / new builds
+  // (roofing, construction, home-improvement), vehicle density (cars/EV/fleet),
+  // or new-business formation (B2B services). Points are county/region centroids.
+  type DemandPoint = { name: string; lat: number; lon: number; demand: number; detail: string; value: number };
+  const demandPoints: DemandPoint[] = [];
+  if (pool) {
+    const src = detectDemandSource(q);
+    try {
+      const { getCountyPropertyDemand, getRegionalVehicleDemand, getCountyBusinessDemand } =
+        await import("./signals/market-intel.js");
+      if (src === "property") {
+        for (const p of await getCountyPropertyDemand(pool)) {
+          const ll = COUNTY_CENTROIDS[p.place.toUpperCase()];
+          if (!ll) continue;
+          // For roofing/new-build intent, weight toward new builds when present.
+          const newBuildIntent = /\broof|new build|construction|scaffold|cladding|guttering\b/i.test(q);
+          const magnitude = newBuildIntent && p.secondary ? p.secondary : p.value;
+          demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: magnitude, detail: p.detail, value: 0 });
+        }
+      } else if (src === "vehicle") {
+        for (const p of await getRegionalVehicleDemand(pool)) {
+          const ll = REGION_CENTROIDS[p.place] ?? REGION_CENTROIDS[p.place.replace(/ and The Humber/i, "")];
+          if (!ll) continue;
+          // EV/charging intent leans on fleet/company share as the sharper proxy.
+          const evIntent = /\bev\b|electric|charg|zero emission\b/i.test(q);
+          const magnitude = evIntent && p.secondary ? p.secondary : p.value;
+          demandPoints.push({ name: p.place, lat: ll[0], lon: ll[1], demand: magnitude, detail: p.detail, value: 0 });
+        }
+      } else if (src === "business") {
+        for (const p of await getCountyBusinessDemand(pool)) {
+          const ll = COUNTY_CENTROIDS[p.place.toUpperCase()];
+          if (!ll) continue;
+          demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: p.value, detail: p.detail, value: 0 });
+        }
+      }
+    } catch (err) {
+      console.warn("[map] demand layer failed:", String(err).slice(0, 120));
+    }
+  }
+
+  // Procurement/contract points (attach centroids server-side).
+  const contractPoints = [...merged.entries()]
+    .map(([name, v]) => {
+      const ll = DISTRICT_CENTROIDS[name];
+      return { name, lat: ll?.[0] ?? null, lon: ll?.[1] ?? null, contracts: v.contracts, planning: v.planning, value: v.value, demand: 0, detail: "", total: v.contracts + v.planning };
+    })
+    .filter(d => d.total > 0 && d.lat !== null);
+
+  // Merge demand into the same point list; demand contributes to total so dots size up.
+  const byName = new Map<string, any>();
+  for (const c of contractPoints) byName.set(c.name, c);
+  for (const d of demandPoints) {
+    const existing = byName.get(d.name);
+    if (existing) {
+      existing.demand += d.demand;
+      existing.detail = existing.detail || d.detail;
+    } else {
+      byName.set(d.name, { name: d.name, lat: d.lat, lon: d.lon, contracts: 0, planning: 0, value: d.value, demand: d.demand, detail: d.detail });
+    }
+  }
+
+  const districts = [...byName.values()]
+    .map(d => ({ ...d, total: (d.contracts || 0) + (d.planning || 0) + (d.demand || 0) }))
     .filter(d => d.total > 0)
     .sort((a, b) => b.total - a.total)
-    .slice(0, 120);
+    .slice(0, 150);
 
-  res.json({ query: q, districts, totalDistricts: districts.length });
+  const demandSource = detectDemandSource(q);
+  res.json({ query: q, districts, totalDistricts: districts.length, demandSource, hasDemand: demandPoints.length > 0 });
 }));
+
+// Land Registry / Companies House counties arrive UPPERCASE; present them nicely.
+function titleCaseCounty(s: string): string {
+  return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/\bAnd\b/g, "and").replace(/\bOf\b/g, "of");
+}
 
 // ── Shared geo data ───────────────────────────────────────────────────────────
 
@@ -9819,6 +9888,46 @@ const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
     "Belfast": [54.5973, -5.9301], "Derry": [54.9958, -7.3074], "Armagh": [54.3503, -6.6528],
     "Newry": [54.1751, -6.3402], "Lisburn": [54.5162, -6.0582], "Antrim": [54.7195, -6.2081],
 };
+
+// County centroids — keys match Land Registry / Companies House county strings
+// (UPPERCASE), used to plot real private-sector demand on the Atlas map.
+const COUNTY_CENTROIDS: Record<string, [number, number]> = {
+  "GREATER LONDON": [51.5074, -0.1278],
+  "GREATER MANCHESTER": [53.4808, -2.2426], "LANCASHIRE": [53.8175, -2.6347], "MERSEYSIDE": [53.4084, -2.9916], "CHESHIRE": [53.1904, -2.5197], "CUMBRIA": [54.5772, -2.7975],
+  "WEST YORKSHIRE": [53.7997, -1.5492], "SOUTH YORKSHIRE": [53.3811, -1.4701], "NORTH YORKSHIRE": [54.1365, -1.4049], "EAST RIDING OF YORKSHIRE": [53.8417, -0.4327],
+  "WEST MIDLANDS": [52.4862, -1.8904], "STAFFORDSHIRE": [52.8793, -2.0572], "WARWICKSHIRE": [52.2823, -1.5849], "WORCESTERSHIRE": [52.1920, -2.2200], "SHROPSHIRE": [52.7064, -2.7418], "HEREFORDSHIRE": [52.0765, -2.6544],
+  "DERBYSHIRE": [53.1047, -1.5624], "NOTTINGHAMSHIRE": [53.1000, -1.0000], "LEICESTERSHIRE": [52.6369, -1.1398], "NORTHAMPTONSHIRE": [52.2730, -0.8750], "LINCOLNSHIRE": [53.2000, -0.2000], "RUTLAND": [52.6583, -0.6334],
+  "ESSEX": [51.7343, 0.4691], "HERTFORDSHIRE": [51.8098, -0.2377], "NORFOLK": [52.6140, 0.8864], "SUFFOLK": [52.1872, 0.9708], "CAMBRIDGESHIRE": [52.2053, 0.1218], "BEDFORDSHIRE": [52.1350, -0.4667],
+  "KENT": [51.2787, 0.5217], "SURREY": [51.2362, -0.5704], "HAMPSHIRE": [51.0577, -1.3081], "WEST SUSSEX": [50.9280, -0.4617], "EAST SUSSEX": [50.9086, 0.2494], "OXFORDSHIRE": [51.7612, -1.2465], "BERKSHIRE": [51.4543, -0.9781], "BUCKINGHAMSHIRE": [51.8072, -0.8127], "ISLE OF WIGHT": [50.6938, -1.3047],
+  "DEVON": [50.7156, -3.5309], "CORNWALL": [50.2660, -5.0527], "SOMERSET": [51.1051, -2.9262], "WILTSHIRE": [51.3492, -1.9927], "GLOUCESTERSHIRE": [51.8642, -2.2380], "DORSET": [50.7488, -2.3445], "BRISTOL": [51.4545, -2.5879],
+  "TYNE AND WEAR": [54.9783, -1.6178], "COUNTY DURHAM": [54.7294, -1.8746], "NORTHUMBERLAND": [55.2083, -2.0784], "CLEVELAND": [54.5742, -1.2351],
+  "SOUTH GLAMORGAN": [51.4816, -3.1791], "WEST GLAMORGAN": [51.6214, -3.9436], "MID GLAMORGAN": [51.6500, -3.4000], "GWENT": [51.6500, -3.0000], "CLWYD": [53.0833, -3.2500], "POWYS": [52.2000, -3.3333], "DYFED": [51.8667, -4.3000], "GWYNEDD": [52.9333, -4.0000],
+  "STRATHCLYDE": [55.8642, -4.2518], "LOTHIAN": [55.9533, -3.1883], "TAYSIDE": [56.4620, -2.9707], "GRAMPIAN": [57.1497, -2.0943], "HIGHLAND": [57.4778, -4.2247], "FIFE": [56.2082, -3.1495], "CENTRAL": [56.1165, -3.9369], "BORDERS": [55.5486, -2.7861],
+};
+
+// UK region centroids — for DVLA regional vehicle demand.
+const REGION_CENTROIDS: Record<string, [number, number]> = {
+  "London": [51.5074, -0.1278], "South East": [51.2787, -0.5217], "South West": [50.7772, -3.9995],
+  "East of England": [52.2400, 0.5000], "East Midlands": [52.8300, -1.3300], "West Midlands": [52.4862, -1.8904],
+  "Yorkshire": [53.9591, -1.0815], "North West": [53.7632, -2.7044], "North East": [54.9783, -1.6178],
+  "Wales": [52.1307, -3.7837], "Scotland": [56.4907, -4.2026], "Northern Ireland": [54.7877, -6.4923],
+};
+
+// Keyword → which demand-signal source(s) light up the map.
+type DemandSource = "property" | "vehicle" | "business";
+const DEMAND_KEYWORD_MAP: { source: DemandSource; terms: string[] }[] = [
+  { source: "property", terms: ["roof", "construction", "building", "builder", "extension", "loft", "window", "door", "solar", "scaffold", "plumb", "electric", "heating", "boiler", "kitchen", "bathroom", "driveway", "landscap", "fencing", "render", "plaster", "insulation", "conservatory", "groundwork", "joinery", "carpentry", "brick", "flooring", "guttering", "cladding", "damp", "survey", "estate agent", "property", "home improvement", "new build", "house"] },
+  { source: "vehicle", terms: ["car", "vehicle", "electric car", "ev", "van", "fleet", "tyre", "mot", "valet", "garage", "automotive", "motor", "lease", "charging", "charge point", "transport", "haulage", "logistics", "driving"] },
+  { source: "business", terms: ["account", "legal", "solicitor", "consult", "marketing", "recruit", "it service", "software", "saas", "insurance", "bookkeep", "payroll", "hr ", "advisory", "agency", "design", "web", "finance", "startup", "b2b", "office", "coworking"] },
+];
+
+function detectDemandSource(q: string): DemandSource | null {
+  const ql = q.toLowerCase();
+  for (const { source, terms } of DEMAND_KEYWORD_MAP) {
+    if (terms.some(t => ql.includes(t))) return source;
+  }
+  return null;
+}
 
 // ── Atlas (geo intelligence command centre) ───────────────────────────────────
 
@@ -9979,7 +10088,7 @@ ${pageShellHeader(null, authCtx)}
   <div class="atl-hero-inner">
     <div class="atl-hero-eyebrow"><span class="atl-live-dot"></span>Live Geo Intelligence</div>
     <h1>Where is the UK buying<br>what you sell?</h1>
-    <p class="atl-hero-sub">Search any service keyword to map public-sector contract demand across every district in England, Scotland, Wales &amp; Northern Ireland.</p>
+    <p class="atl-hero-sub">Search any product or service to map real UK demand — vehicle density, new-build activity, business formation and live public contracts — across England, Scotland, Wales &amp; Northern Ireland.</p>
     <div class="atl-search-row">
       <input id="atl-q" type="text" value="${q}" placeholder="e.g. roofing, social care, IT services, waste management…" autocomplete="off">
       <button class="atl-search-btn" id="atl-go">Map demand</button>
@@ -10031,10 +10140,10 @@ ${pageShellHeader(null, authCtx)}
           <div class="atl-side-q" id="atl-side-q">Enter a keyword to begin</div>
         </div>
         <div class="atl-kpis">
-          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-z">—</div><div class="atl-kpi-lbl">Districts</div></div>
-          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-c">—</div><div class="atl-kpi-lbl">Contracts</div></div>
-          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-p">—</div><div class="atl-kpi-lbl">Planning</div></div>
-          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-v">—</div><div class="atl-kpi-lbl">Est. value</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-z">—</div><div class="atl-kpi-lbl" id="kpi-z-l">Areas</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-c">—</div><div class="atl-kpi-lbl" id="kpi-c-l">Demand</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-p">—</div><div class="atl-kpi-lbl" id="kpi-p-l">Contracts</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-v">—</div><div class="atl-kpi-lbl" id="kpi-v-l">Est. value</div></div>
         </div>
         <div class="atl-legend">
           <div class="atl-legend-dot" style="background:#dc2626"></div><span class="atl-legend-lbl">High</span>
@@ -10153,9 +10262,9 @@ function render(data){
   if(!data||!data.districts||!data.districts.length)return;
   var max=data.districts[0].total||1;
   data.districts.forEach(function(d){
-    var ll=C[d.name];
+    var ll=(d.lat!=null&&d.lon!=null)?[d.lat,d.lon]:C[d.name];
     if(!ll)return;
-    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0)+(d.demand||0);
     if(tot===0)return;
     var ratio=tot/max;
     var color=clr(ratio);
@@ -10167,11 +10276,12 @@ function render(data){
     var mk=L.circleMarker(ll,{radius:r,fillColor:color,color:color,weight:1.5,opacity:0.85,fillOpacity:0.45}).addTo(map);
     mkrs.push(mk);
     var lines='<div style="padding:14px 16px 12px"><div style="font-family:var(--serif);font-size:14px;color:var(--text);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-2)">'+d.name+'</div>';
+    if(d.demand>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0;gap:14px"><span style="color:var(--muted);font-size:11px">Demand signal</span><span style="color:var(--brand);font-weight:700;font-size:12px;text-align:right">'+(d.detail||d.demand.toLocaleString())+'</span></div>';
     if(lyr.contracts&&d.contracts>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Contracts</span><span style="color:#b45309;font-weight:700;font-size:12px">'+d.contracts+'</span></div>';
     if(lyr.planning&&d.planning>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Planning apps</span><span style="color:#15803d;font-weight:700;font-size:12px">'+d.planning+'</span></div>';
     if(d.value>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Est. value</span><span style="color:var(--text);font-size:12px">'+fv(d.value)+'</span></div>';
     lines+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><a href="/scan" style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">→ Scan this opportunity</a></div></div>';
-    mk.bindPopup(lines,{maxWidth:220});
+    mk.bindPopup(lines,{maxWidth:240});
     mk.on('click',function(){hilite(d.name);});
   });
 }
@@ -10182,7 +10292,7 @@ function renderRanks(data){
   var max=data.districts[0].total||1;
   var html='';
   data.districts.slice(0,40).forEach(function(d,i){
-    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0)+(d.demand||0);
     var pct=max>0?Math.round(tot/max*100):0;
     var bc=clr(tot/max);
     html+='<div class="atl-rank-row" data-n="'+d.name.replace(/"/g,'')+'" style="cursor:pointer">'+
@@ -10205,7 +10315,7 @@ function renderHotspots(data){
   var max=top[0].total||1;
   var html='';
   top.forEach(function(d,i){
-    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0)+(d.demand||0);
     var pct=Math.round(tot/max*100);
     var bc=clr(tot/max);
     html+='<div class="atl-hs-card" data-n="'+d.name.replace(/"/g,'')+'" style="cursor:pointer">'+
@@ -10213,6 +10323,7 @@ function renderHotspots(data){
       '<div class="atl-hs-name">'+d.name+'</div>'+
       '<div class="atl-hs-bar-wrap"><div class="atl-hs-bar" style="width:'+pct+'%;background:'+bc+'"></div></div>'+
       '<div class="atl-hs-meta">'+
+        (d.demand>0?'<div class="atl-hs-stat"><b>'+(d.demand>999?(d.demand/1000).toFixed(0)+'k':d.demand)+'</b> demand</div>':'')+
         (d.contracts>0?'<div class="atl-hs-stat"><b>'+d.contracts+'</b> contracts</div>':'')+
         (d.planning>0?'<div class="atl-hs-stat"><b>'+d.planning+'</b> planning</div>':'')+
         (d.value>0?'<div class="atl-hs-stat"><b>'+fv(d.value)+'</b> value</div>':'')+
@@ -10227,13 +10338,25 @@ function updateKpis(data){
     ['kpi-z','kpi-c','kpi-p','kpi-v'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='—';});
     return;
   }
-  var tc=data.districts.reduce(function(s,d){return s+d.contracts;},0);
-  var tp=data.districts.reduce(function(s,d){return s+d.planning;},0);
+  var tc=data.districts.reduce(function(s,d){return s+(d.contracts||0);},0);
+  var tp=data.districts.reduce(function(s,d){return s+(d.planning||0);},0);
+  var td=data.districts.reduce(function(s,d){return s+(d.demand||0);},0);
   var tv=data.districts.reduce(function(s,d){return s+(d.value||0);},0);
   var tz=data.districts.length;
+  function dn(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);}
   document.getElementById('kpi-z').textContent=tz;
-  document.getElementById('kpi-c').textContent=tc;
-  document.getElementById('kpi-p').textContent=tp;
+  if(data.hasDemand){
+    // Demand mode: lead with the demand signal magnitude.
+    document.getElementById('kpi-c').textContent=dn(td);
+    document.getElementById('kpi-c-l').textContent='Demand signal';
+    document.getElementById('kpi-p').textContent=tc;
+    document.getElementById('kpi-p-l').textContent='Contracts';
+  } else {
+    document.getElementById('kpi-c').textContent=tc;
+    document.getElementById('kpi-c-l').textContent='Contracts';
+    document.getElementById('kpi-p').textContent=tp;
+    document.getElementById('kpi-p-l').textContent='Planning';
+  }
   document.getElementById('kpi-v').textContent=fv(tv);
 }
 
@@ -10284,7 +10407,7 @@ function doSearch(){
   var q=document.getElementById('atl-q').value.trim();
   if(!q){hideLdr();return;}
   document.getElementById('atl-side-q').textContent=q;
-  document.getElementById('atl-section-title').textContent='Contract demand — '+q;
+  document.getElementById('atl-section-title').textContent='Demand map — '+q;
   var ldr=document.getElementById('atl-ldr');
   if(ldr){ldr.style.display='';ldr.classList.remove('gone');}
   var done=false;
@@ -10298,7 +10421,7 @@ function doSearch(){
       renderHotspots(data);
       updateKpis(data);
       if(data.districts&&data.districts.length){
-        var bounds=data.districts.slice(0,10).map(function(d){return C[d.name];}).filter(Boolean);
+        var bounds=data.districts.slice(0,10).map(function(d){return (d.lat!=null&&d.lon!=null)?[d.lat,d.lon]:C[d.name];}).filter(Boolean);
         if(bounds.length)map.flyToBounds(bounds,{padding:[40,40],maxZoom:8,animate:true,duration:1.2});
       }
     })

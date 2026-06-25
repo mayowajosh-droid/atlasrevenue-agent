@@ -534,6 +534,68 @@ export function formatSignalLine(s: MarketSignal): string {
   return s.formatted;
 }
 
+// ── Geo-demand exports (for the Atlas demand map) ───────────────────────────────
+// These return RAW geographic demand arrays (county/region keyed) so the map can
+// plot real private-sector demand proxies, not just procurement contracts.
+
+export type GeoDemandPoint = {
+  place: string;        // county or region name
+  value: number;        // primary demand magnitude
+  secondary?: number;   // optional secondary metric (e.g. new builds)
+  detail: string;       // human label, e.g. "12,340 completions · 410 new builds"
+};
+
+/** Land Registry property demand by county — completions + new builds.
+ *  New builds are a direct demand proxy for roofing/construction/fit-out trades. */
+export async function getCountyPropertyDemand(pool: Pool): Promise<GeoDemandPoint[]> {
+  type LandReg = {
+    byCounty: { county: string; transactionCount: number; avgPrice: number; newBuildCount: number }[];
+  };
+  const data = await getLatestPayload<LandReg>(pool, "land_registry_transactions");
+  if (!data?.byCounty?.length) return [];
+  return data.byCounty
+    .filter(c => c.county && c.transactionCount > 0)
+    .map(c => ({
+      place: c.county,
+      value: c.transactionCount,
+      secondary: c.newBuildCount ?? 0,
+      detail: `${fmt(c.transactionCount)} completions${c.newBuildCount ? ` · ${fmt(c.newBuildCount)} new builds` : ""}${c.avgPrice ? ` · avg ${fmtGbp(c.avgPrice)}` : ""}`,
+    }));
+}
+
+/** DVLA vehicle demand by region — total cars + company/fleet share. */
+export async function getRegionalVehicleDemand(pool: Pool): Promise<GeoDemandPoint[]> {
+  type DvlaRegion = { region: string; totalCars: number; companyCars: number; quarter: string };
+  const rows = await getLatestPayloads<DvlaRegion>(pool, "dvla_ods_regional", 14);
+  if (!rows.length) return [];
+  return rows
+    .map(r => r.payload)
+    .filter(r => r?.region && r.totalCars > 0)
+    .map(r => {
+      const fleetPct = r.totalCars ? Math.round((r.companyCars / r.totalCars) * 100) : 0;
+      return {
+        place: r.region,
+        value: r.totalCars,
+        secondary: r.companyCars ?? 0,
+        detail: `${fmt(r.totalCars)} licensed vehicles${fleetPct ? ` · ${fleetPct}% fleet/company` : ""}`,
+      };
+    });
+}
+
+/** Companies House new-business demand by county — proxy for B2B service demand. */
+export async function getCountyBusinessDemand(pool: Pool): Promise<GeoDemandPoint[]> {
+  type ChSnapshot = { topCounties: { county: string; count: number }[] };
+  const data = await getLatestPayload<ChSnapshot>(pool, "ch_new_businesses");
+  if (!data?.topCounties?.length) return [];
+  return data.topCounties
+    .filter(c => c.county && c.count > 0)
+    .map(c => ({
+      place: c.county,
+      value: c.count,
+      detail: `${fmt(c.count)} new companies incorporated`,
+    }));
+}
+
 // ── Regional Intelligence ──────────────────────────────────────────────────────
 
 export type RegionIntel = {
