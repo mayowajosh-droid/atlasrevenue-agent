@@ -598,9 +598,10 @@ export async function getCountyBusinessDemand(pool: Pool): Promise<GeoDemandPoin
 }
 
 /** Companies House sector-specific density by county — competitive-landscape signal.
- *  Filters the CH businesses array by SIC-sector terms and groups by county,
- *  showing where businesses in that category are concentrated (proven market)
- *  or sparse (opportunity gap). */
+ *  Filters the CH businesses array by SIC-sector terms and groups by county.
+ *  Uses sectorTotals to scale sample counts to estimated actuals — e.g. if we
+ *  sampled 100 retail businesses from 7,500 total, a county with 5 in the sample
+ *  gets scaled to ~375 estimated. */
 export async function getCountySectorDensity(
   pool: Pool,
   sectorFilter: string[],
@@ -609,6 +610,7 @@ export async function getCountySectorDensity(
   type ChSnapshot = {
     topCounties: { county: string; count: number }[];
     businesses: { sector: string; county: string; incorporatedOn: string }[];
+    sectorTotals?: Record<string, number>;
   };
   const data = await getLatestPayload<ChSnapshot>(pool, "ch_new_businesses");
   if (!data?.businesses?.length) return [];
@@ -619,21 +621,40 @@ export async function getCountySectorDensity(
   );
   if (!filtered.length) return [];
 
+  // Scale factor: if sectorTotals says there are 7,500 Retail businesses but we
+  // only sampled 100, multiply each county count by 75 for estimated actuals.
+  let scaleFactor = 1;
+  if (data.sectorTotals) {
+    let totalHits = 0;
+    for (const sf of sectorFilter) {
+      const sfLc = sf.toLowerCase();
+      for (const [sector, hits] of Object.entries(data.sectorTotals)) {
+        if (sector.toLowerCase().includes(sfLc)) totalHits += hits;
+      }
+    }
+    if (totalHits > filtered.length) {
+      scaleFactor = totalHits / filtered.length;
+    }
+  }
+
   const byCty: Record<string, number> = {};
   for (const b of filtered) {
     if (b.county) byCty[b.county] = (byCty[b.county] ?? 0) + 1;
   }
 
-  const counts = Object.values(byCty);
-  const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
+  const scaled = Object.entries(byCty).map(([county, raw]) => ({
+    county,
+    estimated: Math.round(raw * scaleFactor),
+  }));
+  const avg = scaled.reduce((s, c) => s + c.estimated, 0) / scaled.length;
 
-  return Object.entries(byCty)
-    .filter(([, count]) => count > 0)
-    .map(([county, count]) => ({
-      place: county,
-      value: count,
-      detail: `${fmt(count)} ${sectorLabel} businesses`
-        + (count >= avg * 1.5 ? " · proven market" : count <= avg * 0.5 ? " · opportunity gap" : " · active market"),
+  return scaled
+    .filter(c => c.estimated > 0)
+    .map(c => ({
+      place: c.county,
+      value: c.estimated,
+      detail: `~${fmt(c.estimated)} ${sectorLabel} businesses`
+        + (c.estimated >= avg * 1.5 ? " · proven market" : c.estimated <= avg * 0.5 ? " · opportunity gap" : " · active market"),
     }))
     .sort((a, b) => b.value - a.value);
 }

@@ -24,6 +24,7 @@ export type ChNewBusinessSnapshot = {
   periodTo: string;
   businesses: NewBusiness[];
   topCounties: { county: string; count: number }[];
+  sectorTotals?: Record<string, number>;
 };
 
 const SIC_SECTOR_LABELS: Record<string, string> = {
@@ -149,6 +150,7 @@ export async function fetchNewBusinessRegistrations(
   try {
     const allItems: ChItem[] = [];
     let totalHits = 0;
+    let sectorTotals: Record<string, number> = {};
 
     if (sicCodePrefix) {
       // Single-sector mode (explicit SIC filter)
@@ -164,6 +166,8 @@ export async function fetchNewBusinessRegistrations(
     } else {
       // Multi-sector mode: fetch 100 businesses per key sector in parallel batches.
       // CH rate limit is 600/5min — 12 concurrent requests is safe.
+      // Also stores total hits per sector so the density function can scale
+      // sample counts to estimated actuals (100 sampled from 7,500 → multiply by 75).
       const batches: typeof SECTOR_SIC_CODES[] = [];
       for (let i = 0; i < SECTOR_SIC_CODES.length; i += 4) {
         batches.push(SECTOR_SIC_CODES.slice(i, i + 4));
@@ -178,12 +182,13 @@ export async function fetchNewBusinessRegistrations(
               size: "100",
               sic_codes: entry.codes,
             });
-            return fetchPage(authHeader, params);
+            return fetchPage(authHeader, params).then(r => ({ ...r, sector: entry.sector }));
           }),
         );
         for (const r of results) {
           if (r.status === "fulfilled") {
             totalHits += r.value.hits;
+            sectorTotals[r.value.sector] = r.value.hits;
             allItems.push(...r.value.items);
           }
         }
@@ -239,6 +244,7 @@ export async function fetchNewBusinessRegistrations(
       periodTo,
       businesses,
       topCounties,
+      ...(Object.keys(sectorTotals ?? {}).length ? { sectorTotals } : {}),
     };
   } catch { return empty; }
 }
