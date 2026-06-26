@@ -1516,6 +1516,8 @@ async function queryChaseableStats(): Promise<ChaseStats> {
 type ChartDataPoint = { month: string; total_m: number };
 async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean; topDesk: string | null }> {
   if (pool) {
+    // Sum value across ALL valued notices (open + awarded) for the spend trend —
+    // the awarded-only filter was too narrow and produced a near-empty £0.0m chart.
     const [r, topR] = await Promise.all([
       pool.query<ChartDataPoint>(
         `SELECT to_char(date_trunc('month', notice_date), 'Mon') AS month,
@@ -1526,7 +1528,6 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
            AND value_amount IS NOT NULL
            AND value_amount > 0
            AND value_amount <= 2000000000
-           AND (LOWER(status) LIKE '%award%')
          GROUP BY date_trunc('month', notice_date)
          ORDER BY date_trunc('month', notice_date)`
       ),
@@ -1538,16 +1539,20 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
            AND value_amount IS NOT NULL
            AND value_amount > 0
            AND value_amount <= 2000000000
-           AND (LOWER(status) LIKE '%award%')
          GROUP BY category
          ORDER BY SUM(value_amount) DESC
          LIMIT 1`
       ),
     ]);
+    const total = r.rows.reduce((s, p) => s + (p.total_m || 0), 0);
+    // Fall back to the illustrative trend if the real data is too thin to be
+    // meaningful (< £10m total over 12 months = a data gap, not a real signal) —
+    // better an honestly-labelled illustrative line than an embarrassing £0.0m.
+    const illustrative = r.rows.length < 3 || total < 10;
     return {
-      points: r.rows,
-      illustrative: r.rows.length < 3,
-      topDesk: topR.rows[0]?.category ?? null,
+      points: illustrative ? [] : r.rows,
+      illustrative,
+      topDesk: illustrative ? null : (topR.rows[0]?.category ?? null),
     };
   }
   return { points: [], illustrative: true, topDesk: null };
@@ -10185,14 +10190,14 @@ ${pageShellHeader(null, authCtx)}
     </div>
     <div class="atl-pills-row">
       <span class="atl-pill" data-q="roofing">Roofing</span>
-      <span class="atl-pill" data-q="construction">Construction</span>
-      <span class="atl-pill" data-q="social care">Social care</span>
+      <span class="atl-pill" data-q="electric cars">Electric cars</span>
+      <span class="atl-pill" data-q="perfumes">Perfumes</span>
+      <span class="atl-pill" data-q="coffee">Coffee</span>
+      <span class="atl-pill" data-q="solar panels">Solar panels</span>
       <span class="atl-pill" data-q="IT services">IT services</span>
-      <span class="atl-pill" data-q="facilities management">Facilities</span>
-      <span class="atl-pill" data-q="energy">Energy</span>
+      <span class="atl-pill" data-q="accountants">Accountants</span>
+      <span class="atl-pill" data-q="social care">Social care</span>
       <span class="atl-pill" data-q="cleaning">Cleaning</span>
-      <span class="atl-pill" data-q="security">Security</span>
-      <span class="atl-pill" data-q="waste management">Waste</span>
       <span class="atl-pill" data-q="highways">Highways</span>
     </div>
     <div class="atl-hero-stats">
@@ -10210,7 +10215,7 @@ ${pageShellHeader(null, authCtx)}
     <div class="atl-section-hd">
       <div>
         <div class="atl-section-label">Demand map</div>
-        <div class="atl-section-title" id="atl-section-title">Search above to map UK contract demand</div>
+        <div class="atl-section-title" id="atl-section-title">Search a product or service to map UK demand</div>
       </div>
       <div class="atl-layers-tog">
         <span class="atl-layer on" data-layer="contracts">Contracts</span>
@@ -13058,8 +13063,8 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 </head>
 <body>
 <div class="topstrip">
-  <span>Intelligence scan &middot; UK public sector</span>
-  <span>Public record &middot; updated continuously</span>
+  <span>Intelligence scan &middot; UK market &amp; public sector</span>
+  <span>Real data &middot; updated continuously</span>
 </div>
 <header><div class="mast">
   <a class="logo" href="/"><span class="logo-dot"></span>Atlas<b>Revenue</b></a>
@@ -16906,7 +16911,9 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
   const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const renderCard = (d: DS, rank: number): string => {
-    const sharePct = grandTotal > 0 ? Math.round((d.totalValue / grandTotal) * 100) : 0;
+    // One decimal so closely-ranked desks don't all round to the same integer
+    // (e.g. three desks at "15%" reads as hardcoded even when the values differ).
+    const sharePct = grandTotal > 0 ? Number(((d.totalValue / grandTotal) * 100).toFixed(1)) : 0;
     const maxCatVal = d.topCats.length > 0 ? d.topCats[0].value : 0;
     const updatedStr = d.cachedAt ? timeAgo(d.cachedAt) : null;
 
@@ -18633,19 +18640,32 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
     return;
   }
 
-  const pdfEdp = parseEdpFromMarkdown(scan.report_markdown);
-  const consistency = validateReportConsistency(pdfEdp, scan.report_markdown);
+  // Intelligence-mode reports use a different EDP structure (market size / growth
+  // rate, not the procurement evidence-grade/verdict fields), so the standard
+  // consistency guard would wrongly block them. Apply only a light sanity check.
+  const scanMode = (scan.input_json as any)?.scanMode ?? "both";
+  if (scanMode === "intelligence") {
+    const md = stripLlmNarration(scan.report_markdown);
+    if (!/##\s*1\.\s*Executive Decision Panel/i.test(md) || md.length < 400) {
+      console.error("[pdf] blocked — intelligence report incomplete", { scanId: scan.id });
+      res.status(422).json({ error: "PDF export blocked: report incomplete.", detail: "Intelligence report is missing its Executive Decision Panel or is too short." });
+      return;
+    }
+  } else {
+    const pdfEdp = parseEdpFromMarkdown(scan.report_markdown);
+    const consistency = validateReportConsistency(pdfEdp, scan.report_markdown);
 
-  if (!consistency.valid) {
-    const detail = [...consistency.errors, ...consistency.conflicts].join(" | ");
-    console.error("[pdf] blocked — consistency validation failed:", detail, { scanId: scan.id });
-    res.status(422).json({
-      error: "PDF export blocked: report consistency validation failed.",
-      detail,
-      errors: consistency.errors,
-      conflicts: consistency.conflicts
-    });
-    return;
+    if (!consistency.valid) {
+      const detail = [...consistency.errors, ...consistency.conflicts].join(" | ");
+      console.error("[pdf] blocked — consistency validation failed:", detail, { scanId: scan.id });
+      res.status(422).json({
+        error: "PDF export blocked: report consistency validation failed.",
+        detail,
+        errors: consistency.errors,
+        conflicts: consistency.conflicts
+      });
+      return;
+    }
   }
 
   const html = reportPage(scan).replace(
@@ -20804,28 +20824,70 @@ app.get("/unsubscribe-briefing/:id", asyncRoute(async (req, res) => {
 app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
   const subs = await listAllSubscriptions();
   const token = String(req.query.token || "");
+  const activeCount = subs.filter(s => s.active).length;
   res.type("html").send(`<!doctype html>
 <html lang="en">
-<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
-<h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">Weekly Alert Subscriptions</h1>
-<p><a href="/admin/scans?token=${encodeURIComponent(token)}">← Back to scans</a></p>
-<table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1200px">
-<tr><th>Created</th><th>Company</th><th>Email</th><th>Active</th><th>Last Alerted</th><th>Tracked</th><th>Fire</th></tr>
-${subs.map(s => `
-  <tr>
-    <td>${escapeHtml(formatDate(s.created_at))}</td>
-    <td>${escapeHtml(s.company_name)}</td>
-    <td>${escapeHtml(s.email)}</td>
-    <td>${s.active ? "Yes" : "No"}</td>
-    <td>${s.last_alerted_at ? escapeHtml(formatDate(s.last_alerted_at)) : "Never"}</td>
-    <td>${(s.alerted_notice_ids || []).length}</td>
-    <td>
-      <form method="POST" action="/admin/subscriptions/${s.id}/fire?token=${encodeURIComponent(token)}">
-        <button style="background:#1d6b4f;color:#fff;border:0;padding:6px 10px;cursor:pointer">Fire Now</button>
-      </form>
-    </td>
-  </tr>`).join("")}
-</table>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weekly Alert Subscriptions — AtlasRevenue Admin</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+:root{--base:#F4F1E9;--surface:#FFFFFF;--surface-2:#F9F7F2;--brand:#B4924E;--border:#E5DFD4;--text:#1A1208;--muted:#7D6B50;--green:#1d6b4f;
+--serif:"Newsreader",Georgia,serif;--sans:"Libre Franklin",system-ui,sans-serif;--mono:"Spline Sans Mono",ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--base);color:var(--text);font-family:var(--sans);padding:40px 32px;font-size:14px}
+.wrap{max-width:1200px;margin:0 auto}
+.crumb{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.crumb a{color:var(--muted);text-decoration:none}.crumb a:hover{color:var(--text)}
+h1{font-family:var(--serif);font-weight:500;font-size:30px;letter-spacing:-.01em;margin-bottom:6px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+.kpis{display:flex;gap:14px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);padding:16px 20px;min-width:120px}
+.kpi-v{font-family:var(--serif);font-size:26px;font-weight:500;line-height:1}
+.kpi-l{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border)}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px}
+tr:last-child td{border-bottom:0}
+.pill{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:2px}
+.pill-on{background:rgba(29,107,79,.12);color:var(--green)}.pill-off{background:rgba(125,107,80,.12);color:var(--muted)}
+.fire-btn{background:var(--green);color:#fff;border:0;padding:7px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+.fire-btn:hover{opacity:.9}
+.empty{background:var(--surface);border:1px dashed var(--border);padding:48px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--text);font-family:var(--serif);font-size:18px;font-weight:500;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crumb"><a href="/admin/scans?token=${encodeURIComponent(token)}">← Admin</a> &middot; Subscriptions</div>
+  <h1>Weekly Alert Subscriptions</h1>
+  <p class="sub">Companies subscribed to weekly opportunity alerts. Fire an alert manually to re-scan and email new matches.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-v">${subs.length}</div><div class="kpi-l">Total</div></div>
+    <div class="kpi"><div class="kpi-v">${activeCount}</div><div class="kpi-l">Active</div></div>
+  </div>
+  ${subs.length === 0 ? `<div class="empty"><b>No subscriptions yet</b>Subscriptions appear here when a visitor signs up for weekly alerts from a completed scan report.</div>` : `
+  <table>
+    <thead><tr><th>Created</th><th>Company</th><th>Email</th><th>Status</th><th>Last Alerted</th><th>Tracked</th><th>Action</th></tr></thead>
+    <tbody>
+    ${subs.map(s => `
+      <tr>
+        <td>${escapeHtml(formatDate(s.created_at))}</td>
+        <td><b>${escapeHtml(s.company_name)}</b></td>
+        <td style="font-family:var(--mono);font-size:12px">${escapeHtml(s.email)}</td>
+        <td><span class="pill ${s.active ? "pill-on" : "pill-off"}">${s.active ? "Active" : "Paused"}</span></td>
+        <td>${s.last_alerted_at ? escapeHtml(formatDate(s.last_alerted_at)) : "Never"}</td>
+        <td>${(s.alerted_notice_ids || []).length}</td>
+        <td>
+          <form method="POST" action="/admin/subscriptions/${s.id}/fire?token=${encodeURIComponent(token)}">
+            <button class="fire-btn">Fire now</button>
+          </form>
+        </td>
+      </tr>`).join("")}
+    </tbody>
+  </table>`}
+</div>
 </body></html>`);
 }));
 
