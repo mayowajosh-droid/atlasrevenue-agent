@@ -287,6 +287,39 @@ export async function upsertPlanningApplication(app: Omit<PlanningApplication, "
   }
 }
 
+// Batch insert — one multi-row query per chunk instead of N sequential inserts,
+// so a full national pull lands well within the time budget. Uses lat/lon columns
+// (no geom) for simplicity; the map reads lat/lon, not PostGIS, for these points.
+export async function upsertPlanningApplicationsBatch(apps: Omit<PlanningApplication, "id">[]): Promise<number> {
+  if (!pool || apps.length === 0) return 0;
+  const COLS = 15;
+  let written = 0;
+  // Postgres caps at 65535 params; 15 cols → ~4300 rows max. Chunk at 500 to be safe.
+  for (let i = 0; i < apps.length; i += 500) {
+    const chunk = apps.slice(i, i + 500);
+    const values: any[] = [];
+    const tuples = chunk.map((a, j) => {
+      const b = j * COLS;
+      values.push(a.reference, a.description, a.status, a.decision, a.application_type,
+        a.applicant_name, a.address, a.postcode, a.local_authority, a.lat, a.lon,
+        a.received_date, a.decided_date, a.estimated_value, a.source);
+      return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15})`;
+    });
+    try {
+      const r = await pool.query(
+        `INSERT INTO planning_applications (reference, description, status, decision, application_type, applicant_name, address, postcode, local_authority, lat, lon, received_date, decided_date, estimated_value, source)
+         VALUES ${tuples.join(",")}
+         ON CONFLICT DO NOTHING`,
+        values
+      );
+      written += r.rowCount ?? 0;
+    } catch (err: any) {
+      console.warn("[geo] planning batch insert failed:", err?.message?.split("\n")[0]);
+    }
+  }
+  return written;
+}
+
 export async function findLocationsNear(lat: number, lon: number, radiusKm: number, limit = 20): Promise<SpatialLocation[]> {
   if (!pool) return [];
 

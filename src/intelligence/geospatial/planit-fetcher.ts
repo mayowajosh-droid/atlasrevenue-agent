@@ -12,7 +12,7 @@
  *           start_date / end_date (YYYY-MM-DD), bbox, app_size, app_state …
  */
 
-import { upsertPlanningApplication } from "./db.js";
+import { upsertPlanningApplicationsBatch, type PlanningApplication } from "./db.js";
 
 const PLANIT_BASE = "https://www.planit.org.uk/api/applics/json";
 
@@ -102,12 +102,12 @@ export async function ingestPlanningApplications(opts: {
       const records = data.records ?? [];
       if (records.length === 0) break;
 
+      // Map the page, then write it in one batched insert (fast enough to pull the
+      // full national set within the time budget).
+      const mapped: Omit<PlanningApplication, "id">[] = [];
       for (const r of records) {
-        if (ingested >= maxRecords) break;
         if (!r.name) continue;
-        const lat = typeof r.location_y === "number" ? r.location_y : null;
-        const lon = typeof r.location_x === "number" ? r.location_x : null;
-        await upsertPlanningApplication({
+        mapped.push({
           reference: r.name,
           description: r.description ?? null,
           status: r.app_state ?? null,
@@ -118,14 +118,16 @@ export async function ingestPlanningApplications(opts: {
           address: r.address ?? null,
           postcode: r.postcode ?? null,
           local_authority: r.area_name ?? null,
-          lat, lon,
+          lat: typeof r.location_y === "number" ? r.location_y : null,
+          lon: typeof r.location_x === "number" ? r.location_x : null,
           received_date: r.start_date ?? null,
           decided_date: r.decided_date ?? null,
           estimated_value: indicativeValue(r.app_size),
           source: "planit",
         });
-        ingested++;
       }
+      await upsertPlanningApplicationsBatch(mapped);
+      ingested += mapped.length;
 
       // Stop if we've drained the result set.
       if (records.length < pageSize) break;
