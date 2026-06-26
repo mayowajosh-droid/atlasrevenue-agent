@@ -119,6 +119,86 @@ async function fetchPage(
   return { hits: data.hits ?? 0, items: data.items ?? [] };
 }
 
+// Map common locality/city names to their parent county, so businesses without
+// a `region` field still get assigned to the right county for map plotting.
+const LOCALITY_TO_COUNTY: Record<string, string> = {
+  "london": "Greater London", "westminster": "Greater London", "camden": "Greater London",
+  "islington": "Greater London", "hackney": "Greater London", "tower hamlets": "Greater London",
+  "southwark": "Greater London", "lambeth": "Greater London", "wandsworth": "Greater London",
+  "croydon": "Greater London", "barnet": "Greater London", "ealing": "Greater London",
+  "brent": "Greater London", "enfield": "Greater London", "bromley": "Greater London",
+  "newham": "Greater London", "hillingdon": "Greater London", "hounslow": "Greater London",
+  "greenwich": "Greater London", "lewisham": "Greater London", "walthamstow": "Greater London",
+  "stratford": "Greater London", "romford": "Greater London", "ilford": "Greater London",
+  "sutton": "Greater London", "kingston upon thames": "Greater London", "richmond": "Greater London",
+  "surbiton": "Greater London", "hayes": "Greater London", "edgware": "Greater London",
+  "harrow": "Greater London", "wembley": "Greater London", "chiswick": "Greater London",
+  "manchester": "Greater Manchester", "salford": "Greater Manchester", "stockport": "Greater Manchester",
+  "bolton": "Greater Manchester", "oldham": "Greater Manchester", "rochdale": "Greater Manchester",
+  "bury": "Greater Manchester", "wigan": "Greater Manchester", "tameside": "Greater Manchester",
+  "birmingham": "West Midlands", "wolverhampton": "West Midlands", "coventry": "West Midlands",
+  "solihull": "West Midlands", "dudley": "West Midlands", "walsall": "West Midlands",
+  "sandwell": "West Midlands", "west bromwich": "West Midlands",
+  "leeds": "West Yorkshire", "bradford": "West Yorkshire", "wakefield": "West Yorkshire",
+  "huddersfield": "West Yorkshire", "halifax": "West Yorkshire",
+  "sheffield": "South Yorkshire", "rotherham": "South Yorkshire", "doncaster": "South Yorkshire",
+  "barnsley": "South Yorkshire",
+  "liverpool": "Merseyside", "st helens": "Merseyside", "wirral": "Merseyside",
+  "sefton": "Merseyside", "knowsley": "Merseyside", "birkenhead": "Merseyside",
+  "newcastle upon tyne": "Tyne and Wear", "sunderland": "Tyne and Wear",
+  "gateshead": "Tyne and Wear", "south shields": "Tyne and Wear",
+  "nottingham": "Nottinghamshire", "leicester": "Leicestershire", "derby": "Derbyshire",
+  "northampton": "Northamptonshire", "lincoln": "Lincolnshire",
+  "norwich": "Norfolk", "ipswich": "Suffolk", "cambridge": "Cambridgeshire",
+  "peterborough": "Cambridgeshire", "chelmsford": "Essex", "colchester": "Essex",
+  "southend-on-sea": "Essex", "basildon": "Essex",
+  "brighton": "East Sussex", "brighton and hove": "East Sussex", "eastbourne": "East Sussex",
+  "hastings": "East Sussex", "worthing": "West Sussex", "crawley": "West Sussex",
+  "chichester": "West Sussex",
+  "reading": "Berkshire", "slough": "Berkshire", "maidenhead": "Berkshire",
+  "oxford": "Oxfordshire", "milton keynes": "Buckinghamshire", "aylesbury": "Buckinghamshire",
+  "luton": "Bedfordshire", "bedford": "Bedfordshire",
+  "guildford": "Surrey", "woking": "Surrey", "epsom": "Surrey", "reigate": "Surrey",
+  "canterbury": "Kent", "maidstone": "Kent", "tunbridge wells": "Kent", "dartford": "Kent",
+  "chatham": "Kent", "gravesend": "Kent",
+  "southampton": "Hampshire", "portsmouth": "Hampshire", "winchester": "Hampshire",
+  "basingstoke": "Hampshire", "fareham": "Hampshire",
+  "bristol": "Bristol", "bath": "Somerset", "taunton": "Somerset", "yeovil": "Somerset",
+  "exeter": "Devon", "plymouth": "Devon", "torquay": "Devon",
+  "truro": "Cornwall", "falmouth": "Cornwall", "newquay": "Cornwall",
+  "gloucester": "Gloucestershire", "cheltenham": "Gloucestershire",
+  "salisbury": "Wiltshire", "swindon": "Wiltshire",
+  "bournemouth": "Dorset", "poole": "Dorset", "dorchester": "Dorset",
+  "chester": "Cheshire", "crewe": "Cheshire", "warrington": "Cheshire",
+  "preston": "Lancashire", "blackburn": "Lancashire", "burnley": "Lancashire",
+  "lancaster": "Lancashire", "blackpool": "Lancashire",
+  "carlisle": "Cumbria", "kendal": "Cumbria", "barrow-in-furness": "Cumbria",
+  "stoke-on-trent": "Staffordshire", "stafford": "Staffordshire", "lichfield": "Staffordshire",
+  "warwick": "Warwickshire", "stratford-upon-avon": "Warwickshire", "leamington spa": "Warwickshire",
+  "worcester": "Worcestershire", "redditch": "Worcestershire",
+  "shrewsbury": "Shropshire", "telford": "Shropshire",
+  "hereford": "Herefordshire",
+  "york": "North Yorkshire", "harrogate": "North Yorkshire", "scarborough": "North Yorkshire",
+  "hull": "East Riding of Yorkshire", "kingston upon hull": "East Riding of Yorkshire",
+  "middlesbrough": "Cleveland", "darlington": "County Durham", "durham": "County Durham",
+  "glasgow": "Strathclyde", "edinburgh": "Lothian", "aberdeen": "Grampian",
+  "dundee": "Tayside", "inverness": "Highland", "stirling": "Central",
+  "perth": "Tayside", "paisley": "Strathclyde",
+  "cardiff": "South Glamorgan", "swansea": "West Glamorgan", "newport": "Gwent",
+  "wrexham": "Clwyd", "bangor": "Gwynedd", "aberystwyth": "Dyfed",
+  "belfast": "Northern Ireland",
+};
+
+function normalizeCounty(region?: string, locality?: string, country?: string): string {
+  if (region) return region;
+  if (locality) {
+    const mapped = LOCALITY_TO_COUNTY[locality.toLowerCase()];
+    if (mapped) return mapped;
+    return locality;
+  }
+  return country ?? "Unknown";
+}
+
 /**
  * Companies House advanced search for recently incorporated businesses.
  * Runs sector-specific fetches for key SIC codes to build rich county
@@ -218,7 +298,7 @@ export async function fetchNewBusinessRegistrations(
       seen.add(num);
 
       const addr = c.registered_office_address ?? {};
-      const county = addr.region ?? addr.locality ?? addr.country ?? "Unknown";
+      const county = normalizeCounty(addr.region, addr.locality, addr.country);
       countyCounts[county] = (countyCounts[county] ?? 0) + 1;
       const sicCodes = c.sic_codes ?? [];
       businesses.push({
