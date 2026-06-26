@@ -9715,6 +9715,36 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
           if (!ll) continue;
           demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: p.value, detail: p.detail, value: 0 });
         }
+      } else if (src === "consumer") {
+        // Consumer goods/services: demand = population & disposable-income concentration,
+        // tilted by the ONS spend trend for this keyword's category (discretionary/staple).
+        const isDiscretionary = DISCRETIONARY_TERMS.some(t => qLower.includes(t));
+        const isStaple = STAPLE_TERMS.some(t => qLower.includes(t));
+        let onsTrend = "";
+        let tilt = 1;
+        try {
+          const onsRow = await pool.query<{ raw_payload: any }>(
+            `SELECT raw_payload FROM canonical_ingest WHERE source = 'ons_card_spending' ORDER BY fetched_at DESC LIMIT 1`
+          );
+          const payload = onsRow.rows[0]?.raw_payload;
+          const onsSnap = (typeof payload === "string" ? JSON.parse(payload) : payload) as { categories?: { displayName: string; changePercent: number }[] } | null;
+          const cat = onsSnap?.categories?.find(c =>
+            isDiscretionary ? /delay|discretion|social/i.test(c.displayName)
+            : isStaple ? /staple|essential|grocer/i.test(c.displayName)
+            : /aggregate|all|total/i.test(c.displayName)
+          ) ?? onsSnap?.categories?.[0];
+          if (cat) {
+            onsTrend = ` · spend ${cat.changePercent >= 0 ? "+" : ""}${cat.changePercent.toFixed(1)}% YoY`;
+            tilt = 1 + Math.max(-0.3, Math.min(0.3, cat.changePercent / 100));
+          }
+        } catch {}
+        const label = isDiscretionary ? "premium/discretionary market" : isStaple ? "everyday consumer market" : "consumer market";
+        for (const [name, pop] of Object.entries(CONSUMER_MARKET_INDEX)) {
+          const ll = DISTRICT_CENTROIDS[name];
+          if (!ll) continue;
+          const demand = Math.round(pop * tilt);
+          demandPoints.push({ name, lat: ll[0], lon: ll[1], demand, detail: `Pop. ${pop >= 1000 ? (pop / 1000).toFixed(1) + "m" : pop + "k"} · ${label}${onsTrend}`, value: 0 });
+        }
       }
     } catch (err) {
       console.warn("[map] demand layer failed:", String(err).slice(0, 120));
@@ -9913,10 +9943,34 @@ const REGION_CENTROIDS: Record<string, [number, number]> = {
   "Wales": [52.1307, -3.7837], "Scotland": [56.4907, -4.2026], "Northern Ireland": [54.7877, -6.4923],
 };
 
+// Consumer market index — population (000s) for the major UK consumer markets.
+// Used as the demand proxy for retail/consumer keywords (perfume, fashion, food,
+// electronics…): where the people and disposable income are = where demand is.
+// Every key exists in DISTRICT_CENTROIDS so it plots on the map.
+const CONSUMER_MARKET_INDEX: Record<string, number> = {
+  // London (boroughs — dense, high-spend consumer market)
+  "Westminster": 260, "Camden": 270, "Islington": 245, "Hackney": 280, "Tower Hamlets": 324,
+  "Southwark": 318, "Lambeth": 318, "Wandsworth": 329, "Ealing": 367, "Brent": 340,
+  "Barnet": 395, "Croydon": 390, "Newham": 353, "Enfield": 333, "Bromley": 332, "Hillingdon": 306,
+  // Major English cities
+  "Birmingham": 1140, "Leeds": 793, "Sheffield": 584, "Manchester": 552, "Bradford": 546,
+  "Liverpool": 500, "Bristol": 472, "Coventry": 371, "Leicester": 355, "Nottingham": 332,
+  "Newcastle upon Tyne": 300, "Brighton and Hove": 291, "Kingston upon Hull": 267,
+  "Plymouth": 264, "Wolverhampton": 264, "Stoke-on-Trent": 258, "Derby": 257, "Southampton": 252,
+  "Portsmouth": 238, "Reading": 232, "Preston": 230, "Luton": 225, "Milton Keynes": 290,
+  "Northampton": 225, "Norwich": 213, "Oxford": 162, "Cambridge": 145, "York": 211,
+  // Devolved nations
+  "Glasgow": 635, "Edinburgh": 530, "Cardiff": 366, "Swansea": 246, "Belfast": 343, "Aberdeen": 230, "Dundee": 148,
+};
+
+// Consumer spend categories — used to colour the demand label (discretionary vs staple).
+const DISCRETIONARY_TERMS = ["perfume", "fragrance", "cosmetic", "makeup", "make-up", "skincare", "beauty", "luxury", "jewel", "watch", "handbag", "fashion", "clothing", "apparel", "footwear", "shoes", "gadget", "electronics", "gift", "candle", "homeware", "furniture", "wine", "spirits", "champagne", "designer", "premium"];
+const STAPLE_TERMS = ["food", "grocery", "groceries", "bread", "milk", "household", "cleaning product", "toiletries", "pharmacy", "medicine"];
+
 // Keyword → which demand-signal source(s) light up the map.
 // Checked in order: VEHICLE first (so "electric cars" beats the "electric" in the
-// property list), then PROPERTY, then BUSINESS. Short tokens use word boundaries.
-type DemandSource = "property" | "vehicle" | "business";
+// property list), then PROPERTY, then BUSINESS, then CONSUMER as the catch-all.
+type DemandSource = "property" | "vehicle" | "business" | "consumer";
 const DEMAND_KEYWORD_MAP: { source: DemandSource; terms: string[]; word?: string[] }[] = [
   { source: "vehicle",
     terms: ["electric car", "electric vehicle", "vehicle", "fleet", "tyre", "valet", "automotive", "motor", "charge point", "charging", "haulage", "logistics", "dealership", "car dealer", "car park", "car wash", "minibus", "lorry", "hgv"],
@@ -9929,13 +9983,15 @@ const DEMAND_KEYWORD_MAP: { source: DemandSource; terms: string[]; word?: string
     word: ["hr", "b2b", "finance"] },
 ];
 
-function detectDemandSource(q: string): DemandSource | null {
+function detectDemandSource(q: string): DemandSource {
   const ql = q.toLowerCase();
   for (const { source, terms, word } of DEMAND_KEYWORD_MAP) {
     if (terms.some(t => ql.includes(t))) return source;
     if (word && word.some(w => new RegExp(`\\b${w}\\b`).test(ql))) return source;
   }
-  return null;
+  // Anything else (perfume, fashion, food, electronics, services…) is treated as a
+  // consumer good — demand is mapped to population & disposable-income concentration.
+  return "consumer";
 }
 
 // ── Atlas (geo intelligence command centre) ───────────────────────────────────
