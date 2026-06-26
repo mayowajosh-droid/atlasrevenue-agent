@@ -9185,7 +9185,20 @@ app.get("/api/signals/for-keyword", asyncRoute(async (req, res) => {
       for (const s of secs) if (!sectors.includes(s)) sectors.push(s);
     }
   }
-  const snap = await generateMarketSignals(pool, { sectors: sectors.length ? sectors : undefined, limit: 12 });
+  // Fallback: if no explicit keyword matched, derive sectors from the demand router
+  // so the signals stay RELEVANT to the keyword (e.g. coffee → retail/food, not DVLA).
+  if (!sectors.length) {
+    const src = detectDemandSource(q);
+    const SOURCE_SECTORS: Record<string, MarketSignalSector[]> = {
+      property: ["property", "construction"],
+      vehicle: ["automotive", "transport"],
+      business: ["professional_services", "finance", "tech"],
+      consumer: ["retail", "food_beverage"],
+    };
+    sectors.push(...SOURCE_SECTORS[src]);
+  }
+  // Always pass concrete sectors — never undefined (which would return every signal).
+  const snap = await generateMarketSignals(pool, { sectors, limit: 12 });
   res.json({ signals: snap.signals, totalSignals: snap.totalSignals, sectors, sourcesCovered: snap.sourcesCovered });
 }));
 
