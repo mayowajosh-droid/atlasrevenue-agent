@@ -49,16 +49,27 @@ function indicativeValue(size?: string): number | null {
   }
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// PlanIt rate-limits aggressive pagination (429). Retry a rate-limited page a couple
+// of times with backoff before giving up.
 async function fetchPage(params: Record<string, string | number>, signal?: AbortSignal): Promise<PlanItResponse> {
   const qs = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)])
   ).toString();
-  const resp = await fetch(`${PLANIT_BASE}?${qs}`, {
-    headers: { "User-Agent": "AtlasRevenue/1.0 (planning demand intelligence)", Accept: "application/json" },
-    signal,
-  });
-  if (!resp.ok) throw new Error(`PlanIt ${resp.status} ${resp.statusText}`);
-  return (await resp.json()) as PlanItResponse;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const resp = await fetch(`${PLANIT_BASE}?${qs}`, {
+      headers: { "User-Agent": "AtlasRevenue/1.0 (planning demand intelligence)", Accept: "application/json" },
+      signal,
+    });
+    if (resp.ok) return (await resp.json()) as PlanItResponse;
+    if (resp.status === 429 && attempt < 2) {
+      await sleep(4000 * (attempt + 1)); // 4s, then 8s
+      continue;
+    }
+    throw new Error(`PlanIt ${resp.status} ${resp.statusText}`);
+  }
+  throw new Error("PlanIt: exhausted retries");
 }
 
 export interface PlanItIngestResult {
@@ -132,6 +143,7 @@ export async function ingestPlanningApplications(opts: {
       // Stop if we've drained the result set.
       if (records.length < pageSize) break;
       page++;
+      await sleep(600); // be polite to PlanIt — avoids 429 on sustained pagination
     }
     return { recordsIngested: ingested, pagesFetched, total, error: null };
   } catch (err: any) {
