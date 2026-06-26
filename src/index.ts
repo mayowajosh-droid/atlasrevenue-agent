@@ -9738,7 +9738,7 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
   if (pool) {
     const src = detectDemandSource(q);
     try {
-      const { getCountyPropertyDemand, getRegionalVehicleDemand, getCountyBusinessDemand } =
+      const { getCountyPropertyDemand, getRegionalVehicleDemand, getCountyBusinessDemand, getCountySectorDensity } =
         await import("./signals/market-intel.js");
       if (src === "property") {
         for (const p of await getCountyPropertyDemand(pool)) {
@@ -9778,34 +9778,28 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
           demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: p.value, detail: p.detail, value: 0 });
         }
       } else if (src === "consumer") {
-        // Consumer goods/services: demand = population & disposable-income concentration,
-        // tilted by the ONS spend trend for this keyword's category (discretionary/staple).
-        const isDiscretionary = DISCRETIONARY_TERMS.some(t => qLower.includes(t));
-        const isStaple = STAPLE_TERMS.some(t => qLower.includes(t));
-        let onsTrend = "";
-        let tilt = 1;
-        try {
-          const onsRow = await pool.query<{ raw_payload: any }>(
-            `SELECT raw_payload FROM canonical_ingest WHERE source = 'ons_card_spending' ORDER BY fetched_at DESC LIMIT 1`
-          );
-          const payload = onsRow.rows[0]?.raw_payload;
-          const onsSnap = (typeof payload === "string" ? JSON.parse(payload) : payload) as { categories?: { displayName: string; changePercent: number }[] } | null;
-          const cat = onsSnap?.categories?.find(c =>
-            isDiscretionary ? /delay|discretion|social/i.test(c.displayName)
-            : isStaple ? /staple|essential|grocer/i.test(c.displayName)
-            : /aggregate|all|total/i.test(c.displayName)
-          ) ?? onsSnap?.categories?.[0];
-          if (cat) {
-            onsTrend = ` · spend ${cat.changePercent >= 0 ? "+" : ""}${cat.changePercent.toFixed(1)}% YoY`;
-            tilt = 1 + Math.max(-0.3, Math.min(0.3, cat.changePercent / 100));
+        // Consumer goods/services: CH SIC-code density by county = real competitive
+        // landscape. "perfumes" → where beauty/retail businesses are concentrated
+        // (proven market) or sparse (opportunity gap). Falls back to population only
+        // when sector data is too sparse (<5 counties).
+        const chMatch = matchChSectors(q);
+        const sectorPoints = await getCountySectorDensity(pool, chMatch.sectors, chMatch.label);
+
+        if (sectorPoints.length >= 5) {
+          for (const p of sectorPoints) {
+            const ll = COUNTY_CENTROIDS[p.place.toUpperCase()];
+            if (!ll) continue;
+            demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: p.value, detail: p.detail, value: 0 });
           }
-        } catch {}
-        const label = isDiscretionary ? "premium/discretionary market" : isStaple ? "everyday consumer market" : "consumer market";
-        for (const [name, pop] of Object.entries(CONSUMER_MARKET_INDEX)) {
-          const ll = DISTRICT_CENTROIDS[name];
-          if (!ll) continue;
-          const demand = Math.round(pop * tilt);
-          demandPoints.push({ name, lat: ll[0], lon: ll[1], demand, detail: `Pop. ${pop >= 1000 ? (pop / 1000).toFixed(1) + "m" : pop + "k"} · ${label}${onsTrend}`, value: 0 });
+        } else {
+          // Sparse sector data — supplement with total new incorporations by county
+          // (still better than generic population).
+          const bizPoints = await getCountyBusinessDemand(pool);
+          for (const p of bizPoints) {
+            const ll = COUNTY_CENTROIDS[p.place.toUpperCase()];
+            if (!ll) continue;
+            demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: p.value, detail: `${p.detail} · potential ${chMatch.label} buyers`, value: 0 });
+          }
         }
       }
     } catch (err) {
@@ -10031,6 +10025,55 @@ const CONSUMER_MARKET_INDEX: Record<string, number> = {
 // Consumer spend categories — used to colour the demand label (discretionary vs staple).
 const DISCRETIONARY_TERMS = ["perfume", "fragrance", "cosmetic", "makeup", "make-up", "skincare", "beauty", "luxury", "jewel", "watch", "handbag", "fashion", "clothing", "apparel", "footwear", "shoes", "gadget", "electronics", "gift", "candle", "homeware", "furniture", "wine", "spirits", "champagne", "designer", "premium"];
 const STAPLE_TERMS = ["food", "grocery", "groceries", "bread", "milk", "household", "cleaning product", "toiletries", "pharmacy", "medicine"];
+
+// ── Keyword → Companies House SIC-sector mapping ────────────────────────────
+// Maps consumer keywords to CH sector strings (from the businesses[] array in
+// the ch_new_businesses payload). This gives REAL competitive-landscape data
+// per search keyword instead of generic population numbers.
+const KEYWORD_CH_SECTORS: { terms: string[]; sectors: string[]; label: string }[] = [
+  { terms: ["perfume", "fragrance", "cosmetic", "beauty", "skincare", "makeup", "make-up"],
+    sectors: ["Retail", "Creative"], label: "beauty & retail" },
+  { terms: ["coffee", "cafe", "restaurant", "catering", "bakery", "pizza", "takeaway", "pub", "bar"],
+    sectors: ["Food & Beverage"], label: "food & beverage" },
+  { terms: ["gym", "fitness", "physiotherapy", "wellness", "yoga", "sport", "personal trainer"],
+    sectors: ["Health"], label: "health & fitness" },
+  { terms: ["fashion", "clothing", "apparel", "shoes", "footwear", "jewel", "accessori"],
+    sectors: ["Retail", "Creative"], label: "fashion & retail" },
+  { terms: ["furniture", "homeware", "interior", "kitchen", "bathroom", "home decor"],
+    sectors: ["Retail", "Construction"], label: "home & interiors" },
+  { terms: ["pet", "animal", "veterinary", "dog", "cat"],
+    sectors: ["Retail", "Health"], label: "pet & animal" },
+  { terms: ["garden", "landscape", "outdoor", "plant", "florist", "flower"],
+    sectors: ["Retail", "Construction"], label: "garden & outdoor" },
+  { terms: ["candle", "home fragrance", "incense", "essential oil", "aromatherapy", "diffuser"],
+    sectors: ["Retail"], label: "home & lifestyle retail" },
+  { terms: ["toy", "game", "children", "baby", "nursery", "kids"],
+    sectors: ["Retail", "Education"], label: "children & family" },
+  { terms: ["phone", "gadget", "electronics", "computer", "laptop", "tablet"],
+    sectors: ["Retail", "Software & Tech"], label: "tech & electronics" },
+  { terms: ["art", "craft", "print", "photography", "creative", "design"],
+    sectors: ["Creative & Design"], label: "creative & design" },
+  { terms: ["music", "audio", "instrument", "dj", "recording"],
+    sectors: ["Retail", "Creative"], label: "music & entertainment" },
+  { terms: ["wedding", "event", "party", "celebration"],
+    sectors: ["Retail", "Food & Beverage"], label: "events & hospitality" },
+  { terms: ["cleaning", "laundry", "dry clean", "valet"],
+    sectors: ["Retail"], label: "cleaning & services" },
+  { terms: ["wine", "spirits", "beer", "alcohol", "drink", "beverage"],
+    sectors: ["Food & Beverage", "Retail"], label: "drinks & hospitality" },
+  { terms: ["solar", "energy", "renewabl", "electric", "green"],
+    sectors: ["Construction", "Architecture"], label: "energy & green tech" },
+  { terms: ["food", "snack", "grocery", "meal", "health food", "organic"],
+    sectors: ["Food & Beverage", "Retail"], label: "food & grocery" },
+];
+
+function matchChSectors(q: string): { sectors: string[]; label: string } {
+  const ql = q.toLowerCase();
+  for (const entry of KEYWORD_CH_SECTORS) {
+    if (entry.terms.some(t => ql.includes(t))) return { sectors: entry.sectors, label: entry.label };
+  }
+  return { sectors: ["Retail"], label: "retail" };
+}
 
 // Keyword → which demand-signal source(s) light up the map.
 // Checked in order: VEHICLE first (so "electric cars" beats the "electric" in the

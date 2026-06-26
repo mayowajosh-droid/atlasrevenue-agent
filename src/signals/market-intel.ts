@@ -597,6 +597,47 @@ export async function getCountyBusinessDemand(pool: Pool): Promise<GeoDemandPoin
     }));
 }
 
+/** Companies House sector-specific density by county — competitive-landscape signal.
+ *  Filters the CH businesses array by SIC-sector terms and groups by county,
+ *  showing where businesses in that category are concentrated (proven market)
+ *  or sparse (opportunity gap). */
+export async function getCountySectorDensity(
+  pool: Pool,
+  sectorFilter: string[],
+  sectorLabel: string,
+): Promise<GeoDemandPoint[]> {
+  type ChSnapshot = {
+    topCounties: { county: string; count: number }[];
+    businesses: { sector: string; county: string; incorporatedOn: string }[];
+  };
+  const data = await getLatestPayload<ChSnapshot>(pool, "ch_new_businesses");
+  if (!data?.businesses?.length) return [];
+
+  const filterLc = sectorFilter.map(s => s.toLowerCase());
+  const filtered = data.businesses.filter(b =>
+    b.sector && filterLc.some(sf => b.sector.toLowerCase().includes(sf)),
+  );
+  if (!filtered.length) return [];
+
+  const byCty: Record<string, number> = {};
+  for (const b of filtered) {
+    if (b.county) byCty[b.county] = (byCty[b.county] ?? 0) + 1;
+  }
+
+  const counts = Object.values(byCty);
+  const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
+
+  return Object.entries(byCty)
+    .filter(([, count]) => count > 0)
+    .map(([county, count]) => ({
+      place: county,
+      value: count,
+      detail: `${fmt(count)} ${sectorLabel} businesses`
+        + (count >= avg * 1.5 ? " · proven market" : count <= avg * 0.5 ? " · opportunity gap" : " · active market"),
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
 // ── Regional Intelligence ──────────────────────────────────────────────────────
 
 export type RegionIntel = {
