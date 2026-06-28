@@ -12197,354 +12197,439 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
     ? `<a href="/scan/${escapeHtml(completedScans[1].id)}/compare?with=${encodeURIComponent(completedScans[0].id)}" class="dash-btn" style="font-size:9px">Compare latest 2 &rarr;</a>`
     : "";
 
-  const navLinks = DESK_PROFILES.filter(d => d.live).map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
+  // ── Latest scan + extracted intel for the Command Centre cards ───────────
+  const latestScan = (completedScans[0] || userScans[0] || null) as any;
+  const latestMd: string = latestScan?.report_snippet ? String(latestScan.report_snippet) : "";
+  const latestEdp = latestMd ? parseEdpFromMarkdown(latestMd) : null;
+  const latestMeta = latestScan ? scanTypeFromScan(latestScan) : null;
+  const latestScores = latestScan ? calcPremiumScores(latestScan) : null;
+  const latestRecommendedRoute = latestEdp?.recommendedRoute || latestScores?.route || "—";
+
+  // Parse the Buyer Watchlist (Section 6) table rows from latest scan markdown.
+  function parseBuyerWatchlist(md: string, max = 5): Array<{ buyer: string; access: string }> {
+    if (!md) return [];
+    const sec = md.match(/##\s*6\..*?(?=\n##\s|\Z)/s)?.[0] || "";
+    const rows = sec.match(/^\|[^|\n]+\|[^|\n]+\|[^\n]*\|/gm) || [];
+    return rows.slice(2, 2 + max).map(line => {
+      const cells = line.split("|").map(s => s.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+      return { buyer: cells[0] || "", access: cells[3] || cells[1] || cells[2] || "" };
+    }).filter(r => r.buyer && !/^[-=]+$/.test(r.buyer));
+  }
+  function parseNextActions(md: string, max = 3): Array<{ when: string; what: string }> {
+    if (!md) return [];
+    // Try Section 9 (30-day activation plan or revenue activation plan), then 30-day pack.
+    const sec = (md.match(/##\s*9\..*?(?=\n##\s|\Z)/s)?.[0] || "")
+              + (md.match(/##\s*\d+\.\s*30[- ]Day.*?(?=\n##\s|\Z)/si)?.[0] || "");
+    const items: Array<{ when: string; what: string }> = [];
+    const weekMatches = sec.matchAll(/(?:^|\n)\s*\*?\*?(Week\s+\d+[^*\n:—–-]*)\*?\*?\s*[:\-—–]\s*([^\n]+)/gi);
+    for (const m of weekMatches) {
+      items.push({ when: m[1].trim().slice(0, 24), what: m[2].trim().replace(/^\*+|\*+$/g, "").slice(0, 180) });
+      if (items.length >= max) break;
+    }
+    if (!items.length) {
+      const bullets = (sec.match(/(?:^|\n)\s*[-*]\s+([^\n]+)/g) || []).slice(0, max);
+      for (const b of bullets) {
+        items.push({ when: "Next", what: b.replace(/^(?:\s*[-*]\s+)/, "").slice(0, 180) });
+      }
+    }
+    return items;
+  }
+  const watchlistRows = parseBuyerWatchlist(latestMd, 5);
+  const nextActions = parseNextActions(latestMd, 3);
+
+  // 3 user states drive what the dashboard shows.
+  const userState: "free" | "payg" | "subscription" =
+    user.tier === "free" ? "free" :
+    user.tier === "payg" ? "payg" :
+    "subscription";
+
+  // Verdict/grade helpers (already defined above) are reused per scan-history row.
+  const rowVerdictCell = (s: any): { text: string; color: string } => {
+    const isCompleted = s.status === "completed";
+    if (!isCompleted) return { text: s.status === "failed" ? "Failed" : "Pending", color: s.status === "failed" ? "#9b2d20" : "var(--muted)" };
+    const edp = s.report_snippet ? parseEdpFromMarkdown(String(s.report_snippet)) : null;
+    const v = edp?.verdict || "—";
+    return { text: v.length > 22 ? v.slice(0, 20) + "…" : v, color: edp?.verdict ? verdictColor(edp.verdict) : "var(--muted)" };
+  };
+  const rowRouteCell = (s: any): string => {
+    if (s.status !== "completed") return "—";
+    const edp = s.report_snippet ? parseEdpFromMarkdown(String(s.report_snippet)) : null;
+    const r = edp?.recommendedRoute || calcPremiumScores(s).route;
+    return r.length > 38 ? r.slice(0, 36) + "…" : r;
+  };
 
   // ── CSS ───────────────────────────────────────────────────────────────────
   const dashCss = `
-.pg-mast{border-bottom:1px solid var(--border-2)}
-.pg-mast h1{color:var(--text)}
-.pg-crumb,.pg-crumb a{color:var(--muted)}
-.pg-crumb-active{color:var(--text-mid)}
-.pg-stat-val{color:var(--text);font-family:var(--serif)!important}
-.pg-stat-label{color:var(--muted)}
-.pg-stats{border:1px solid var(--border-2)}
-.pg-stat{border-right:1px solid var(--border)}
-.mkt-strip{background:var(--surface-2);color:var(--text-mid);padding:12px 56px;display:flex;gap:40px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
-.mkt-stat{display:flex;align-items:baseline;gap:8px;flex-shrink:0}
-.mkt-val{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text)}
-.mkt-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:40px;align-items:start}
-.dash-card{background:var(--surface);border:1px solid var(--border-2);margin-bottom:20px;transition:border-color .2s,box-shadow .2s}
-.dash-card:hover{border-color:var(--border-3);box-shadow:0 4px 20px rgba(27,30,25,.07)}
-.dash-card-head{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.dash-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.dash-card-body{padding:18px}
-.scan-table{width:100%;border-collapse:collapse;font-size:13px}
-.scan-table th{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:10px 8px 10px 0;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
-.scan-table td{padding:11px 8px 11px 0;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-mid)}
-.scan-table tr:last-child td{border-bottom:none}
-.scan-badge{display:inline-block;padding:2px 7px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
-.scan-badge-completed{background:rgba(29,107,79,.08);color:#1d6b4f;border:1px solid rgba(29,107,79,.22)}
-.scan-badge-pending,.scan-badge-running{background:rgba(180,83,9,.08);color:#b45309;border:1px solid rgba(180,83,9,.22)}
-.scan-badge-failed{background:rgba(155,45,32,.06);color:#9b2d20;border:1px solid rgba(155,45,32,.20)}
-.dash-btn{display:inline-block;padding:5px 12px;border:1px solid var(--border-2);font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mid);text-decoration:none;background:var(--surface-2);cursor:pointer;transition:.15s}
-.dash-btn:hover{background:var(--surface-3);border-color:var(--border-3)}
-.dash-empty{padding:32px 0;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center}
-.tier-pill{display:inline-block;padding:2px 8px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
-.tier-free{background:var(--surface-2);color:var(--muted);border:1px solid var(--border-2)}
-.tier-pro{background:rgba(180,146,78,.1);color:#8B6B2A;border:1px solid rgba(180,146,78,.30)}
-.tier-agency{background:rgba(29,107,79,.08);color:#1d6b4f;border:1px solid rgba(29,107,79,.22)}
-.flash-ok{background:rgba(29,107,79,.07);border:1px solid rgba(29,107,79,.22);color:#1d6b4f;padding:12px 16px;margin-bottom:24px;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
-.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tool-card{display:block;padding:13px;border:1px solid var(--border-2);text-decoration:none;transition:.18s;background:var(--surface-2)}
-.tool-card:hover{background:var(--surface-3);border-color:var(--border-3)}
-.tool-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text);font-weight:600;display:block;margin-bottom:4px}
-.tool-card-desc{font-size:11px;color:var(--muted);display:block;line-height:1.4}
-.upgrade-box{background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);padding:24px;margin-bottom:24px}
-.upgrade-box h3{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:8px;color:var(--text)}
-.upgrade-box p{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.55}
-.upgrade-box ul{list-style:none;margin-bottom:18px}
-.upgrade-box li{font-size:12px;color:var(--text-mid);padding:4px 0 4px 16px;position:relative}
-.upgrade-box li::before{content:"\\2713";position:absolute;left:0;color:var(--brand)}
-.btn-upgrade{display:inline-block;background:#102A1E;color:#F3EFE6;padding:10px 20px;font-family:var(--sans);font-size:13px;font-weight:600;text-decoration:none}
-.btn-upgrade:hover{background:#0A1C12}
-.acct-meta{margin-bottom:14px}
-.acct-meta-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
-.acct-meta-val{font-size:13px;font-weight:600;color:var(--text)}
-.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.dl-card{padding:12px;border-left:3px solid}
-.deadline-urgent{background:rgba(155,45,32,.06);border-color:#9b2d20}
-.deadline-soon{background:rgba(180,83,9,.06);border-color:#b45309}
-.deadline-ok{background:var(--surface);border:1px solid var(--border-2);border-left:3px solid var(--border-2)}
-.dl-countdown{font-family:var(--mono);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;flex-shrink:0}
-.deadline-urgent .dl-countdown{color:#9b2d20}
-.deadline-soon .dl-countdown{color:#b45309}
-.deadline-ok .dl-countdown{color:var(--muted)}
-.sector-shortcuts{display:flex;flex-wrap:wrap;gap:6px}
-.sector-btn{display:inline-block;padding:5px 11px;border:1px solid var(--border-2);font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mid);text-decoration:none;transition:.15s;background:var(--surface-2)}
-.sector-btn:hover{background:var(--surface-3);border-color:var(--border-3);color:var(--text)}
-.intel-tools-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.dash-auth-row{display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap}
-.dash-email{font-family:var(--mono);font-size:10px;color:#7a909e}
-.dash-new-scan{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;text-decoration:none;padding:5px 11px;border:1px solid rgba(255,255,255,.15);border-radius:2px}
-.onb-hero{margin-bottom:28px}
-.onb-hero-inner{display:grid;grid-template-columns:1fr 320px;gap:40px;background:var(--surface);border:1px solid var(--border-2);padding:36px 40px;align-items:start}
-.onb-hero-content{min-width:0}
-.onb-steps{display:flex;gap:20px;margin-bottom:24px;flex-wrap:wrap}
-.onb-step{display:flex;align-items:center;gap:10px}
-.onb-step-num{width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0}
-.onb-step-text{font-family:var(--mono);font-size:11px;color:var(--text-mid);letter-spacing:.03em}
-.onb-cta{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:13px 28px;text-decoration:none;transition:background .15s}
-.onb-cta:hover{background:var(--brand-hot)}
-.onb-preview{background:var(--surface-2);border:1px solid var(--border-2);padding:20px 22px}
-.onb-preview-item{font-size:12.5px;color:var(--text-mid);padding:5px 0;display:flex;align-items:center;gap:8px}
-.onb-hero-side{min-width:0}
-@media(max-width:900px){.dash-grid{grid-template-columns:1fr}.mkt-strip{padding-left:16px;padding-right:16px}.onb-hero-inner{grid-template-columns:1fr;gap:24px;padding:28px 24px}.dash-email{display:none}}
-@media(max-width:760px){.scan-table th:nth-child(n+4),.scan-table td:nth-child(n+4){display:none}.dl-grid{grid-template-columns:1fr}}
-@media(max-width:480px){
-  .mkt-strip{padding-left:12px;padding-right:12px;gap:12px;flex-direction:column;align-items:flex-start}
-  .scan-table th:nth-child(n+3),.scan-table td:nth-child(n+3){display:none}
-  .scan-table{font-size:12px}
-  .tools-grid{grid-template-columns:1fr}
-  .tool-card{padding:11px}
-  .onb-hero-inner{padding:20px 16px}
-  .onb-steps{flex-direction:column;gap:10px}
-  .pg-mast-inner{padding:20px 16px}
-  .pg-stats{flex-direction:column}
-  .pg-stat{border-right:none;border-bottom:1px solid var(--border);padding:10px 0}
-  .pg-stat:last-child{border-bottom:none}
-  .dash-auth-row{gap:8px}
-  .dash-new-scan{font-size:9px;padding:4px 8px}
-  .sector-shortcuts{gap:4px}
-  .sector-btn{font-size:8.5px;padding:4px 8px}
-  .intel-tools-grid{grid-template-columns:1fr}
-}
+/* Revenue Command Centre — V1 dashboard */
+.rcc-mast{border-bottom:1px solid var(--border-2);padding:36px 0 28px}
+.rcc-mast-inner{max-width:1320px;margin:0 auto;padding:0 48px}
+.rcc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px}
+.rcc-h1{font-family:var(--serif);font-size:34px;font-weight:400;color:var(--text);line-height:1.1;margin-bottom:8px;letter-spacing:-.01em}
+.rcc-sub{font-size:14.5px;color:var(--muted);max-width:54em;line-height:1.55;margin-bottom:20px}
+.rcc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border-2);background:var(--surface)}
+.rcc-kpi{padding:14px 20px;border-right:1px solid var(--border)}
+.rcc-kpi:last-child{border-right:none}
+.rcc-kpi-val{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text);line-height:1.1;display:block;margin-bottom:4px}
+.rcc-kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.rcc-mast-cta{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+.rcc-btn-primary{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;padding:11px 22px;text-decoration:none;font-weight:600;transition:background .15s}
+.rcc-btn-primary:hover{background:var(--brand-hot)}
+.rcc-btn-secondary{display:inline-block;background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;padding:10px 22px;text-decoration:none;font-weight:600;border:1px solid var(--border-3);transition:.15s}
+.rcc-btn-secondary:hover{background:var(--surface-2);color:var(--text)}
+.rcc-flash{padding:12px 16px;margin-bottom:24px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;border-left:3px solid #1d6b4f;background:rgba(29,107,79,.06);color:#1d6b4f}
+.rcc-body{padding:32px 0 80px}
+.rcc-body-inner{max-width:1320px;margin:0 auto;padding:0 48px}
+.rcc-grid{display:grid;grid-template-columns:1fr 360px;gap:28px;align-items:start}
+.rcc-main{min-width:0;display:flex;flex-direction:column;gap:18px}
+.rcc-side{display:flex;flex-direction:column;gap:18px}
+.rcc-card{background:var(--surface);border:1px solid var(--border-2);transition:border-color .2s}
+.rcc-card-head{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rcc-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.rcc-card-body{padding:22px}
+.rcc-card-foot{padding:14px 22px;border-top:1px solid var(--border);background:var(--surface-2);font-family:var(--mono);font-size:11px;color:var(--muted)}
+/* Latest scan hero */
+.rcc-latest-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);font-weight:700;margin-bottom:6px}
+.rcc-latest-company{font-family:var(--serif);font-size:24px;font-weight:500;color:var(--text);line-height:1.2;margin-bottom:10px}
+.rcc-latest-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+.rcc-chip{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mid);background:var(--surface-2);border:1px solid var(--border-2);padding:3px 9px}
+.rcc-latest-grid{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:18px;padding:18px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:18px}
+.rcc-latest-cell-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.rcc-latest-cell-val{font-size:14px;font-weight:600;color:var(--text);line-height:1.3}
+.rcc-latest-grade{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1}
+.rcc-latest-actions{display:flex;gap:8px;flex-wrap:wrap}
+.rcc-action-pack{margin-top:18px;padding:14px 16px;background:var(--surface-2);border-left:3px solid var(--brand);font-size:13px;color:var(--text-mid);line-height:1.55}
+.rcc-action-pack strong{display:block;color:var(--text);font-family:var(--serif);font-size:15px;font-weight:500;margin-bottom:4px}
+.rcc-action-pack a{color:var(--brand);font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;text-decoration:none;display:inline-block;margin-top:8px}
+/* Buyer watchlist */
+.rcc-wl-list{list-style:none;margin:0;padding:0}
+.rcc-wl-item{padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rcc-wl-item:last-child{border-bottom:none}
+.rcc-wl-buyer{font-size:13.5px;font-weight:600;color:var(--text);line-height:1.35;flex:1;min-width:0}
+.rcc-wl-access{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;text-align:right;line-height:1.4;max-width:160px}
+.rcc-wl-locked{position:relative;min-height:200px}
+.rcc-wl-locked-blur{filter:blur(4px);opacity:.55;pointer-events:none;user-select:none}
+.rcc-wl-locked-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.92) 60%);padding:24px}
+.rcc-wl-lock-icon{font-size:24px;line-height:1;color:var(--brand)}
+.rcc-wl-lock-title{font-family:var(--serif);font-size:16px;font-weight:500;color:var(--text)}
+.rcc-wl-lock-msg{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:30em}
+/* Next best actions */
+.rcc-nba-list{list-style:none;margin:0;padding:0;counter-reset:nba}
+.rcc-nba-item{padding:14px 0;border-bottom:1px solid var(--border);display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:flex-start;counter-increment:nba}
+.rcc-nba-item:last-child{border-bottom:none}
+.rcc-nba-when{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);font-weight:700;white-space:nowrap;padding-top:1px;min-width:60px}
+.rcc-nba-what{font-size:13.5px;color:var(--text);line-height:1.5}
+/* Scan history table */
+.rcc-history-wrap{padding:0 22px;overflow-x:auto}
+.rcc-history{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+.rcc-history th{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 8px 11px 0;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:700}
+.rcc-history td{padding:13px 8px 13px 0;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-mid)}
+.rcc-history tr:last-child td{border-bottom:none}
+.rcc-history td:first-child{font-weight:600;color:var(--text)}
+.rcc-history td:first-child a{color:var(--text);text-decoration:none}
+.rcc-history td:first-child a:hover{color:var(--brand)}
+.rcc-badge{display:inline-block;padding:2px 7px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.rcc-badge-completed{background:rgba(29,107,79,.08);color:#1d6b4f;border:1px solid rgba(29,107,79,.22)}
+.rcc-badge-pending,.rcc-badge-running{background:rgba(180,83,9,.08);color:#b45309;border:1px solid rgba(180,83,9,.22)}
+.rcc-badge-failed{background:rgba(155,45,32,.06);color:#9b2d20;border:1px solid rgba(155,45,32,.20)}
+.rcc-tier-pill{display:inline-block;padding:2px 8px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.rcc-tier-free{background:var(--surface-2);color:var(--muted);border:1px solid var(--border-2)}
+.rcc-tier-payg{background:rgba(180,146,78,.08);color:#8B6B2A;border:1px solid rgba(180,146,78,.22)}
+.rcc-tier-pro{background:rgba(180,146,78,.1);color:#8B6B2A;border:1px solid rgba(180,146,78,.30)}
+.rcc-tier-agency{background:rgba(29,107,79,.08);color:#1d6b4f;border:1px solid rgba(29,107,79,.22)}
+/* Plan & billing */
+.rcc-plan-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:12px}
+.rcc-plan-row:last-of-type{border-bottom:none}
+.rcc-plan-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rcc-plan-val{font-size:13px;font-weight:600;color:var(--text);text-align:right;word-break:break-word;max-width:60%}
+/* Upgrade card */
+.rcc-upgrade ul{list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:6px}
+.rcc-upgrade li{font-size:12.5px;color:var(--text-mid);padding-left:18px;position:relative;line-height:1.5}
+.rcc-upgrade li::before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:700}
+.rcc-upgrade .rcc-upgrade-sub{font-size:11px;color:var(--muted);margin-top:10px;text-align:center}
+.rcc-upgrade .rcc-upgrade-sub a{color:var(--muted);text-decoration:underline}
+/* Empty state */
+.rcc-empty{padding:60px 0 40px;text-align:center}
+.rcc-empty h2{font-family:var(--serif);font-size:32px;font-weight:400;color:var(--text);line-height:1.2;margin-bottom:16px;letter-spacing:-.01em}
+.rcc-empty-lede{font-size:15px;color:var(--muted);max-width:42em;margin:0 auto 36px;line-height:1.6}
+.rcc-empty-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:920px;margin:0 auto 36px;text-align:left}
+.rcc-empty-card{background:var(--surface);border:1px solid var(--border-2);padding:24px 22px;position:relative}
+.rcc-empty-card .rcc-empty-num{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--brand);background:var(--surface-2);border:1px solid var(--border-2);padding:3px 10px;margin-bottom:12px}
+.rcc-empty-card h3{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text);margin-bottom:8px;line-height:1.25}
+.rcc-empty-card p{font-size:13px;color:var(--muted);line-height:1.55;margin:0}
+.rcc-empty-cta{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+/* Monitoring card */
+.rcc-mon-list{list-style:none;padding:0;margin:0}
+.rcc-mon-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-mid)}
+.rcc-mon-item:last-child{border-bottom:none}
+.rcc-mon-val{font-family:var(--mono);font-weight:700;color:var(--text)}
+@media(max-width:980px){.rcc-grid{grid-template-columns:1fr}.rcc-kpis{grid-template-columns:repeat(2,1fr)}.rcc-kpi:nth-child(2){border-right:none}.rcc-kpi:nth-child(1),.rcc-kpi:nth-child(2){border-bottom:1px solid var(--border)}.rcc-empty-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.rcc-mast-inner,.rcc-body-inner{padding-left:20px;padding-right:20px}.rcc-h1{font-size:26px}.rcc-empty h2{font-size:24px}.rcc-latest-grid{grid-template-columns:1fr;gap:12px}.rcc-history th:nth-child(n+4),.rcc-history td:nth-child(n+4){display:none}}
 `;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Intelligence Dashboard &#8212; AtlasRevenue</title>
+<title>Revenue Command Centre &mdash; AtlasRevenue</title>
 <style>${pageShellCss()}${dashCss}</style>
 </head>
 <body>
-<header class="gh">
-  <div class="gh-inner">
-    <div class="gh-top">
-      <div class="gh-brand">
-        <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
-        <span class="gh-tag">Public-sector revenue intelligence</span>
-      </div>
-      <div class="dash-auth-row">
-        <span class="dash-email">${escapeHtml(user.email)}</span>
-        <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
-        <a href="/scan" class="dash-new-scan">+ New scan</a>
-        <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#9aabb7;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:0">Sign out</button></form>
-      </div>
-    </div>
-    <nav class="gh-nav">${navLinks}</nav>
-  </div>
-</header>
+${pageShellHeader(null, { email: user.email, tier: user.tier })}
 
-<div class="mkt-strip">
-  <div class="mkt-stat"><span class="mkt-val">${totalOpenSignals > 0 ? totalOpenSignals.toLocaleString("en-GB") : "&#8212;"}</span><span class="mkt-lbl">Open signals</span></div>
-  ${totalOpenValue > 0 ? `<div class="mkt-stat"><span class="mkt-val">${fmtMoney(totalOpenValue)}</span><span class="mkt-lbl">Total open contract value</span></div>` : ""}
-  <div class="mkt-stat"><span class="mkt-val">${signalsThisWeek}</span><span class="mkt-lbl">New this week</span></div>
-  ${upcomingDeadlines.length > 0 ? `<div class="mkt-stat"><span class="mkt-val" style="color:#e87979">${upcomingDeadlines.length}</span><span class="mkt-lbl">Deadlines &lt;21 days</span></div>` : ""}
-  <div style="margin-left:auto"><a href="/desks" style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9aabb7;text-decoration:none">Browse all desks &rarr;</a></div>
-</div>
-
-<div class="pg-mast">
-  <div class="pg-mast-inner">
-    <div class="pg-crumb"><a href="/">AtlasRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
-    <h1>Intelligence Dashboard</h1>
-    <div class="pg-stats">
-      <div class="pg-stat"><span class="pg-stat-val">${userScans.length || `<a href="/scan" style="color:var(--brand);text-decoration:none;font-size:14px">Run first scan &rarr;</a>`}</span><span class="pg-stat-label">${userScans.length ? "Scans run" : "Get started"}</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${completedCount || `<span style="font-size:14px;color:var(--muted)">&mdash;</span>`}</span><span class="pg-stat-label">${completedCount ? "Reports complete" : "Reports"}</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${upcomingDeadlines.length > 0 ? upcomingDeadlines.length : totalOpenSignals > 0 ? totalOpenSignals.toLocaleString() : "&#8212;"}</span><span class="pg-stat-label">${upcomingDeadlines.length > 0 ? "Live deadlines" : "Open signals"}</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${memberSince}</span><span class="pg-stat-label">Member since</span></div>
+<div class="rcc-mast">
+  <div class="rcc-mast-inner">
+    <div class="rcc-eyebrow">Revenue Command Centre</div>
+    <h1 class="rcc-h1">${escapeHtml(user.email.split("@")[0])}&rsquo;s revenue map</h1>
+    <p class="rcc-sub">Here&rsquo;s your revenue situation. Here&rsquo;s what AtlasRevenue found. Here&rsquo;s who to chase next.</p>
+    <div class="rcc-kpis">
+      <div class="rcc-kpi"><span class="rcc-kpi-val">${userScans.length || "0"}</span><span class="rcc-kpi-lbl">Scans run</span></div>
+      <div class="rcc-kpi"><span class="rcc-kpi-val">${completedCount || "0"}</span><span class="rcc-kpi-lbl">Reports complete</span></div>
+      <div class="rcc-kpi"><span class="rcc-kpi-val">${totalOpenSignals > 0 ? totalOpenSignals.toLocaleString("en-GB") : "&#8212;"}</span><span class="rcc-kpi-lbl">Live opportunities tracked</span></div>
+      <div class="rcc-kpi"><span class="rcc-kpi-val">${escapeHtml(memberSince)}</span><span class="rcc-kpi-lbl">Member since</span></div>
     </div>
+    ${userScans.length ? `<div class="rcc-mast-cta"><a href="/scan" class="rcc-btn-primary">+ New scan</a><a href="/scan/sample" class="rcc-btn-secondary">View sample report</a></div>` : ""}
   </div>
 </div>
 
-<div class="pg-body">
-<div class="pg-body-inner">
-${welcome ? `<div class="flash-ok">Account created &#8212; welcome to AtlasRevenue. Run your first intelligence scan to get started.</div>` : ""}
-${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite unlocked.</div>` : ""}
+<div class="rcc-body">
+<div class="rcc-body-inner">
+
+${welcome ? `<div class="rcc-flash">Account created &mdash; welcome to AtlasRevenue. Run your first scan to populate your revenue map.</div>` : ""}
+${upgraded ? `<div class="rcc-flash">Subscription active. Full Command Centre unlocked.</div>` : ""}
 
 ${userScans.length === 0 ? `
-<div class="onb-hero">
-  <div class="onb-hero-inner">
-    <div class="onb-hero-content">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Welcome to AtlasRevenue</div>
-      <h2 style="font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:14px;line-height:1.3">The raw data is public. The advantage is in the assembly.</h2>
-      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">AtlasRevenue maps named buyers, verified contacts, and pre-tender demand signals against your company profile. In under 5 minutes you get a 10-section intelligence report: who is spending, where demand is concentrating, and where your firm should move next.</p>
-      <div class="onb-steps">
-        <div class="onb-step"><span class="onb-step-num">1</span><span class="onb-step-text">Tell us about your company</span></div>
-        <div class="onb-step"><span class="onb-step-num">2</span><span class="onb-step-text">We scan live procurement data</span></div>
-        <div class="onb-step"><span class="onb-step-num">3</span><span class="onb-step-text">Get your intelligence report</span></div>
-      </div>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <a href="/scan" class="onb-cta">Run your first scan &rarr;</a>
-        <a href="/scan/sample" class="scta-btn" style="background:transparent;border:1px solid var(--border-2);color:var(--text-mid);font-size:11px;padding:10px 18px">View sample report</a>
-      </div>
+<section class="rcc-empty">
+  <h2>Your revenue map is empty.<br>Run your first AtlasRevenue scan.</h2>
+  <p class="rcc-empty-lede">One scan tells you where demand is forming, who&rsquo;s buying, and the next route to revenue &mdash; across public procurement, private/B2B channels, partnerships, or a hybrid play.</p>
+  <div class="rcc-empty-grid">
+    <div class="rcc-empty-card">
+      <span class="rcc-empty-num">1</span>
+      <h3>Find demand</h3>
+      <p>See where buyers and market signals are forming across UK public and private markets.</p>
     </div>
-    <div class="onb-hero-side">
-      <div class="onb-preview">
-        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">What you will get</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Executive Decision Panel</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Evidence Grade (A&#8211;E)</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Money Map: routes to revenue</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Buyer Watchlist with spend data</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Bid Readiness Score</div>
-        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> 30-Day Activation Plan</div>
-        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Every figure sourced from</div>
-          <div style="font-size:12px;color:var(--text-mid);line-height:1.5">Contracts Finder &middot; Find a Tender &middot; Companies House</div>
-        </div>
-      </div>
+    <div class="rcc-empty-card">
+      <span class="rcc-empty-num">2</span>
+      <h3>Choose your route</h3>
+      <p>Public procurement, private/B2B channels, partnerships, or a hybrid play &mdash; matched to your firm.</p>
+    </div>
+    <div class="rcc-empty-card">
+      <span class="rcc-empty-num">3</span>
+      <h3>Take action</h3>
+      <p>Get buyer targets, readiness gaps, and a 30&ndash;90 day plan you can hand to your team on Monday.</p>
     </div>
   </div>
-</div>
-` : ""}
+  <div class="rcc-empty-cta">
+    <a href="/scan" class="rcc-btn-primary">Run my first scan</a>
+    <a href="/scan/sample" class="rcc-btn-secondary">See sample report</a>
+  </div>
+</section>
+` : `
 
-<div class="dash-grid">
+<div class="rcc-grid">
 
-  <!-- ── MAIN COLUMN ──────────────────────────────────────────────── -->
-  <div>
+  <!-- ── MAIN ───────────────────────────────────────────────── -->
+  <div class="rcc-main">
 
-    ${upcomingDeadlines.length > 0 ? `
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <span class="dash-card-title" style="color:#9b2d20">&#9888;&nbsp; Upcoming deadlines</span>
-        <span style="font-family:var(--mono);font-size:10px;color:#9b2d20;font-weight:700">${upcomingDeadlines.length} closing within 21 days</span>
+    ${latestScan ? (() => {
+      const sLatest = latestScan;
+      const isCompletedLatest = sLatest.status === "completed";
+      const verdict = latestEdp?.verdict || "&#8212;";
+      const verdictCol = latestEdp?.verdict ? verdictColor(latestEdp.verdict) : "var(--muted)";
+      const grade = latestEdp?.evidenceGrade || "&#8212;";
+      const gradeCol = latestEdp?.evidenceGrade ? gradeColor(latestEdp.evidenceGrade) : "var(--muted)";
+      const route = latestRecommendedRoute;
+      const scanTypeLine = latestMeta?.scanTypeLine || "Hybrid demand scan";
+      const dateLine = new Date(sLatest.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      const isPaygOnly = user.tier === "payg";
+      const showActionPackUpsell = user.tier === "free" || user.tier === "payg";
+      return `<section class="rcc-card">
+      <div class="rcc-card-body">
+        <div class="rcc-latest-eyebrow">Latest scan</div>
+        <div class="rcc-latest-company">${escapeHtml(sLatest.company_name)}</div>
+        <div class="rcc-latest-chips">
+          <span class="rcc-chip">${escapeHtml(scanTypeLine)}</span>
+          <span class="rcc-chip">${escapeHtml(dateLine)}</span>
+          ${!isCompletedLatest ? `<span class="rcc-chip" style="color:#b45309;border-color:#b45309">${escapeHtml(sLatest.status)}</span>` : ""}
+        </div>
+        ${isCompletedLatest ? `
+        <div class="rcc-latest-grid">
+          <div>
+            <div class="rcc-latest-cell-lbl">Verdict</div>
+            <div class="rcc-latest-cell-val" style="color:${verdictCol}">${escapeHtml(verdict.length > 28 ? verdict.slice(0, 26) + "…" : verdict)}</div>
+          </div>
+          <div>
+            <div class="rcc-latest-cell-lbl">Evidence grade</div>
+            <div class="rcc-latest-grade" style="color:${gradeCol}">${escapeHtml(grade)}</div>
+          </div>
+          <div>
+            <div class="rcc-latest-cell-lbl">Recommended route</div>
+            <div class="rcc-latest-cell-val">${escapeHtml(route)}</div>
+          </div>
+        </div>
+        <div class="rcc-latest-actions">
+          <a href="/scan/${escapeHtml(sLatest.id)}" class="rcc-btn-primary">View full report &rarr;</a>
+          <a href="/api/scans/${escapeHtml(sLatest.id)}/report.pdf" class="rcc-btn-secondary">Download PDF</a>
+          ${isPaid ? `
+            <a href="/scan/${escapeHtml(sLatest.id)}/capability-statement" class="rcc-btn-secondary">Capability statement</a>
+            <a href="/scan/${escapeHtml(sLatest.id)}/outreach-emails" class="rcc-btn-secondary">Outreach emails</a>
+            <a href="/scan/${escapeHtml(sLatest.id)}/frameworks" class="rcc-btn-secondary">Framework checker</a>
+          ` : ""}
+        </div>
+        ${showActionPackUpsell ? `
+        <div class="rcc-action-pack">
+          <strong>Turn this scan into a buyer action pack</strong>
+          ${isPaygOnly
+            ? `Capability statement, outreach emails, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist and readiness gaps.<br><a href="/pricing">Unlock with Pro &rarr;</a>`
+            : `Outreach emails, capability statement, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist.<br><a href="/pricing">Upgrade to Pro &rarr;</a>`}
+        </div>` : ""}
+        ` : `<div class="rcc-action-pack" style="margin-top:0"><strong>Scan in progress.</strong>The report will appear here as soon as it&rsquo;s ready &mdash; usually 2&ndash;5 minutes.</div>`}
       </div>
-      <div class="dash-card-body"><div class="dl-grid">${deadlineCards}</div></div>
-    </div>
-    ` : ""}
+    </section>`;
+    })() : ""}
 
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <span class="dash-card-title">Intelligence scan history</span>
-        <div style="display:flex;gap:8px;align-items:center">${compareLink}<a href="/scan" class="dash-btn">+ New scan</a></div>
+    ${latestScan && latestScan.status === "completed" ? `
+    <section class="rcc-card">
+      <div class="rcc-card-head">
+        <span class="rcc-card-title">Buyer Watchlist &mdash; latest scan</span>
+        ${isPaid ? `<a href="/scan/${escapeHtml(latestScan.id)}#section-6" class="rcc-btn-secondary" style="padding:5px 12px;font-size:10px">Open full watchlist &rarr;</a>` : ""}
       </div>
-      <div style="padding:0 20px;overflow-x:auto">
-        <table class="scan-table" style="min-width:620px">
+      <div class="rcc-card-body">
+        ${isPaid && watchlistRows.length ? `
+          <ul class="rcc-wl-list">
+            ${watchlistRows.map(r => `<li class="rcc-wl-item">
+              <div class="rcc-wl-buyer">${escapeHtml(r.buyer)}</div>
+              ${r.access ? `<div class="rcc-wl-access">${escapeHtml(r.access.length > 40 ? r.access.slice(0, 38) + "…" : r.access)}</div>` : ""}
+            </li>`).join("")}
+          </ul>
+        ` : isPaid ? `
+          <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:18px 0;text-align:center">No buyer watchlist parsed from this report yet.</div>
+        ` : `
+          <div class="rcc-wl-locked">
+            <div class="rcc-wl-locked-blur">
+              <ul class="rcc-wl-list">
+                <li class="rcc-wl-item"><div class="rcc-wl-buyer">Premium franchise dealer groups</div><div class="rcc-wl-access">After-sales / CX manager</div></li>
+                <li class="rcc-wl-item"><div class="rcc-wl-buyer">Porsche franchise dealerships</div><div class="rcc-wl-access">After-sales manager direct</div></li>
+                <li class="rcc-wl-item"><div class="rcc-wl-buyer">BMW / Mercedes / Land Rover franchises</div><div class="rcc-wl-access">Dealer principal / CX lead</div></li>
+                <li class="rcc-wl-item"><div class="rcc-wl-buyer">Sixt luxury fleet operators</div><div class="rcc-wl-access">Fleet manager / procurement</div></li>
+              </ul>
+            </div>
+            <div class="rcc-wl-locked-overlay">
+              <div class="rcc-wl-lock-icon">&#x1F512;</div>
+              <div class="rcc-wl-lock-title">Buyer Watchlist locked</div>
+              <div class="rcc-wl-lock-msg">Unlock the named buyers, access routes and approach timing from your latest scan.</div>
+              <a href="/pricing" class="rcc-btn-primary" style="margin-top:6px">Upgrade to Pro</a>
+            </div>
+          </div>
+        `}
+      </div>
+    </section>` : ""}
+
+    ${latestScan && latestScan.status === "completed" && nextActions.length ? `
+    <section class="rcc-card">
+      <div class="rcc-card-head"><span class="rcc-card-title">Next best actions</span></div>
+      <div class="rcc-card-body">
+        <ol class="rcc-nba-list">
+          ${nextActions.map(a => `<li class="rcc-nba-item">
+            <span class="rcc-nba-when">${escapeHtml(a.when)}</span>
+            <span class="rcc-nba-what">${escapeHtml(a.what)}</span>
+          </li>`).join("")}
+        </ol>
+      </div>
+    </section>` : ""}
+
+    <section class="rcc-card">
+      <div class="rcc-card-head">
+        <span class="rcc-card-title">Scan history</span>
+        <a href="/scan" class="rcc-btn-secondary" style="padding:5px 12px;font-size:10px">+ New scan</a>
+      </div>
+      <div class="rcc-history-wrap">
+        <table class="rcc-history">
           <thead><tr>
-            <th>Company / Sector</th><th>Date</th><th>Verdict</th><th style="text-align:center">Grade</th>
-            <th>Report</th><th>Cap</th><th>Email</th><th>FWK</th>
+            <th>Company</th><th>Scan type</th><th>Verdict</th><th>Route</th><th>Date</th><th style="text-align:center">PDF</th><th>Status</th>
           </tr></thead>
-          <tbody>${scanRows}</tbody>
+          <tbody>
+            ${userScans.length ? userScans.map((s: any) => {
+              const isComp = s.status === "completed";
+              const meta = scanTypeFromScan(s);
+              const v = rowVerdictCell(s);
+              const route = rowRouteCell(s);
+              const dateStr = new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+              const badgeCls = `rcc-badge-${escapeHtml(s.status)}`;
+              return `<tr>
+                <td><a href="/scan/${escapeHtml(s.id)}">${escapeHtml(s.company_name)}</a></td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text-mid)">${escapeHtml(meta.scanTypeLine.replace("scan", "").trim() || meta.scanTypeLine)}</td>
+                <td style="font-size:11.5px;font-weight:600;color:${v.color}">${escapeHtml(v.text)}</td>
+                <td style="font-size:11.5px;color:var(--text-mid)">${escapeHtml(route)}</td>
+                <td style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">${escapeHtml(dateStr)}</td>
+                <td style="text-align:center">${isComp ? `<a href="/api/scans/${escapeHtml(s.id)}/report.pdf" style="font-family:var(--mono);font-size:10px;color:var(--brand);text-decoration:none;font-weight:700">PDF &darr;</a>` : `<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">&#8212;</span>`}</td>
+                <td><span class="rcc-badge ${badgeCls}">${escapeHtml(s.status)}</span></td>
+              </tr>`;
+            }).join("") : `<tr><td colspan="7" style="padding:32px 0;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center">No scans yet.</td></tr>`}
+          </tbody>
         </table>
       </div>
-    </div>
-
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <span class="dash-card-title">Intelligence tools</span>
-        ${!isPaid ? `<a href="/pricing" class="dash-btn" style="color:var(--accent);border-color:var(--accent)">Unlock with Pro &rarr;</a>` : ""}
-      </div>
-      <div class="dash-card-body">
-        <div class="intel-tools-grid">
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Capability Statement</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">LLM-generated 2-page statement tailored to your profile and sector. PQQ and framework-ready.</div>
-            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
-          </div>
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Buyer Outreach Emails</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">3 personalised emails to top-ranked buyers from your scan. Introduce your firm, request pre-market meetings.</div>
-            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
-          </div>
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Framework Pre-Qualification</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">Identifies open frameworks, assesses your eligibility, produces a prioritised application checklist.</div>
-            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
-          </div>
-        </div>
-        ${completedScans.length >= 2 ? `
-        <div style="margin-top:10px;padding:14px;background:var(--paper-2);border:1px solid var(--line-strong);border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <div>
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:3px">Scan Comparison</div>
-            <div style="font-size:12px;color:var(--slate)">Track how verdict, grade and buyer landscape have shifted between your scans.</div>
-          </div>
-          ${compareLink}
-        </div>` : ""}
-      </div>
-    </div>
-
-    <div class="dash-card">
-      <div class="dash-card-head"><span class="dash-card-title">Launch a targeted sector scan</span></div>
-      <div class="dash-card-body">
-        <div style="font-size:12px;color:var(--slate);margin-bottom:14px;line-height:1.5">Click any sector to pre-fill the scan form with that desk&rsquo;s context &#8212; your profile against their live procurement data.</div>
-        <div class="sector-shortcuts">
-          ${DESK_PROFILES.filter(d => d.live).map(d => `<a href="/scan?desk=${escapeHtml(d.slug)}" class="sector-btn">${escapeHtml(d.label)}</a>`).join("")}
-        </div>
-      </div>
-    </div>
+    </section>
 
   </div>
 
-  <!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
-  <div>
+  <!-- ── SIDEBAR ────────────────────────────────────────────── -->
+  <aside class="rcc-side">
 
-    <div class="dash-card">
-      <div class="dash-card-head"><span class="dash-card-title">Account</span></div>
-      <div class="dash-card-body">
-        <div class="acct-meta"><div class="acct-meta-label">Email</div><div class="acct-meta-val" style="word-break:break-all;font-size:12px">${escapeHtml(user.email)}</div></div>
-        <div class="acct-meta">
-          <div class="acct-meta-label">Plan</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-            <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
-            <span style="font-size:12px;color:var(--slate)">${user.tier === "free" ? "Free" : user.tier === "pro" ? "&pound;79/month" : "&pound;499/month"}</span>
-          </div>
-        </div>
-        <div class="acct-meta"><div class="acct-meta-label">Member since</div><div class="acct-meta-val">${memberSince}</div></div>
+    <section class="rcc-card">
+      <div class="rcc-card-head"><span class="rcc-card-title">Plan &amp; billing</span></div>
+      <div class="rcc-card-body">
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Email</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:11px">${escapeHtml(user.email)}</span></div>
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Plan</span><span class="rcc-plan-val"><span class="rcc-tier-pill rcc-tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span></span></div>
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Rate</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:12px">${user.tier === "free" ? "Free" : user.tier === "payg" ? "&pound;29/scan" : user.tier === "pro" ? "&pound;79/mo" : "&pound;499/mo"}</span></div>
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Member since</span><span class="rcc-plan-val">${escapeHtml(memberSince)}</span></div>
         ${user.tier !== "free" && user.stripe_customer_id ? `
-        <form method="POST" action="/billing/portal" style="margin-top:8px">
-          <button type="submit" class="dash-btn" style="width:100%;text-align:center">Manage billing &rarr;</button>
+        <form method="POST" action="/billing/portal" style="margin-top:14px">
+          <button type="submit" class="rcc-btn-secondary" style="width:100%;border:1px solid var(--border-3);background:transparent;cursor:pointer">Manage billing &rarr;</button>
         </form>` : ""}
       </div>
-    </div>
+    </section>
 
     ${user.tier === "free" && stripe ? `
-    <div class="upgrade-box">
-      <h3>Unlock the full suite</h3>
-      <p>Free accounts can run one scan. Pro turns every scan into action — unlimited scans, weekly alerts, and three intelligence tools that convert reports into submissions.</p>
-      <ul>
-        <li>Unlimited scans &amp; full scan history</li>
-        <li>Capability statement generator</li>
-        <li>Buyer outreach email kit (3 per scan)</li>
-        <li>Framework pre-qualification checker</li>
-        <li>Weekly opportunity alert emails</li>
-        <li>Evidence grade tracking over time</li>
-      </ul>
-      <a href="/billing/checkout?plan=pro" class="btn-upgrade">Upgrade to Pro &mdash; &pound;79/month</a>
-      <div style="margin-top:10px"><a href="/billing/checkout?plan=agency" style="font-family:var(--mono);font-size:9px;color:#7a909e;text-decoration:underline;letter-spacing:.05em">Agency plan &pound;499/month (5 seats + portfolio review) &rarr;</a></div>
-    </div>
-    ${userScans.length >= 1 ? `<div style="padding:14px 16px;background:rgba(155,45,32,.08);border:1px solid rgba(155,45,32,.18);font-family:var(--mono);font-size:11px;color:#9b2d20;line-height:1.6;margin-bottom:14px">
-      <strong>Free scan limit reached.</strong> You have used your free scan. Upgrade to Pro for unlimited scans and weekly alerts, or purchase a single scan for &pound;29.
-      <div style="margin-top:8px;display:flex;gap:10px"><a href="/billing/checkout?plan=pro" style="color:#9b2d20;text-decoration:underline;font-weight:600">Upgrade to Pro</a><a href="/checkout?plan=payg" style="color:#9b2d20;text-decoration:underline">One-off scan &pound;29</a></div>
-    </div>` : ""}
+    <section class="rcc-card rcc-upgrade">
+      <div class="rcc-card-head"><span class="rcc-card-title" style="color:var(--brand)">Unlock the full Command Centre</span></div>
+      <div class="rcc-card-body">
+        <ul>
+          <li>Unlimited scans &amp; full scan history</li>
+          <li>Capability statement generator</li>
+          <li>Buyer outreach email kit (3 per scan)</li>
+          <li>Framework pre-qualification checker</li>
+          <li>Weekly opportunity alert emails</li>
+          <li>Buyer watchlist monitoring</li>
+        </ul>
+        <a href="/billing/checkout?plan=pro" class="rcc-btn-primary" style="display:block;text-align:center">Upgrade to Pro &mdash; &pound;79/mo</a>
+        <div class="rcc-upgrade-sub"><a href="/checkout?plan=payg">One-off scan &pound;29</a> &middot; <a href="/billing/checkout?plan=agency">Agency &pound;499/mo</a></div>
+      </div>
+    </section>
     ` : ""}
 
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <span class="dash-card-title">Hot sectors right now</span>
-        <a href="/desks" style="font-family:var(--mono);font-size:9.5px;color:var(--accent);text-decoration:none;text-transform:uppercase;letter-spacing:.06em">All ${DESK_PROFILES.filter(d => d.live).length} &rarr;</a>
+    ${userState === "subscription" ? `
+    <section class="rcc-card">
+      <div class="rcc-card-head"><span class="rcc-card-title">Monitoring</span></div>
+      <div class="rcc-card-body">
+        <ul class="rcc-mon-list">
+          <li class="rcc-mon-item"><span>Active watchlists</span><span class="rcc-mon-val">${completedCount}</span></li>
+          <li class="rcc-mon-item"><span>New signals this week</span><span class="rcc-mon-val">${signalsThisWeek}</span></li>
+          <li class="rcc-mon-item"><span>Live opportunities</span><span class="rcc-mon-val">${totalOpenSignals.toLocaleString("en-GB")}</span></li>
+          <li class="rcc-mon-item"><span>Weekly alerts</span><span class="rcc-mon-val" style="color:#1d6b4f">On</span></li>
+        </ul>
+        <div style="margin-top:14px"><a href="/desks" class="rcc-btn-secondary" style="width:100%;text-align:center">Browse all desks &rarr;</a></div>
       </div>
-      <div class="dash-card-body">${hotSectorRows}</div>
-    </div>
+    </section>
+    ` : ""}
 
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <span class="dash-card-title">Live open signals</span>
-        ${totalOpenSignals > 0 ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600">${totalOpenSignals.toLocaleString("en-GB")}</span>` : ""}
-      </div>
-      <div style="padding:0 20px">
-        ${signalItems}
-        <div style="padding:14px 0 6px"><a href="/desks" class="dash-btn">Browse all desks &rarr;</a></div>
-      </div>
-    </div>
+  </aside>
 
-    <div class="dash-card">
-      <div class="dash-card-head"><span class="dash-card-title">Quick access</span></div>
-      <div class="dash-card-body">
-        <div class="tools-grid">
-          <a href="/scan" class="tool-card"><span class="tool-card-title">New scan</span><span class="tool-card-desc">Run an intelligence scan for any company</span></a>
-          <a href="/desks" class="tool-card"><span class="tool-card-title">Sector desks</span><span class="tool-card-desc">${DESK_PROFILES.filter(d => d.live).length} live desks with procurement signals</span></a>
-          <a href="/pricing" class="tool-card"><span class="tool-card-title">Pricing</span><span class="tool-card-desc">Free, Pro &amp; Agency plans compared</span></a>
-          <a href="/" class="tool-card"><span class="tool-card-title">Home</span><span class="tool-card-desc">Homepage with live market signals</span></a>
-        </div>
-      </div>
-    </div>
+</div>
+`}
 
-  </div>
 </div>
 </div>
-</div>
-${sampleCtaBlock("compact")}
+
 ${pageShellFoot()}
 </body>
 </html>`);
