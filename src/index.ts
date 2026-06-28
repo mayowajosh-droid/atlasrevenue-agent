@@ -10488,7 +10488,7 @@ const KEYWORD_SIC_FILTER: { terms: string[]; sics: string[]; label: string }[] =
     sics: ["47750"], label: "cosmetics & perfumes retail" },
   { terms: ["coffee shop", "coffee roaster", "espresso bar", "specialty coffee", "coffee"],
     sics: ["56301", "56302"], label: "coffee shops & cafés" },
-  { terms: ["café", "cafe ", "tea room"],
+  { terms: ["café", "cafe", "tea room"],
     sics: ["56302", "56301"], label: "cafés & tea rooms" },
   { terms: ["bistro", "fine dining", "restaurant"],
     sics: ["56101", "56102"], label: "restaurants" },
