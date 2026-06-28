@@ -5638,7 +5638,19 @@ function calcPremiumScores(scan: ScanRecord) {
         ? (_meta.key === "private" ? "Targeted buyer-channel + partner route" : "Targeted bid + partner route")
         : _meta.fallbackRoute;
 
-  const sector = escapeHtml(resolvedSector.label);
+  // For private/B2B intelligence scans, the procurement-shaped sector resolver
+  // (built around social-care/health/facilities/etc.) returns "General public-
+  // sector services" for anything outside its keyword set — wildly wrong for a
+  // private B2B brief. Override with the company's own category derived from
+  // mainServices so e.g. Viano's "Premium in-car fragrance systems, luxury
+  // automotive accessories…" surfaces as "Premium in-car fragrance" not
+  // "General public-sector services".
+  const sectorLabel = _meta.key === "private"
+    ? (deriveCategoryLensFromInput(input) || resolvedSector.label)
+    : (resolvedSector.label === "General public-sector services" && _meta.key === "hybrid"
+        ? (deriveCategoryLensFromInput(input) || resolvedSector.label)
+        : resolvedSector.label);
+  const sector = escapeHtml(sectorLabel);
 
   return {
     sector,
@@ -5651,6 +5663,33 @@ function calcPremiumScores(scan: ScanRecord) {
     openCount,
     awardCount
   };
+}
+
+// Derive a short, human-readable category lens from the company's own
+// mainServices description. Used by private/B2B intelligence scans where the
+// procurement-shaped sector resolver doesn't apply. Cheap heuristic: take the
+// first noun phrase before the first comma/semicolon, strip throwaway words,
+// title-case the result, cap at ~6 words.
+function deriveCategoryLensFromInput(input: any): string {
+  const text: string = (input?.mainServices || "").toString().trim();
+  if (!text) return "";
+  // First clause only.
+  const head = text.split(/[,;.\n]/)[0].trim();
+  if (!head) return "";
+  // Strip generic openers, vendor-speak, and trailing "systems/services/solutions".
+  const trimmed = head
+    .replace(/^(?:we (?:offer|provide|sell|deliver|do|build|design|make)|providers? of|specialists? in|leaders? in|the\s+)/i, "")
+    .replace(/\b(?:systems|solutions|services|products|supplies|business|company|specialists?|experts?)$/i, "")
+    .trim();
+  const words = trimmed.split(/\s+/).slice(0, 6).join(" ").trim();
+  if (!words) return "";
+  // Smart-case: keep tokens with intercaps, lowercase common stop-words inside.
+  const stop = new Set(["a", "an", "and", "or", "of", "for", "to", "in", "on", "with", "the"]);
+  return words.split(/\s+/).map((w, i) => {
+    if (i > 0 && stop.has(w.toLowerCase())) return w.toLowerCase();
+    if (/[A-Z]{2,}/.test(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(" ");
 }
 
 function scoreLabel(score: number) {
