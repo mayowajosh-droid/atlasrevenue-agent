@@ -78,7 +78,8 @@ function sectorFromSic(sicCodes: string[]): string {
 // Each sector gets its own API call with comma-separated codes → 100 businesses
 // per sector → rich county distributions for the Atlas competitive-landscape layer.
 const SECTOR_SIC_CODES: { sector: string; codes: string }[] = [
-  { sector: "Retail",               codes: "47110,47190,47210,47290,47710,47720,47750,47760,47770,47780,47790,47910,47990" },
+  { sector: "Retail",               codes: "47110,47190,47210,47290,47750,47760,47770,47780,47790,47910,47990" },
+  { sector: "Fashion & Clothing",   codes: "47710,47721,47722,47723,47782,47789" },
   { sector: "Food & Beverage",      codes: "56101,56102,56103,56210,56301,56302" },
   { sector: "Health",               codes: "86101,86210,86220,86230,86900" },
   { sector: "Sports & Fitness",     codes: "93110,93120,93130,93199" },

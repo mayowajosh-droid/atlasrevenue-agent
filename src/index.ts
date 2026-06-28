@@ -10418,6 +10418,8 @@ const KEYWORD_CH_SECTORS: { terms: string[]; sectors: string[]; label: string }[
     sectors: ["Advertising & Marketing"], label: "marketing & advertising" },
   { terms: ["consultancy", "consulting", "advisor", "advisory", "accountant", "accountancy", "bookkeep", "law firm", "solicitor", "legal services"],
     sectors: ["Legal & Accounting"], label: "professional services" },
+  { terms: ["fashion boutique", "clothing store", "clothing brand", "boutique", "menswear", "womenswear", "streetwear", "shoe shop", "footwear"],
+    sectors: ["Fashion & Clothing"], label: "fashion & clothing" },
   // Consumer-density layer keywords (broader, used by the Atlas map demand layer).
   { terms: ["perfume", "fragrance", "cosmetic", "beauty", "skincare", "makeup", "make-up"],
     sectors: ["Personal Services", "Retail"], label: "beauty & retail" },
