@@ -4319,13 +4319,20 @@ function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>): Pr
   return fn(controller.signal).finally(() => clearTimeout(timer));
 }
 
-// OpenAI calls are capped at 90s (see CLAUDE.md) to keep the scan queue from stalling.
+// OpenAI keyword-gen calls (per scan, JSON mode, short) capped at 90s.
 function withOpenAiTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   return withTimeout(90_000, fn);
 }
 
+// OpenAI report-generation calls (full 10-section report + web_search tool) need
+// more headroom — bumped to 180s so the scan doesn't fall back to "Request was
+// aborted" before the model has finished writing.
+function withOpenAiReportTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  return withTimeout(180_000, fn);
+}
+
 async function callOpenAiReport(prompt: string): Promise<string> {
-  return withOpenAiTimeout(async signal => {
+  return withOpenAiReportTimeout(async signal => {
     try {
       const response = await openai.responses.create({
         model: OPENAI_MODEL,
@@ -4351,11 +4358,13 @@ async function callOpenAiReport(prompt: string): Promise<string> {
   });
 }
 
-// Claude generates the report (the product) with server-side web search. Opus + search
-// needs more headroom than the 90s OpenAI budget, so it gets its own 150s cap.
+// Claude generates the report (the product) with server-side web search. Opus + web
+// search + 16k tokens + 5 search uses regularly takes 3-4 minutes on intelligence-mode
+// scans (heavier market-demand reports). 300s cap gives the model room to finish
+// instead of aborting mid-write.
 async function callClaudeReport(prompt: string): Promise<string> {
   if (!anthropic) throw new Error("Anthropic client not configured.");
-  return withTimeout(150_000, async signal => {
+  return withTimeout(300_000, async signal => {
     const message = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
       max_tokens: 16000,
@@ -4389,23 +4398,36 @@ function isAnthropicCreditError(err: any): boolean {
 
 async function callLlmReport(prompt: string): Promise<string> {
   if (anthropic && !anthropicBillingFailed) {
+    const t0 = Date.now();
     try {
-      return await callClaudeReport(prompt);
+      const out = await callClaudeReport(prompt);
+      console.log(`[report] Claude ${ANTHROPIC_MODEL} ok in ${Math.round((Date.now() - t0) / 1000)}s, ${out.length} chars`);
+      return out;
     } catch (claudeError: any) {
+      const elapsed = Math.round((Date.now() - t0) / 1000);
       if (isAnthropicCreditError(claudeError)) {
         anthropicBillingFailed = true;
-        console.warn("[report] Anthropic credit exhausted — switching all future scans to OpenAI");
+        console.warn(`[report] Anthropic credit exhausted after ${elapsed}s — switching all future scans to OpenAI`);
       } else {
         try {
           captureError(claudeError, {
-            anthropic: { model: ANTHROPIC_MODEL, fellBackToOpenAI: true, error: claudeError?.message || String(claudeError) }
+            anthropic: { model: ANTHROPIC_MODEL, fellBackToOpenAI: true, elapsedSec: elapsed, error: claudeError?.message || String(claudeError) }
           });
         } catch { /* sentry must not block fallback */ }
-        console.error("[report] Claude failed, falling back to OpenAI:", claudeError?.message || claudeError);
+        console.error(`[report] Claude failed after ${elapsed}s, falling back to OpenAI: ${claudeError?.message || claudeError}`);
       }
     }
   }
-  return callOpenAiReport(prompt);
+  const t1 = Date.now();
+  try {
+    const out = await callOpenAiReport(prompt);
+    console.log(`[report] OpenAI ${OPENAI_MODEL} ok in ${Math.round((Date.now() - t1) / 1000)}s, ${out.length} chars`);
+    return out;
+  } catch (openaiError: any) {
+    const elapsed = Math.round((Date.now() - t1) / 1000);
+    console.error(`[report] OpenAI ${OPENAI_MODEL} failed after ${elapsed}s: ${openaiError?.message || openaiError}`);
+    throw openaiError;
+  }
 }
 
 const SCAN_FETCH_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
