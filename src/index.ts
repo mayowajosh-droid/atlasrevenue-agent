@@ -13407,11 +13407,11 @@ app.get("/pricing", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — AtlasRevenue | Buyer Packs from £299</title>
-<meta name="description" content="AtlasRevenue pricing. Buyer Packs from £299 one-off, Buyer Watchlist from £149/month, Growth Intelligence from £750/month. Named buyers with intent scores, outreach packs, and action plans.">
+<title>Pricing — AtlasRevenue | Buyer Packs from £99</title>
+<meta name="description" content="AtlasRevenue pricing. Buyer Packs from £99 one-off, Buyer Watchlist from £249/month, Growth Intelligence from £749/month. Named buyers with intent scores, outreach packs, and action plans.">
 <link rel="canonical" href="${BASE_URL}/pricing">
 <meta name="robots" content="index, follow">
-<meta property="og:title" content="AtlasRevenue Pricing — Buyer Packs from £299">
+<meta property="og:title" content="AtlasRevenue Pricing — Buyer Packs from £99">
 <meta property="og:description" content="Named buyers with intent scores, outreach packs, and action plans. One-off or subscribe.">
 <meta property="og:url" content="${BASE_URL}/pricing">
 <style>
@@ -13485,7 +13485,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     <div class="plan featured">
       <div class="plan-badge">Start here</div>
       <div class="plan-name">Buyer Pack</div>
-      <div class="plan-price"><sup>£</sup>299</div>
+      <div class="plan-price"><sup>£</sup>99</div>
       <div class="plan-period">one-off &middot; per niche</div>
       <div class="plan-desc">15&ndash;25 named buyers in your niche with intent scores, outreach packs, and a 30-day action plan. Proves the value before you subscribe.</div>
       <ul>
@@ -13501,7 +13501,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="plan">
       <div class="plan-name">Buyer Watchlist</div>
-      <div class="plan-price"><sup>£</sup>149</div>
+      <div class="plan-price"><sup>£</sup>249</div>
       <div class="plan-period">per month &middot; cancel anytime</div>
       <div class="plan-desc">Continuous monitoring of your niche. Weekly score updates, new buyer alerts, and refreshed outreach angles as signals change.</div>
       <ul>
@@ -13516,7 +13516,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="plan">
       <div class="plan-name">Growth Intelligence</div>
-      <div class="plan-price"><sup>£</sup>750</div>
+      <div class="plan-price"><sup>£</sup>749</div>
       <div class="plan-period">per month</div>
       <div class="plan-desc">For agencies, bid writers, and consultancies managing client portfolios. Multi-niche coverage, team access, and white-label reports.</div>
       <ul>
@@ -13540,9 +13540,9 @@ ${pageShellHeader(null, getAuthUser(req))}
       <thead>
         <tr>
           <th style="min-width:220px">Feature</th>
-          <th class="cmp-hl" style="min-width:120px">Buyer Pack<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;299</span></th>
-          <th style="min-width:120px">Watchlist<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;149/mo</span></th>
-          <th style="min-width:120px">Growth<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;750/mo</span></th>
+          <th class="cmp-hl" style="min-width:120px">Buyer Pack<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;99</span></th>
+          <th style="min-width:120px">Watchlist<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;249/mo</span></th>
+          <th style="min-width:120px">Growth<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;749/mo</span></th>
         </tr>
       </thead>
       <tbody>
@@ -13626,21 +13626,21 @@ ${pageShellFoot()}
 const PLAN_CONFIG: Record<string, { name: string; price: string; period: string; mode: string; items: string[] }> = {
   payg: {
     name: "Buyer Pack",
-    price: "£299",
+    price: "£99",
     period: "one-off per niche",
     mode: "payment",
     items: ["15–25 buyer opportunity cards", "Intent Score (0–100) per buyer", "Why Now? analysis", "Outreach pack (email + call + LinkedIn)", "Routes to revenue map", "30-day activation plan", "PDF export"],
   },
   watchlist: {
     name: "Buyer Watchlist",
-    price: "£149",
+    price: "£249",
     period: "per month — cancel anytime",
     mode: "subscription",
     items: ["Everything in Buyer Pack", "Weekly intent score updates", "New buyer alerts (email)", "Refreshed outreach angles", "Contract expiry tracking", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`],
   },
   growth: {
     name: "Growth Intelligence",
-    price: "£750",
+    price: "£749",
     period: "per month",
     mode: "subscription",
     items: ["Everything in Watchlist", "Up to 5 niche verticals", "Client portfolio management", "Team access (5 seats)", "White-label PDF reports", "Priority support", "Quarterly strategy call"],
@@ -18203,14 +18203,14 @@ ${pageShellHeader(null, authCtx)}
 
 <section class="rm-cta">
   <div class="rm-cta-inner">
-    <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;299</div>
+    <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;99</div>
     <h2>Get ${isCompiling ? "15+" : String(Math.min(buyerProfiles.length, 25))} retrofit buyer opportunities this week</h2>
     <p class="rm-cta-lede">Named buyers, intent scores, Why Now? analysis, tailored outreach packs (email + call + LinkedIn + &ldquo;do not say&rdquo;), and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
-    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;299 &rarr;</a>
+    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;99 &rarr;</a>
     <p class="rm-cta-note">One-off &bull; public data only &bull; delivered within 48 hours</p>
     <p style="font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.3);margin-top:24px;line-height:1.6">
-      Want ongoing monitoring? <strong style="color:rgba(236,230,214,.5)">Buyer Watchlist &pound;149&ndash;&pound;399/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.<br>
-      Agencies &amp; bid writers? <strong style="color:rgba(236,230,214,.5)">Growth Intelligence &pound;750&ndash;&pound;2,000/mo</strong> &mdash; multi-niche packs, client portfolios, territory exclusivity.<br>
+      Want ongoing monitoring? <strong style="color:rgba(236,230,214,.5)">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.<br>
+      Agencies &amp; bid writers? <strong style="color:rgba(236,230,214,.5)">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.<br>
       Enterprise? <strong style="color:rgba(236,230,214,.5)">Exclusive Opportunity Feed &pound;1,500+/mo</strong> &mdash; category or territory exclusivity, white-label reports.
     </p>
   </div>
