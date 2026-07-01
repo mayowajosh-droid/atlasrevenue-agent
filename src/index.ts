@@ -10357,19 +10357,19 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     body = `
     <div class="svc-statband">
       <div class="svc-stat"><div class="svc-stat-val">${result.estimatedTotal.toLocaleString("en-GB")}</div><div class="svc-stat-lbl">Businesses in this market</div></div>
-      <div class="svc-stat"><div class="svc-stat-val">${regions.length}</div><div class="svc-stat-lbl">Regions with live demand</div></div>
+      <div class="svc-stat"><div class="svc-stat-val">${regions.length}</div><div class="svc-stat-lbl">Regions with activity</div></div>
       <div class="svc-stat"><div class="svc-stat-val">${escapeHtml(result.label || q)}</div><div class="svc-stat-lbl">Matched sector</div></div>
     </div>
     <div class="svc-sec-hd">Where they are</div>
     <div class="svc-sec-title">Top regions for ${escapeHtml(q)}</div>
     <div>${regions.map(r => `<div class="svc-region"><div class="svc-region-name">${escapeHtml(r.county)}</div><div class="svc-region-bar"><div class="svc-region-fill" style="width:${Math.round((r.count / maxR) * 100)}%"></div></div><div class="svc-region-val">${r.count} sampled</div></div>`).join("")}</div>
-    <div class="svc-sec-hd">Who to contact</div>
-    <div class="svc-sec-title">Your first 3 prospects — free</div>
+    <div class="svc-sec-hd">Newest entrants</div>
+    <div class="svc-sec-title">Companies incorporated in the last 90 days in your space — choosing suppliers right now</div>
     <div class="leads-grid">${free.map(leadCardHtml).join("")}</div>
     <div class="svc-gate">
       <div>
-        <div class="svc-gate-title">Get all ${moreCount.toLocaleString("en-GB")}+ named businesses</div>
-        <div class="svc-gate-sub">A full intelligence scan returns the complete named list for your sector, the regions where demand is densest, and a ready-to-send 30-day outreach plan built around your offer.</div>
+        <div class="svc-gate-title">Get the full list — ${moreCount.toLocaleString("en-GB")}+ companies</div>
+        <div class="svc-gate-sub">Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. The engine goes beyond the register — it maps who's actually buying what you sell. £99.</div>
       </div>
       <div class="svc-gate-actions">
         <a class="svc-btn" href="/scan?services=${encodeURIComponent(q)}">Run a full scan &rarr;</a>
@@ -10378,8 +10378,8 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     </div>
     <form id="pv-mail" class="svc-gate" style="margin-top:12px" onsubmit="return pvSub(event)">
       <div>
-        <div class="svc-gate-title">Or get a weekly drop of new ${escapeHtml(result.label || q)} businesses</div>
-        <div class="svc-gate-sub">We email you newly registered companies in this sector as they appear on the public register. Free. Unsubscribe anytime.</div>
+        <div class="svc-gate-title">Or get a weekly drop of new ${escapeHtml(result.label || q)} market entrants</div>
+        <div class="svc-gate-sub">We email you newly incorporated companies in this sector as they appear on the register — competitors to watch or partners to reach first. Free. Unsubscribe anytime.</div>
       </div>
       <div class="svc-gate-actions">
         <input name="email" type="email" required placeholder="you@studio.com" style="background:var(--surface);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:14px;padding:13px 16px;min-width:220px">
@@ -10391,26 +10391,26 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     body = `<div class="svc-empty">No registered businesses matched “${escapeHtml(q)}” in our current sample.<br>Try a broader term like “design”, “software”, “marketing” or “consultancy”.</div>`;
   } else {
     body = `
-    <div class="svc-sec-hd">How it works</div>
-    <div class="svc-sec-title">From “what you sell” to a named prospect list</div>
-    <div class="svc-cards">
-      <a class="svc-card" href="/preview?q=design%20studio"><div class="svc-card-label">1 · Type what you sell</div><div class="svc-card-blurb">Tell us your product or service — “web design”, “IT support”, “accountancy”. No account needed.</div><div class="svc-card-ex">free · instant</div></a>
-      <a class="svc-card" href="/sectors"><div class="svc-card-label">2 · See the market</div><div class="svc-card-blurb">We show how many UK businesses are in your sector, the regions with the most demand, and three named prospects.</div><div class="svc-card-ex">real Companies House data</div></a>
-      <a class="svc-card" href="/scan"><div class="svc-card-label">3 · Get the full list</div><div class="svc-card-blurb">Run a scan for the complete named list, contact routes, and a 30-day outreach plan around your offer.</div><div class="svc-card-ex">from £99</div></a>
+    <div class=”svc-sec-hd”>How it works</div>
+    <div class=”svc-sec-title”>From “what you sell” to a market map</div>
+    <div class=”svc-cards”>
+      <a class=”svc-card” href=”/preview?q=design%20studio”><div class=”svc-card-label”>1 · Type what you sell</div><div class=”svc-card-blurb”>”web design”, “IT support”, “accountancy”. No account, no email.</div><div class=”svc-card-ex”>free · instant</div></a>
+      <a class=”svc-card” href=”/sectors”><div class=”svc-card-label”>2 · See your market mapped</div><div class=”svc-card-blurb”>Total companies in your space, the densest regions, and the newest entrants from the live Companies House register.</div><div class=”svc-card-ex”>real register data</div></a>
+      <a class=”svc-card” href=”/scan”><div class=”svc-card-label”>3 · Find who's actually buying</div><div class=”svc-card-blurb”>Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. £99.</div><div class=”svc-card-ex”>from £99</div></a>
     </div>`;
   }
 
   return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Free demand preview — see who's buying what you sell | AtlasRevenue</title>
-<meta name="description" content="Type what you sell and instantly see how many UK businesses are in your market, where demand is densest, and three named prospects — free, from real Companies House data.">
+<title>Free market preview — see the size and shape of your market | AtlasRevenue</title>
+<meta name="description" content="Type what you sell and instantly see how many UK businesses operate in your space, where they cluster, and the newest market entrants — free, from the live Companies House register.">
 <link rel="canonical" href="${BASE_URL}/preview">
 <style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
 ${pageShellHeader(null, auth)}
 <section class="svc-hero"><div class="svc-hero-inner">
-  <div class="svc-eyebrow">● Free demand preview</div>
-  <h1>See who's buying what you sell — before you spend a penny.</h1>
-  <p>Type your product or service. We read the live UK business register and show you the size of your market, where it's concentrated, and real named prospects.</p>
+  <div class="svc-eyebrow">● Free market preview</div>
+  <h1>See the size and shape of your market — in ten seconds, free.</h1>
+  <p>Type your product or service. We read the live UK business register and show you how many companies operate in your space, where they cluster, and who's entered the market most recently.</p>
   <form class="svc-search" action="/preview" method="get">
     <input name="q" value="${escapeHtml(q)}" placeholder="e.g. web design, IT support, marketing, accountancy…" autocomplete="off">
     <button type="submit">Show me</button>
@@ -10523,10 +10523,10 @@ ${pageShellHeader(null, auth)}
   <div>${regionsHtml}</div>
   <div class="svc-sec-hd">Who just launched</div>
   <div class="svc-sec-title">Newly registered ${escapeHtml(sector.label.toLowerCase())} businesses</div>
-  <p style="font-size:13px;color:var(--muted);max-width:62ch;margin:-8px 0 16px;line-height:1.6">Companies that just appeared on the register — warm prospects setting up suppliers right now. Each links to its Companies House record.</p>
+  <p style="font-size:13px;color:var(--muted);max-width:62ch;margin:-8px 0 16px;line-height:1.6">Companies incorporated in the last 90 days — new firms choosing their suppliers right now. Each links to its Companies House record.</p>
   ${leadsHtml}
   <div class="svc-gate" style="margin-top:28px">
-    <div><div class="svc-gate-title">Get the full ${escapeHtml(sector.label)} prospect list</div>
+    <div><div class="svc-gate-title">Get the full ${escapeHtml(sector.label)} market list</div>
     <div class="svc-gate-sub">Run a scan for the complete named list, contact routes, and a 30-day outreach plan built around what you sell.</div></div>
     <div class="svc-gate-actions"><a class="svc-btn" href="/scan?services=${encodeURIComponent(sector.query)}">Run a scan &rarr;</a><a class="svc-btn svc-btn-ghost" href="/preview?q=${encodeURIComponent(sector.query)}">Free preview</a></div>
   </div>
@@ -11187,7 +11187,7 @@ ${pageShellHeader(null, authCtx)}
       </div>
       <div id="atl-leads-meta" style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em">Companies House · live register</div>
     </div>
-    <p style="font-size:13px;color:var(--muted);max-width:60ch;margin:-6px 0 18px;line-height:1.6">Recently incorporated UK companies in this sector — warm prospects who are setting up suppliers right now. Each links to its Companies House record.</p>
+    <p style="font-size:13px;color:var(--muted);max-width:60ch;margin:-6px 0 18px;line-height:1.6">Recently incorporated UK companies in this sector — new firms choosing their suppliers right now. Each links to its Companies House record.</p>
     <div id="atl-leads-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
     <div id="atl-leads-foot" style="margin-top:18px"></div>
   </div>
