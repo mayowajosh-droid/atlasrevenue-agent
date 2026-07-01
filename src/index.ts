@@ -8403,7 +8403,7 @@ app.get("/", asyncRoute(async (req, res) => {
       </div>`
     : "";
 
-  const sampleLink = `<a class="btn-ghost" href="/scan/sample">See a sample report &rarr;</a>`;
+  const sampleLink = `<a class="btn-ghost" href="/scan/sample">See a real report &rarr;</a>`;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -9180,7 +9180,7 @@ ${pageShellHeader(null, auth)}
       <p style="font-size:17px;line-height:1.6;color:#C5C9BC;max-width:40em;margin-bottom:28px">AtlasRevenue reads real UK data — DVLA, ONS, Land Registry, Companies House — and turns it into a demand map for your product or service: named buyers, regional concentration, competitor gaps, and exactly how to reach them.</p>
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <a href="/scan" style="background:var(--brand);color:#10110D;font-weight:600;font-size:14px;padding:14px 24px">Map my market demand &rarr;</a>
-        <a href="/scan" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#C5C9BC;text-decoration:underline;text-underline-offset:4px">See a sample report &rarr;</a>
+        <a href="/scan/sample" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#C5C9BC;text-decoration:underline;text-underline-offset:4px">See a real report &rarr;</a>
       </div>
     </div>
   </section>
@@ -13816,9 +13816,9 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
 
   const liveEvidenceHtml = liveEvidence.length ? `
     <div class="sr-tier-banner sr-tier-1-banner">
-      <div class="sr-tier-tag">Tier 1 of 3 &middot; Live Procurement Records</div>
+      <div class="sr-tier-tag">Live Procurement Records</div>
       <div class="sr-tier-h">Real UK public-sector notices the engine ingests today</div>
-      <div class="sr-tier-p">Each card below is an actual notice pulled from Contracts Finder or Find a Tender within the last 90 days &mdash; real buyer, real value, real source link. This is one of several evidence layers a paid scan combines (see Tier 3 below for the full picture).</div>
+      <div class="sr-tier-p">Each card below is an actual notice pulled from Contracts Finder or Find a Tender within the last 90 days &mdash; real buyer, real value, real source link. Every link opens the original government notice.</div>
     </div>
     <div class="sr-section sr-tier-1">
       <div class="sr-label">Live evidence &middot; refreshed hourly</div>
@@ -13848,14 +13848,14 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
       </div>
     </div>
     <div class="sr-tier-banner sr-tier-2-banner">
-      <div class="sr-tier-tag">Tier 2 of 3 &middot; Demo Report</div>
-      <div class="sr-tier-h">Demo report: fictional company, fictional opportunities</div>
-      <div class="sr-tier-p">This page shows the report format. Live AtlasRevenue scans use source-linked public records and market-demand signals where available. Every buyer name, value, deadline and award status in the section below is illustrative &mdash; designed to show what the structure delivers, not to represent a real opportunity.</div>
+      <div class="sr-tier-tag">Illustrative Report Format</div>
+      <div class="sr-tier-h">Report format: fictional company, fictional opportunities</div>
+      <div class="sr-tier-p">The sections below show the structure a £99 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
     </div>` : `
     <div class="sr-tier-banner sr-tier-2-banner">
-      <div class="sr-tier-tag">Demo Report</div>
-      <div class="sr-tier-h">Demo report: fictional company, fictional opportunities</div>
-      <div class="sr-tier-p">This page shows the report format. Live AtlasRevenue scans use source-linked public records and market-demand signals where available. Every buyer name, value, deadline and award status in the section below is illustrative &mdash; designed to show what the structure delivers, not to represent a real opportunity.</div>
+      <div class="sr-tier-tag">Illustrative Report Format</div>
+      <div class="sr-tier-h">Report format: fictional company, fictional opportunities</div>
+      <div class="sr-tier-p">The sections below show the structure a £99 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
     </div>`;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -13863,7 +13863,7 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sample Report &mdash; Live Evidence + Illustrative Sample &mdash; AtlasRevenue</title>
+<title>Sample Report &mdash; Live Evidence + Report Format &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .sr-ribbon{background:rgba(180,146,78,.06);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -13977,7 +13977,7 @@ ${pageShellCss()}
 <body>
 ${pageShellHeader(null, authCtx)}
 <div class="sr-ribbon">
-  <span>Live evidence + illustrative sample &mdash; real recent contracts above, fictional Brightwell FM Ltd report below</span>
+  <span>Live procurement evidence + illustrative report format</span>
   <span class="sr-ribbon-cta"><a href="/scan">Run your scan &rarr;</a></span>
 </div>
 <div class="sr-watermark">SAMPLE</div>
@@ -14120,58 +14120,12 @@ ${pageShellHeader(null, authCtx)}
     </div>
   </div>
 
-  <div class="sr-tier-banner sr-tier-3-banner">
-    <div class="sr-tier-tag">Tier 3 of 3 &middot; Live Evidence Preview</div>
-    <div class="sr-tier-h">Live Evidence Preview</div>
-    <div class="sr-tier-p">Real examples of buyer activity and market-demand signals AtlasRevenue can track from public records, procurement data, geography, company intelligence, and sector sources.</div>
-    <div class="sr-tier-note">These examples are separate from the fictional Brightwell demo above. They show the type of real evidence AtlasRevenue can use in live scans. Cards below are example slots &mdash; real source links appear in live deployments.</div>
-  </div>
-
-  <div class="sr-section sr-evidence-preview">
-    <div class="sr-ep-grid">
-      <div class="sr-ep-left">
-        <h3 class="sr-ep-h">How AtlasRevenue turns evidence into commercial direction</h3>
-        <p class="sr-ep-body">AtlasRevenue does not just list tenders. It reads buyer activity, demand signals, sector movement, geography, and commercial fit to show where a company should sell next.</p>
-        <ol class="sr-ep-steps">
-          <li><span class="sr-ep-num">1</span><div><div class="sr-ep-step-h">Detect demand signals</div><div class="sr-ep-step-p">Across public procurement records, company filings, geographic and property data, and sector demand indicators.</div></div></li>
-          <li><span class="sr-ep-num">2</span><div><div class="sr-ep-step-h">Match them to supplier capability</div><div class="sr-ep-step-p">Filter signals by the scanned company&rsquo;s service mix, threshold profile, frameworks held and geographic reach.</div></div></li>
-          <li><span class="sr-ep-num">3</span><div><div class="sr-ep-step-h">Recommend the next route to revenue</div><div class="sr-ep-step-p">Direct tender, framework, subcontractor route, partner route or buyer engagement &mdash; whichever the evidence supports.</div></div></li>
-        </ol>
-      </div>
-      <div class="sr-ep-right">
-        <div class="sr-ev-card">
-          <div class="sr-ev-type">Public procurement record</div>
-          <div class="sr-ev-org">Source-linked buyer appears here <span class="sr-demo-tag">example slot</span></div>
-          <div class="sr-ev-sig"><b>Detected signal:</b> Recent buyer activity in a supplier category relevant to the scanned company.</div>
-          <div class="sr-ev-why"><b>Why it matters:</b> Public records can reveal buyer behaviour, recurring spend, category demand, and likely route-to-market.</div>
-          <div class="sr-ev-conf">Source-linked in live scans</div>
-          <div class="sr-ev-cta">Source link added in live deployment</div>
-        </div>
-        <div class="sr-ev-card">
-          <div class="sr-ev-type">Market-demand signal</div>
-          <div class="sr-ev-org">Sector or geography appears here <span class="sr-demo-tag">example slot</span></div>
-          <div class="sr-ev-sig"><b>Detected signal:</b> Demand movement identified from geography, company, property, funding, or sector data.</div>
-          <div class="sr-ev-why"><b>Why it matters:</b> Early signals can show where demand is forming before a formal tender appears.</div>
-          <div class="sr-ev-conf">Market signal in live scans</div>
-          <div class="sr-ev-cta">Evidence added in live deployment</div>
-        </div>
-        <div class="sr-ev-card">
-          <div class="sr-ev-type">Framework / route-to-market signal</div>
-          <div class="sr-ev-org">Relevant framework or buyer group appears here <span class="sr-demo-tag">example slot</span></div>
-          <div class="sr-ev-sig"><b>Detected signal:</b> A likely route to revenue based on buyer behaviour, supplier category, or procurement pattern.</div>
-          <div class="sr-ev-why"><b>Why it matters:</b> Some companies should not chase tenders directly. The better path may be a framework, subcontractor route, partner route, or buyer engagement.</div>
-          <div class="sr-ev-conf">Route assessed in live scans</div>
-          <div class="sr-ev-cta">Source added in live deployment</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="sr-cta">
-    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Want this built from real evidence for your company?</div>
-    <div style="font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4">Run a live AtlasRevenue scan to see matched buyers, demand signals, source-linked opportunities, readiness gaps, and the next best route to revenue.</div>
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Want this for your firm?</div>
+    <div style="font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:8px;color:var(--text);line-height:1.4">Same engine, your profile, 2&ndash;4 minutes.</div>
+    <p style="font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:20px;max-width:40em;margin-left:auto;margin-right:auto">Report depth varies by sector &mdash; data-rich sectors like construction return more matches than niche ones. The engine says so plainly when evidence is thin.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center">
-      <a href="/scan">Run a live scan &rarr;</a>
+      <a href="/scan">Run your scan &mdash; &pound;99 &rarr;</a>
       <a href="/pricing" style="display:inline-block;background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--border-3);text-decoration:none">View pricing</a>
     </div>
   </div>
