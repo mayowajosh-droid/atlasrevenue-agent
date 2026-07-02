@@ -85,6 +85,8 @@ export type ProcurementNotice = {
   valueHigh: number | null;
   awardedValue: number | null;
   awardedSupplier: string;
+  contractStart?: string | null;
+  contractEnd?: string | null;
   suitableForSme: boolean | null;
   url: string;
   keyword: string;

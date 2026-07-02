@@ -253,3 +253,45 @@ export function isOverseasNotice(title: string, buyer: string): boolean {
   ];
   return overseas.some(p => t.includes(p));
 }
+
+// ── Renewal radar ──────────────────────────────────────────────────────────
+// Awarded contracts whose contractPeriod end falls inside the window
+// [now - lookbackDays, now + horizonDays]. Recently-expired contracts are
+// included because a lapsed contract with no published successor is an open
+// retender window — often the strongest pre-tender signal on a desk.
+export type RenewalNotice = {
+  buyer: string;
+  title: string;
+  awardedValue: number | null;
+  awardedSupplier: string;
+  contractEnd?: string | null;
+  url: string;
+};
+
+export function computeRenewalRadar<T extends RenewalNotice>(
+  awarded: T[],
+  now: Date = new Date(),
+  opts: { lookbackDays?: number; horizonDays?: number; limit?: number } = {}
+): T[] {
+  const t0 = now.getTime() - (opts.lookbackDays ?? 90) * 86_400_000;
+  const t1 = now.getTime() + (opts.horizonDays ?? 365) * 86_400_000;
+  const seen = new Set<string>();
+  return awarded
+    .filter(n => {
+      if (!n.contractEnd) return false;
+      const t = new Date(n.contractEnd).getTime();
+      if (!Number.isFinite(t) || t < t0 || t > t1) return false;
+      if (!n.buyer || n.buyer === "Not stated") return false;
+      if (isAggregatorBuyer(n.buyer)) return false;
+      const key = `${n.buyer}|${n.title}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => new Date(a.contractEnd!).getTime() - new Date(b.contractEnd!).getTime())
+    .slice(0, opts.limit ?? 12);
+}
+
+export function renewalDaysLeft(contractEnd: string, now: Date = new Date()): number {
+  return Math.round((new Date(contractEnd).getTime() - now.getTime()) / 86_400_000);
+}

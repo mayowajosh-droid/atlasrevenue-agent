@@ -38,6 +38,8 @@ export function normaliseNotice(raw: any, keyword: string): ProcurementNotice | 
     valueHigh: item.valueHigh != null ? (Number(item.valueHigh) || null) : null,
     awardedValue: item.awardedValue != null ? (Number(item.awardedValue) || null) : null,
     awardedSupplier: decodeHtmlEntities(String(item.awardedSupplier || "")),
+    contractStart: item.start || null,
+    contractEnd: item.end || null,
     suitableForSme: typeof item.isSuitableForSme === "boolean" ? item.isSuitableForSme : null,
     url: noticeUrl(id),
     keyword

@@ -32,6 +32,8 @@ export function normaliseFindTenderRelease(release: any, keyword: string): Procu
     valueHigh: amount,
     awardedValue: amount,
     awardedSupplier: "",
+    contractStart: release?.awards?.[0]?.contractPeriod?.startDate || tender?.contractPeriod?.startDate || null,
+    contractEnd: release?.awards?.[0]?.contractPeriod?.endDate || tender?.contractPeriod?.endDate || null,
     suitableForSme: null,
     url: release.id ? `https://www.find-tender.service.gov.uk/Notice/${encodeURIComponent(String(release.id))}` : "https://www.find-tender.service.gov.uk/",
     keyword

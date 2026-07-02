@@ -8,6 +8,8 @@ import {
   parseEdpFromMarkdown,
   validateReportConsistency,
   isAggregatorBuyer,
+  computeRenewalRadar,
+  renewalDaysLeft,
 } from "./intel.js";
 
 describe("escapeHtml", () => {
@@ -147,5 +149,60 @@ describe("isAggregatorBuyer", () => {
   });
   it("does not catch The Crescent Academy (a real buyer, handled by outlier exclusion)", () => {
     expect(isAggregatorBuyer("The Crescent Academy")).toBe(false);
+  });
+});
+
+describe("computeRenewalRadar", () => {
+  const now = new Date("2026-07-02T00:00:00Z");
+  const mk = (over: Partial<import("./intel.js").RenewalNotice>) => ({
+    buyer: "Kent County Council",
+    title: "Cleaning services",
+    awardedValue: 500_000,
+    awardedSupplier: "Incumbent Ltd",
+    contractEnd: "2026-12-01T00:00:00Z",
+    url: "https://example.test/notice/1",
+    ...over,
+  });
+
+  it("keeps contracts ending within the 12-month horizon, sorted soonest-first", () => {
+    const out = computeRenewalRadar(
+      [mk({ title: "B", contractEnd: "2027-05-01T00:00:00Z" }), mk({ title: "A", contractEnd: "2026-09-01T00:00:00Z" })],
+      now
+    );
+    expect(out.map(n => n.title)).toEqual(["A", "B"]);
+  });
+
+  it("includes recently-lapsed contracts (open retender window) but not older ones", () => {
+    const lapsed30d = mk({ title: "lapsed", contractEnd: "2026-06-02T00:00:00Z" });
+    const lapsed200d = mk({ title: "too old", contractEnd: "2025-12-14T00:00:00Z" });
+    const out = computeRenewalRadar([lapsed30d, lapsed200d], now);
+    expect(out.map(n => n.title)).toEqual(["lapsed"]);
+  });
+
+  it("drops notices with no contract end, beyond-horizon ends, unnamed buyers and aggregators", () => {
+    const out = computeRenewalRadar(
+      [
+        mk({ title: "no end", contractEnd: null }),
+        mk({ title: "far future", contractEnd: "2029-01-01T00:00:00Z" }),
+        mk({ title: "anon", buyer: "Not stated" }),
+        mk({ title: "aggregator", buyer: "ESPO" }),
+        mk({ title: "keeper" }),
+      ],
+      now
+    );
+    expect(out.map(n => n.title)).toEqual(["keeper"]);
+  });
+
+  it("dedupes identical buyer+title pairs and respects the limit", () => {
+    const out = computeRenewalRadar([mk({}), mk({}), mk({ title: "second" })], now, { limit: 1 });
+    expect(out).toHaveLength(1);
+  });
+});
+
+describe("renewalDaysLeft", () => {
+  it("is positive before expiry and negative after", () => {
+    const now = new Date("2026-07-02T00:00:00Z");
+    expect(renewalDaysLeft("2026-07-12T00:00:00Z", now)).toBe(10);
+    expect(renewalDaysLeft("2026-06-22T00:00:00Z", now)).toBe(-10);
   });
 });

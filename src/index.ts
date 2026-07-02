@@ -28,6 +28,7 @@ import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
   validateReportConsistency, isAggregatorBuyer, isOverseasNotice,
+  computeRenewalRadar, renewalDaysLeft,
   type ParsedEdp
 } from "./lib/intel.js";
 import {
@@ -170,6 +171,8 @@ type ProcurementNotice = {
   valueHigh: number | null;
   awardedValue: number | null;
   awardedSupplier: string;
+  contractStart?: string | null;
+  contractEnd?: string | null;
   suitableForSme: boolean | null;
   url: string;
   keyword: string;
@@ -828,6 +831,8 @@ function normaliseNotice(raw: any, keyword: string): ProcurementNotice | null {
     valueHigh: item.valueHigh != null ? (Number(item.valueHigh) || null) : null,
     awardedValue: item.awardedValue != null ? (Number(item.awardedValue) || null) : null,
     awardedSupplier: decodeHtmlEntities(String(item.awardedSupplier || "")),
+    contractStart: item.start || null,
+    contractEnd: item.end || null,
     suitableForSme: typeof item.isSuitableForSme === "boolean" ? item.isSuitableForSme : null,
     url: noticeUrl(id),
     keyword
@@ -923,6 +928,8 @@ function normaliseFindTenderRelease(release: any, keyword: string): ProcurementN
     valueHigh: amount,
     awardedValue: amount,
     awardedSupplier: "",
+    contractStart: release?.awards?.[0]?.contractPeriod?.startDate || tender?.contractPeriod?.startDate || null,
+    contractEnd: release?.awards?.[0]?.contractPeriod?.endDate || tender?.contractPeriod?.endDate || null,
     suitableForSme: null,
     url: release.id ? `https://www.find-tender.service.gov.uk/Notice/${encodeURIComponent(String(release.id))}` : "https://www.find-tender.service.gov.uk/",
     keyword
@@ -10248,6 +10255,32 @@ app.get("/api/leads", asyncRoute(async (req, res) => {
   });
 }));
 
+// Renewal radar as JSON — awarded contracts on a desk whose contract period
+// ends within the horizon (default 365 days, plus 90-day lookback for lapsed
+// contracts = open retender windows). Feeds the weekly briefing workflow.
+app.get("/api/renewals", asyncRoute(async (req, res) => {
+  const slug = String(req.query.desk || "").trim();
+  const profile = DESK_PROFILES.find(d => d.slug === slug);
+  if (!profile) { res.status(404).json({ error: "Unknown desk. Use ?desk=<slug> from /desks." }); return; }
+  const cached = await getDeskCache(slug);
+  if (!cached) { res.status(503).json({ error: "Desk data is compiling — retry in a minute." }); return; }
+  const horizonDays = Math.min(parseInt(String(req.query.horizonDays || "365"), 10) || 365, 730);
+  const renewals = computeRenewalRadar(
+    (cached.data.contractsFinder.awarded || []).filter(n => !isOverseasNotice(n.title, n.buyer || "")),
+    new Date(),
+    { horizonDays, limit: Math.min(parseInt(String(req.query.limit || "12"), 10) || 12, 50) }
+  ).map(n => ({
+    buyer: n.buyer,
+    title: n.title,
+    awardedValue: n.awardedValue,
+    incumbent: n.awardedSupplier || null,
+    contractEnd: n.contractEnd,
+    daysLeft: renewalDaysLeft(n.contractEnd!),
+    url: n.url,
+  }));
+  res.json({ desk: slug, label: profile.label, generatedAt: cached.cached_at, horizonDays, count: renewals.length, renewals });
+}));
+
 // ── Service-business surfaces: free preview + sector demand pages ─────────────
 // Broaden AtlasRevenue beyond procurement bidders to ANY UK business finding
 // customers (creative studios, software shops, agencies, consultancies). Built
@@ -17088,6 +17121,47 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     </section>`
     : "";
 
+  // ── Renewal radar: awarded contracts whose contract period ends within 12
+  // months (or lapsed in the last 90 days = open retender window). Uses the
+  // full awarded pull (not the 365-day slice) — older awards end sooner.
+  const renewalCandidates = computeRenewalRadar(
+    (data?.contractsFinder.awarded || []).filter(n => !isOverseasNotice(n.title, n.buyer || "")),
+    new Date()
+  );
+  const renewalRadarHtml = renewalCandidates.length > 0
+    ? `<section class="awards-section">
+      <div class="awards-inner">
+        <div class="awards-head-row">
+          <span class="awards-title">RENEWAL RADAR &mdash; CONTRACTS ENTERING RETENDER WINDOWS</span>
+          <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">${renewalCandidates.length} contract${renewalCandidates.length === 1 ? "" : "s"} &middot; next 12 months</span>
+        </div>
+        <div class="awards-grid">
+          ${renewalCandidates.map(n => {
+            const daysLeft = renewalDaysLeft(n.contractEnd!);
+            const endFmt = new Date(n.contractEnd!).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+            const chip = daysLeft < 0
+              ? `<span style="font-family:var(--mono);font-size:10px;color:var(--brand);border:1px solid var(--brand);border-radius:3px;padding:1px 6px">LAPSED ${Math.abs(daysLeft)}D &mdash; RETENDER WINDOW</span>`
+              : daysLeft <= 90
+                ? `<span style="font-family:var(--mono);font-size:10px;color:var(--brand);border:1px solid var(--brand);border-radius:3px;padding:1px 6px">ENDS IN ${daysLeft}D</span>`
+                : `<span style="font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--border);border-radius:3px;padding:1px 6px">ENDS IN ${daysLeft}D</span>`;
+            return `<div class="award-card">
+              <div class="award-card-buyer">${escapeHtml(n.buyer.slice(0, 45))}</div>
+              <div class="award-card-title">${escapeHtml(n.title.slice(0, 90))}</div>
+              <div class="award-card-meta">
+                <span class="award-card-val">${n.awardedValue && n.awardedValue > 0 ? escapeHtml(fmtMoney(n.awardedValue)) : "&mdash;"}</span>
+                <span class="award-card-date">${escapeHtml(endFmt)}</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+                ${chip}
+                ${n.awardedSupplier ? `<span class="award-card-winner" style="margin-top:0">Incumbent: ${escapeHtml(n.awardedSupplier.slice(0, 40))}</span>` : ""}
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </section>`
+    : "";
+
   // Demand map grid
   const sortedCategories = [...profile.categories].sort((a, b) => {
     const da = demandCategories.find(c => c.label === a.label)?.latestDate ?? 0;
@@ -17442,6 +17516,8 @@ ${pulseHtml}
 </div>
 
 ${recentAwardsHtml}
+
+${renewalRadarHtml}
 
 ${analyticsHtml}
 
