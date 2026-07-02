@@ -969,7 +969,7 @@ async function findTenderSearch(keywords: string[], signal?: AbortSignal): Promi
         errors.push(`Find a Tender OCDS page ${page + 1} failed: ${response.status} — continuing with ${releases.length} releases`);
         break;
       }
-      const data = await response.json();
+      const data: any = await response.json();
       if (Array.isArray(data.releases)) releases.push(...data.releases);
       nextUrl = typeof data?.links?.next === "string" && data.links.next.startsWith("https://www.find-tender.service.gov.uk/") ? data.links.next : null;
     }
