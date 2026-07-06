@@ -6317,6 +6317,19 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
 ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
 <meta property="article:published_time" content="${escapeHtml(article.published_at ?? "")}">
 <meta property="article:modified_time" content="${escapeHtml(article.updated_at)}">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": article.title,
+  "description": seoDesc,
+  ...(ogImg ? { "image": ogImg } : {}),
+  "datePublished": article.published_at ?? "",
+  "dateModified": article.updated_at,
+  "author": { "@type": "Organization", "name": "AtlasRevenue", "url": `${BASE_URL}/` },
+  "publisher": { "@type": "Organization", "name": "AtlasRevenue", "url": `${BASE_URL}/` },
+  "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/articles/${article.slug}` },
+}).replace(/</g, "\\u003c")}</script>
 ${faqEntries.length ? `<script type="application/ld+json">${JSON.stringify({
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -8531,10 +8544,11 @@ app.get("/", asyncRoute(async (req, res) => {
       "publisher": { "@id": `${BASE_URL}/#org` }
     },
     {
-      "@type": "Product",
+      "@type": "SoftwareApplication",
       "name": "AtlasRevenue Intelligence Scan",
       "description": "A commercial intelligence scan that maps real UK demand for your products and services and surfaces live public-sector contracts you can win.",
-      "brand": { "@id": `${BASE_URL}/#org` },
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
       "offers": {
         "@type": "Offer",
         "priceCurrency": "GBP",
@@ -17525,7 +17539,14 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(profile.label)} &mdash; AtlasRevenue Desk</title>
+<title>${escapeHtml(profile.label)} — UK ${escapeHtml(profile.label)} Contracts &amp; Demand Intelligence | AtlasRevenue</title>
+<meta name="description" content="Live ${escapeHtml(profile.label).toLowerCase()} contract intelligence and demand signals across the UK. ${awardedCount} awarded contracts tracked, ${uniqueBuyerCount} active buyers. Updated hourly from Contracts Finder and Find a Tender.">
+<link rel="canonical" href="${BASE_URL}/desk/${escapeHtml(profile.slug)}">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${escapeHtml(profile.label)} — UK Contract &amp; Market Intelligence">
+<meta property="og:description" content="Live ${escapeHtml(profile.label).toLowerCase()} procurement data: ${awardedCount} awarded contracts, ${uniqueBuyerCount} buyers, open tenders. Real data, updated hourly.">
+<meta property="og:url" content="${BASE_URL}/desk/${escapeHtml(profile.slug)}">
 <style>
 ${pageShellCss()}
 :root{--paper:#fff;--paper-2:var(--surface);--ink:var(--text);--slate:var(--muted);--accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);}
