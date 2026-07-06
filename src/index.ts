@@ -222,6 +222,10 @@ type ProcurementData = {
     awarded: ProcurementNotice[];
     errors: string[];
   };
+  // Awarded 60→18 months ago with a contract end inside the renewal window.
+  // Kept separate from `awarded` so buyer watchlists and spend stats stay on
+  // the 18-month history; long contracts ending soon live only here.
+  renewalPool?: ProcurementNotice[];
 };
 
 type HomepageSignal = {
@@ -1641,7 +1645,7 @@ async function compileDeskInBackground(profile: DeskProfile): Promise<void> {
   compilingDesks.add(profile.slug);
   try {
     console.log(`[desk] compiling ${profile.slug}`);
-    const data = await pullProcurementData(profile.pinnedProfile);
+    const data = await pullProcurementData(profile.pinnedProfile, undefined, { renewalPool: true });
     const newTotal = data.contractsFinder.open.length + data.contractsFinder.awarded.length + (data.findTender?.notices?.length ?? 0);
     if (newTotal === 0) {
       let oldTotal = 0;
@@ -2594,13 +2598,14 @@ Main goal: ${input.mainGoal || "win public sector contracts"}
 Framework access: ${input.frameworkStatus || "none stated"}
 Last public contract: ${input.lastPublicContract || "none stated"}`;
 
+  // gpt-5 models reject max_tokens (need max_completion_tokens) and non-default
+  // temperature; reasoning tokens also count toward the cap, so 300 truncates to empty.
   const response = await withOpenAiTimeout(signal =>
     openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
-      temperature: 0.1,
-      max_tokens: 300
+      max_completion_tokens: 2000
     }, { signal })
   );
 
@@ -2655,7 +2660,7 @@ const SECTOR_CPV: Record<string, string[]> = {
   "uniforms-workwear":    ["18000000", "18100000", "18130000", "35113000", "18110000"],
 };
 
-async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal): Promise<ProcurementData> {
+async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal, opts: { renewalPool?: boolean } = {}): Promise<ProcurementData> {
   let keywords: string[];
   try {
     keywords = await generateSearchKeywords(input);
@@ -2753,6 +2758,36 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?:
     }
   }
 
+  // Renewal pool: awards from 60→18 months ago whose contract period ends
+  // inside the renewal window. The 18-month awarded pull cannot contain a
+  // 3-year contract ending next quarter — this complement pass can. Desk
+  // compiles only (opts.renewalPool); page-capped because recall on old
+  // awards matters less than not doubling compile time.
+  const renewalPool: ProcurementNotice[] = [];
+  if (opts.renewalPool) {
+    const renewalAwardedFrom = new Date(now.getTime() - 1825 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const windowStart = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+    const windowEnd = now.getTime() + 380 * 24 * 60 * 60 * 1000;
+    const RENEWAL_PAGES = 3;
+    for (const keyword of keywords) {
+      const crit = { ...staticCriteria, keyword, types: ["Contract"], statuses: ["Awarded"], awardedFrom: renewalAwardedFrom, awardedTo: awardedDateFrom };
+      try {
+        for (let p = 0; p < RENEWAL_PAGES; p++) {
+          const { notices } = await contractsFinderPage(crit, keyword, p * 100, 100, signal);
+          renewalPool.push(...notices.filter(n => {
+            if (!n.contractEnd) return false;
+            const t = new Date(n.contractEnd).getTime();
+            return Number.isFinite(t) && t >= windowStart && t <= windowEnd;
+          }));
+          if (notices.length < 100) break;
+        }
+      } catch (error: any) {
+        if ((error as any)?.name === "AbortError") throw error;
+        errors.push(`Renewal search failed for "${keyword}": ${error?.message || error}`);
+      }
+    }
+  }
+
   const companiesHouse = await companiesHouseSearch(input.companyName);
   if (companiesHouse.errors.length) {
     for (const error of companiesHouse.errors) {
@@ -2777,6 +2812,11 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?:
     regions
   );
 
+  const finalRenewalPool = dedupeNotices(renewalPool)
+    .sort((a, b) => new Date(a.contractEnd!).getTime() - new Date(b.contractEnd!).getTime())
+    .slice(0, 120)
+    .map(n => ({ ...n, description: "" }));
+
   return {
     generatedAt: nowIso(),
     quality,
@@ -2788,7 +2828,8 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?:
       open: finalOpen,
       awarded: finalAwarded,
       errors
-    }
+    },
+    ...(opts.renewalPool ? { renewalPool: finalRenewalPool } : {})
   };
 }
 
@@ -10454,6 +10495,18 @@ app.get("/api/leads", asyncRoute(async (req, res) => {
   });
 }));
 
+// Union of the 18-month awarded pull and the older renewal pool, kept to
+// notices whose TITLE matches the desk's category keywords — the same
+// title-only rule every other desk surface uses (description matching leaked
+// off-desk notices: media buying on Construction, policing college on Catering).
+function renewalCandidatesForDesk(profile: DeskProfile, data: ProcurementData): ProcurementNotice[] {
+  const deskKeywords = profile.categories.flatMap(c => c.keywords.map(k => k.toLowerCase()));
+  return [...(data.contractsFinder.awarded || []), ...(data.renewalPool || [])].filter(n =>
+    !isOverseasNotice(n.title, n.buyer || "") &&
+    anyKeywordMatches(n.title.toLowerCase(), deskKeywords)
+  );
+}
+
 // Renewal radar as JSON — awarded contracts on a desk whose contract period
 // ends within the horizon (default 365 days, plus 90-day lookback for lapsed
 // contracts = open retender windows). Feeds the weekly briefing workflow.
@@ -10465,7 +10518,7 @@ app.get("/api/renewals", asyncRoute(async (req, res) => {
   if (!cached) { res.status(503).json({ error: "Desk data is compiling — retry in a minute." }); return; }
   const horizonDays = Math.min(parseInt(String(req.query.horizonDays || "365"), 10) || 365, 730);
   const renewals = computeRenewalRadar(
-    (cached.data.contractsFinder.awarded || []).filter(n => !isOverseasNotice(n.title, n.buyer || "")),
+    renewalCandidatesForDesk(profile, cached.data),
     new Date(),
     { horizonDays, limit: Math.min(parseInt(String(req.query.limit || "12"), 10) || 12, 50) }
   ).map(n => ({
@@ -17503,10 +17556,11 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     : "";
 
   // ── Renewal radar: awarded contracts whose contract period ends within 12
-  // months (or lapsed in the last 90 days = open retender window). Uses the
-  // full awarded pull (not the 365-day slice) — older awards end sooner.
+  // months (or lapsed in the last 90 days = open retender window). Candidates
+  // come from the awarded pull plus the renewalPool complement (awards 60→18
+  // months old), title-filtered to the desk's category keywords.
   const renewalCandidates = computeRenewalRadar(
-    (data?.contractsFinder.awarded || []).filter(n => !isOverseasNotice(n.title, n.buyer || "")),
+    data ? renewalCandidatesForDesk(profile, data) : [],
     new Date()
   );
   const renewalRadarHtml = renewalCandidates.length > 0

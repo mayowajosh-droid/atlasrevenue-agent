@@ -35,13 +35,14 @@ Main goal: ${input.mainGoal || "win public sector contracts"}
 Framework access: ${input.frameworkStatus || "none stated"}
 Last public contract: ${input.lastPublicContract || "none stated"}`;
 
+  // gpt-5 models reject max_tokens (need max_completion_tokens) and non-default
+  // temperature; reasoning tokens also count toward the cap, so 300 truncates to empty.
   const response = await withOpenAiTimeout(signal =>
     openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
-      temperature: 0.1,
-      max_tokens: 300
+      max_completion_tokens: 2000
     }, { signal })
   );
 
