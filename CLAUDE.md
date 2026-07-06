@@ -61,7 +61,10 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 `validateReportConsistency()` checks for conflicting grades/verdicts before PDF export. Returns HTTP 422 if invalid. Never bypass or remove this check.
 
 ### Title-only matching for live signals
-`deskPage` live signal filter, `subPage` open notices, and `refreshHomepageSignals()` all use title-only keyword matching. Description-level matching caused false positives (home care on Facilities desk, property consultancy on Energy desk, landscaping on Finance desk). Do not revert.
+`deskPage` live signal filter, `subPage` open notices, `refreshHomepageSignals()`, and the desk Renewal Radar (`renewalCandidatesForDesk`) all use title-only keyword matching. Description-level matching caused false positives (home care on Facilities desk, property consultancy on Energy desk, landscaping on Finance desk, media buying on Construction renewals). Do not revert.
+
+### Renewal radar sources
+Renewal candidates = 18-month awarded pull ∪ `data.renewalPool` (awards 60→18 months old whose contract end falls in the renewal window, pulled page-capped at desk compile via `pullProcurementData(..., { renewalPool: true })`), title-filtered by desk category keywords in `renewalCandidatesForDesk()`. The complement pool exists because a 3-year contract ending next quarter was awarded outside the 18-month window — without it the radar misses most long contracts. Scans do not pull the pool. Force-refresh one desk with `POST /admin/desks/:slug/rebuild`.
 
 ### CPV search is supplementary
 `SECTOR_CPV` map runs a parallel CPV-code pass on Contracts Finder after the keyword loop. Kept intentionally tight — broad CPV codes cause noisy cross-sector matches. Do not widen without testing against known-good results.

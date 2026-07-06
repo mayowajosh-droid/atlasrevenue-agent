@@ -68,6 +68,7 @@ import {
   initSupplierGraphTables, listSuppliers, getSupplierProfile, getSupplierEntityById,
   syncSuppliersFromHistory,
 } from "./intelligence/supplier-graph/index.js";
+import { initOutboundTables, startOutboundWorkers, registerOutboundRoutes } from "./outbound/index.js";
 import {
   initGovernanceTables, upsertMetadataCatalog, getMetadataCatalog,
   runQualityChecks, getLatestQualityResults, writeAuditLog, getAuditLog,
@@ -24432,6 +24433,7 @@ initDb()
   .then(() => pool ? initRelationshipTables(pool) : Promise.resolve())
   .then(() => initGeospatialTables())
   .then(() => initSupplierGraphTables())
+  .then(() => initOutboundTables())
   .then(async () => {
     if (pool) {
       await initWebhookTables(pool);
@@ -24464,12 +24466,14 @@ initDb()
       startSignalsWorker();
       if (redisConnection) {
         startIngestScheduler(redisConnection);
+        startOutboundWorkers();
       }
     } else {
       console.log("[queue] worker disabled by RUN_WORKER=false");
     }
 
     if (RUN_WEB) {
+      registerOutboundRoutes(app);
       app.listen(PORT, () => {
         console.log(`[server] AtlasRevenue Agent running on port ${PORT}`);
         // Warm up live desk caches on startup — staggered to avoid hammering Contracts Finder.

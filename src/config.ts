@@ -29,6 +29,12 @@ export const SENTRY_ENABLED = Boolean(SENTRY_DSN);
 export const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 export const DESK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
+export const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || "";
+export const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || "";
+export const OUTBOUND_REPORT_EMAIL = process.env.OUTBOUND_REPORT_EMAIL || "";
+export const OUTBOUND_ENABLED = process.env.OUTBOUND_ENABLED === "true";
+export const OUTBOUND_DAILY_LIMIT = Number(process.env.OUTBOUND_DAILY_LIMIT || 25);
+
 export const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 if (SENTRY_ENABLED) {
@@ -73,6 +79,10 @@ export const alertQueue = redisConnection
 
 export const signalQueue = redisConnection
   ? new Queue("atlasrevenue-signals", { connection: redisConnection as any })
+  : null;
+
+export const outboundQueue = redisConnection
+  ? new Queue("atlasrevenue-outbound", { connection: redisConnection as any })
   : null;
 
 export function asyncRoute(handler: import("./types.js").AsyncRouteHandler) {
