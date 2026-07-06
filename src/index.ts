@@ -17568,13 +17568,13 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(profile.label)} — UK ${escapeHtml(profile.label)} Contracts &amp; Demand Intelligence | AtlasRevenue</title>
-<meta name="description" content="Live ${escapeHtml(profile.label).toLowerCase()} contract intelligence and demand signals across the UK. ${awardedCount} awarded contracts tracked, ${uniqueBuyerCount} active buyers. Updated hourly from Contracts Finder and Find a Tender.">
+<title>${escapeHtml(profile.label)} Contracts UK — Live Intelligence | AtlasRevenue</title>
+<meta name="description" content="Live ${escapeHtml(profile.label).toLowerCase()} contract intelligence and demand signals across the UK. ${awardedCount > 0 ? `${awardedCount} awarded contracts tracked, ${uniqueBuyerCount} active buyers. ` : ""}Updated hourly from Contracts Finder and Find a Tender.">
 <link rel="canonical" href="${BASE_URL}/desk/${escapeHtml(profile.slug)}">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(profile.label)} — UK Contract &amp; Market Intelligence">
-<meta property="og:description" content="Live ${escapeHtml(profile.label).toLowerCase()} procurement data: ${awardedCount} awarded contracts, ${uniqueBuyerCount} buyers, open tenders. Real data, updated hourly.">
+<meta property="og:description" content="Live ${escapeHtml(profile.label).toLowerCase()} procurement data: ${awardedCount > 0 ? `${awardedCount} awarded contracts, ${uniqueBuyerCount} buyers, ` : ""}open tenders and demand signals. Real data, updated hourly.">
 <meta property="og:url" content="${BASE_URL}/desk/${escapeHtml(profile.slug)}">
 <style>
 ${pageShellCss()}
