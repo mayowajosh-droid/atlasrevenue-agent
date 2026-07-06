@@ -1642,6 +1642,30 @@ async function compileDeskInBackground(profile: DeskProfile): Promise<void> {
   try {
     console.log(`[desk] compiling ${profile.slug}`);
     const data = await pullProcurementData(profile.pinnedProfile);
+    const newTotal = data.contractsFinder.open.length + data.contractsFinder.awarded.length + (data.findTender?.notices?.length ?? 0);
+    if (newTotal === 0) {
+      let oldTotal = 0;
+      try {
+        if (pool) {
+          const r = await pool.query<{ data: ProcurementData }>(`SELECT data FROM desk_cache WHERE slug = $1`, [profile.slug]);
+          if (r.rows[0]) {
+            const old = r.rows[0].data;
+            oldTotal = (old.contractsFinder?.open?.length ?? 0) + (old.contractsFinder?.awarded?.length ?? 0) + (old.findTender?.notices?.length ?? 0);
+          }
+        } else {
+          const mem = deskCacheMemStore.get(profile.slug);
+          if (mem) {
+            oldTotal = (mem.data.contractsFinder?.open?.length ?? 0) + (mem.data.contractsFinder?.awarded?.length ?? 0) + (mem.data.findTender?.notices?.length ?? 0);
+          }
+        }
+      } catch {}
+      if (oldTotal > 0) {
+        if (pool) await pool.query(`UPDATE desk_cache SET cached_at = NOW() WHERE slug = $1`, [profile.slug]);
+        console.warn(`[desk] compile returned 0 notices for ${profile.slug} but existing cache has ${oldTotal} — refreshed TTL, keeping old data`);
+        return;
+      }
+      console.warn(`[desk] compile returned 0 notices for ${profile.slug} — caching anyway (no previous data)`);
+    }
     await setDeskCache(profile.slug, data);
     console.log(`[desk] compiled ${profile.slug} — ${data.contractsFinder.open.length} open, ${data.contractsFinder.awarded.length} awarded`);
   } catch (err: any) {
@@ -12120,10 +12144,15 @@ app.post("/admin/desks/rebuild", requireAdmin, asyncRoute(async (_req, res) => {
   if (pool) await pool.query("TRUNCATE TABLE desk_cache");
   deskCacheMemStore.clear();
   const liveDesks = DESK_PROFILES.filter(d => d.live);
+  let delay = 0;
   for (const profile of liveDesks) {
-    compileDeskInBackground(profile).catch(err => console.error(`[desk] rebuild failed for ${profile.slug}`, err));
+    setTimeout(() => {
+      compileDeskInBackground(profile).catch(err => console.error(`[desk] rebuild failed for ${profile.slug}`, err));
+    }, delay);
+    delay += 10_000;
   }
-  res.json({ ok: true, message: `Cache cleared. Rebuilding ${liveDesks.length} desks in background.` });
+  const estMinutes = Math.ceil((liveDesks.length * 10) / 60);
+  res.json({ ok: true, message: `Cache cleared. Rebuilding ${liveDesks.length} desks staggered over ~${estMinutes} min.` });
 }));
 
 app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
