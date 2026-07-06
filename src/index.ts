@@ -12155,6 +12155,16 @@ app.post("/admin/desks/rebuild", requireAdmin, asyncRoute(async (_req, res) => {
   res.json({ ok: true, message: `Cache cleared. Rebuilding ${liveDesks.length} desks staggered over ~${estMinutes} min.` });
 }));
 
+// Rebuild a single desk — clears its cache row so the compile always writes fresh data.
+app.post("/admin/desks/:slug/rebuild", requireAdmin, asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug && d.live);
+  if (!profile) { res.status(404).json({ error: "Unknown desk slug" }); return; }
+  if (pool) await pool.query(`DELETE FROM desk_cache WHERE slug = $1`, [profile.slug]);
+  deskCacheMemStore.delete(profile.slug);
+  compileDeskInBackground(profile).catch(err => console.error(`[desk] rebuild failed for ${profile.slug}`, err));
+  res.json({ ok: true, message: `Cache cleared for ${profile.slug}. Recompiling in background — check in ~90s.` });
+}));
+
 app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
   await deleteScan(req.params.id);
   const token = String(req.query.token || "");
