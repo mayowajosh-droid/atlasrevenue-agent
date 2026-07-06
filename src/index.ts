@@ -8202,17 +8202,41 @@ app.get("/sitemap.xml", asyncRoute(async (_req, res) => {
   const staticUrls = ["/", "/pricing", "/sectors", "/preview", "/scan", "/scan/sample", "/atlas", "/charts", "/articles", "/market-intelligence", "/market/retrofit", "/market/plumbing", "/market/facilities"];
   const deskUrls = DESK_PROFILES.filter(d => d.live).map(d => `/desk/${d.slug}`);
   const sectorUrls = SERVICE_SECTORS.map(s => `/sector/${s.slug}`);
-  let articleSlugs: string[] = [];
+  let articleRows: { slug: string; published_at: Date | null; updated_at: Date | null }[] = [];
   if (pool) {
     try {
-      const r = await pool.query<{ slug: string }>(`SELECT slug FROM articles WHERE published_at IS NOT NULL ORDER BY published_at DESC LIMIT 500`);
-      articleSlugs = r.rows.map(row => `/articles/${row.slug}`);
-    } catch { articleSlugs = []; }
+      const r = await pool.query<{ slug: string; published_at: Date | null; updated_at: Date | null }>(`SELECT slug, published_at, updated_at FROM articles WHERE published_at IS NOT NULL ORDER BY published_at DESC LIMIT 500`);
+      articleRows = r.rows;
+    } catch { articleRows = []; }
   }
-  const urls = [...staticUrls, ...deskUrls, ...sectorUrls, ...articleSlugs];
   const today = new Date().toISOString().slice(0, 10);
+  const staticDate = "2026-07-02";
+  const articleDates = new Map(articleRows.map(r => {
+    const d = r.updated_at ?? r.published_at;
+    return [`/articles/${r.slug}`, d ? new Date(d as unknown as string).toISOString().slice(0, 10) : staticDate];
+  }));
+  const urls = [...staticUrls, ...deskUrls, ...sectorUrls, ...articleRows.map(r => `/articles/${r.slug}`)];
+  const getLastmod = (u: string): string => {
+    if (u === "/") return today;
+    if (articleDates.has(u)) return articleDates.get(u)!;
+    if (u.startsWith("/desk/")) return today;
+    return staticDate;
+  };
+  const getPriority = (u: string): string => {
+    if (u === "/") return "1.0";
+    if (u === "/pricing" || u === "/scan" || u === "/articles") return "0.9";
+    if (u.startsWith("/desk/")) return "0.8";
+    if (u.startsWith("/articles/")) return "0.8";
+    return "0.6";
+  };
+  const getFreq = (u: string): string => {
+    if (u === "/") return "daily";
+    if (u.startsWith("/desk/")) return "daily";
+    if (u.startsWith("/articles/")) return "monthly";
+    return "weekly";
+  };
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
-    .map(u => `  <url><loc>${BASE_URL}${u}</loc><lastmod>${today}</lastmod><changefreq>${u === "/" ? "daily" : "weekly"}</changefreq><priority>${u === "/" ? "1.0" : "0.7"}</priority></url>`)
+    .map(u => `  <url><loc>${BASE_URL}${u}</loc><lastmod>${getLastmod(u)}</lastmod><changefreq>${getFreq(u)}</changefreq><priority>${getPriority(u)}</priority></url>`)
     .join("\n")}\n</urlset>\n`;
   res.type("application/xml").send(body);
 }));
