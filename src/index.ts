@@ -16569,6 +16569,16 @@ async function nicheMarketWithContacts(cfg: NicheConfig, deskSlug: string, req: 
   res.type("html").send(nicheMarketPage(cfg, cached, getAuthUser(req), contacts));
 }
 
+app.get("/api/debug/buyer-contacts", asyncRoute(async (req, res) => {
+  if (req.query.token !== process.env.ADMIN_TOKEN) { res.status(401).json({ error: "unauthorized" }); return; }
+  const cached = await getDeskCache("construction").catch(() => null);
+  const profiles = buildNicheBuyerProfiles(NICHE_RETROFIT, cached?.data ?? undefined);
+  const names = profiles.slice(0, 6).map(bp => bp.buyer);
+  const domains = names.map(n => ({ name: n, orgType: buyerOrgType(n), domain: publicSectorDomain(n) }));
+  const contacts = await lookupBuyerContacts(names);
+  res.json({ profileCount: profiles.length, names, domains, contactCount: contacts.size, contacts: Object.fromEntries(contacts) });
+}));
+
 app.get("/market/retrofit", asyncRoute(async (req, res) => {
   await nicheMarketWithContacts(NICHE_RETROFIT, "construction", req, res);
 }));
