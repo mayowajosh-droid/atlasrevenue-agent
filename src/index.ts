@@ -1397,15 +1397,15 @@ async function initDb() {
   `);
 
   try {
-    const legacyCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_name'`);
-    if (legacyCols.rowCount && legacyCols.rowCount > 0) {
-      await pool.query(`DROP TABLE IF EXISTS buyer_contacts CASCADE`);
-      console.log("[db] dropped legacy buyer_contacts (owned by email-discovery module now)");
+    const bcSchema = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_name'`);
+    if (bcSchema.rowCount === 0) {
+      await pool.query(`ALTER TABLE IF EXISTS buyer_contacts RENAME TO buyer_contacts_legacy`);
+      console.log("[db] renamed old buyer_contacts → buyer_contacts_legacy");
     }
-  } catch (err) { console.warn("[db] legacy buyer_contacts check failed:", String(err).slice(0, 100)); }
+  } catch { /* table may not exist yet */ }
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS procurement_contact_cache (
+    CREATE TABLE IF NOT EXISTS buyer_contacts (
       id TEXT PRIMARY KEY,
       buyer_name TEXT NOT NULL,
       contact_name TEXT,
