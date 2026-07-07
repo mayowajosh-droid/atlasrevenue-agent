@@ -1396,6 +1396,17 @@ async function initDb() {
     )
   `);
 
+  try {
+    const tableExists = await pool.query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'buyer_contacts'`);
+    if (tableExists.rowCount && tableExists.rowCount > 0) {
+      const modernCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_entity_id'`);
+      if (!modernCols.rowCount || modernCols.rowCount === 0) {
+        await pool.query(`DROP TABLE IF EXISTS buyer_contacts CASCADE`);
+        console.log("[db] dropped stale buyer_contacts (missing buyer_entity_id) so email-discovery can recreate it");
+      }
+    }
+  } catch (err) { console.warn("[db] buyer_contacts migration check failed:", String(err).slice(0, 200)); }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS buyer_contact_cache (
       id TEXT PRIMARY KEY,
