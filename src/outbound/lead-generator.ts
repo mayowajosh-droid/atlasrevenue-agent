@@ -409,9 +409,11 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   ).catch(() => ({ rowCount: 0 }));
   const infoNuked = nuked.rowCount || 0;
 
-  // Real supplier discovery via OpenAI web_search. Capped + parallelized to keep
-  // the request under HTTP timeout and to protect the OpenAI bill.
-  const DISCOVER_CAP = Number(process.env.OUTBOUND_DISCOVER_CAP || 20);
+  // Real supplier discovery via OpenAI web_search. Runs in the BACKGROUND so
+  // the HTTP request returns quickly (Railway edge cuts long-running requests
+  // at ~60s). Discovery updates the DB in-place — refresh the admin UI to see
+  // rows populate.
+  const DISCOVER_CAP = Number(process.env.OUTBOUND_DISCOVER_CAP || 50);
   const DISCOVER_CONCURRENCY = Number(process.env.OUTBOUND_DISCOVER_CONCURRENCY || 6);
   const needsDiscovery = await pool.query<{ id: string; company_name: string }>(
     `SELECT id, company_name FROM outbound_leads
@@ -422,36 +424,45 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     [DISCOVER_CAP],
   );
 
-  let discovered = 0;
-  let discoveredWebsite = 0;
-  let discoveredEmail = 0;
-
-  const queue = [...needsDiscovery.rows];
-  const workers = Array.from({ length: Math.min(DISCOVER_CONCURRENCY, queue.length) }, async () => {
-    while (queue.length > 0) {
-      const lead = queue.shift();
-      if (!lead) break;
-      try {
-        const found = await discoverRealSupplierContact(lead.company_name);
-        if (!found.website && !found.email) continue;
-        const sets: string[] = [];
-        const vals: unknown[] = [];
-        let p = 1;
-        if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); discoveredWebsite++; }
-        if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); discoveredEmail++; }
-        if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
-        if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
-        if (sets.length === 0) continue;
-        sets.push(`updated_at = now()`);
-        vals.push(lead.id);
-        if (pool) await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
-        discovered++;
-      } catch (err) {
-        console.error(`[outbound] discovery failed for ${lead.company_name}:`, String(err).slice(0, 120));
-      }
-    }
-  });
-  await Promise.all(workers);
+  if (needsDiscovery.rows.length > 0) {
+    const queue = [...needsDiscovery.rows];
+    const started = Date.now();
+    console.log(`[outbound] discovery: kicking off ${queue.length} leads in background (concurrency ${DISCOVER_CONCURRENCY})`);
+    void (async () => {
+      let discoveredLocal = 0, websiteLocal = 0, emailLocal = 0;
+      const workers = Array.from({ length: Math.min(DISCOVER_CONCURRENCY, queue.length) }, async () => {
+        while (queue.length > 0) {
+          const lead = queue.shift();
+          if (!lead) break;
+          try {
+            const found = await discoverRealSupplierContact(lead.company_name);
+            if (!found.website && !found.email) continue;
+            const sets: string[] = [];
+            const vals: unknown[] = [];
+            let p = 1;
+            if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); websiteLocal++; }
+            if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); emailLocal++; }
+            if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
+            if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
+            if (sets.length === 0) continue;
+            sets.push(`updated_at = now()`);
+            vals.push(lead.id);
+            if (pool) await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
+            discoveredLocal++;
+          } catch (err) {
+            console.error(`[outbound] discovery failed for ${lead.company_name}:`, String(err).slice(0, 120));
+          }
+        }
+      });
+      await Promise.all(workers);
+      const elapsed = ((Date.now() - started) / 1000).toFixed(1);
+      console.log(`[outbound] discovery done in ${elapsed}s: ${discoveredLocal} leads (${websiteLocal} websites, ${emailLocal} emails)`);
+    })();
+  }
+  const discovered = 0;
+  const discoveredWebsite = 0;
+  const discoveredEmail = 0;
+  const discoveryQueued = needsDiscovery.rows.length;
 
   const debug = {
     supplierCount: suppliers.rows.length,
@@ -462,7 +473,7 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     discovered,
     discoveredWebsite,
     discoveredEmail,
-    discoverAttempts: needsDiscovery.rows.length,
+    discoveryQueued,
     noEmailCount: noEmail.rows.length,
     apolloAvailable: !!apolloKey,
   };
