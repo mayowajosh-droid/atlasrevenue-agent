@@ -1396,10 +1396,12 @@ async function initDb() {
     )
   `);
 
-  const bcCheck = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_name'`);
-  if (bcCheck.rowCount === 0) {
-    await pool.query(`DROP TABLE IF EXISTS buyer_contacts`);
-  }
+  try {
+    const bcCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_name'`);
+    if (bcCols.rowCount === 0) {
+      await pool.query(`DROP TABLE IF EXISTS buyer_contacts`);
+    }
+  } catch { /* schema check failed, table may not exist yet */ }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS buyer_contacts (
       id TEXT PRIMARY KEY,
