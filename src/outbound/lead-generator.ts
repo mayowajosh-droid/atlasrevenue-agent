@@ -8,6 +8,7 @@ import type { SupplierEntity } from "../intelligence/supplier-graph/types.js";
 import { getOutboundConfig, setOutboundConfig, insertLead } from "./db.js";
 import { qualifyLeadTriggerPair, DESK_SUPPLIER_SIC_PREFIXES } from "./qualification.js";
 import { checkSuppression } from "./suppression.js";
+import { discoverRealSupplierContact } from "./supplier-discovery.js";
 import type { OutboundLead } from "./types.js";
 
 const SEGMENT_TO_DESK: Record<string, string> = {
@@ -408,12 +409,52 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   ).catch(() => ({ rowCount: 0 }));
   const infoNuked = nuked.rowCount || 0;
 
+  // Real supplier discovery via OpenAI web_search. Capped to protect the OpenAI bill.
+  // Only runs for leads that still have no verified website and no contact email.
+  const DISCOVER_CAP = Number(process.env.OUTBOUND_DISCOVER_CAP || 50);
+  const needsDiscovery = await pool.query<{ id: string; company_name: string }>(
+    `SELECT id, company_name FROM outbound_leads
+     WHERE status IN ('qualified','approved')
+       AND website IS NULL AND contact_email IS NULL
+     ORDER BY qualification_score DESC
+     LIMIT $1`,
+    [DISCOVER_CAP],
+  );
+
+  let discovered = 0;
+  let discoveredWebsite = 0;
+  let discoveredEmail = 0;
+  for (const lead of needsDiscovery.rows) {
+    try {
+      const found = await discoverRealSupplierContact(lead.company_name);
+      if (!found.website && !found.email) continue;
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      let p = 1;
+      if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); discoveredWebsite++; }
+      if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); discoveredEmail++; }
+      if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
+      if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
+      if (sets.length === 0) continue;
+      sets.push(`updated_at = now()`);
+      vals.push(lead.id);
+      await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
+      discovered++;
+    } catch (err) {
+      console.error(`[outbound] discovery failed for ${lead.company_name}:`, String(err).slice(0, 120));
+    }
+  }
+
   const debug = {
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
     apolloFound,
     infoNuked,
+    discovered,
+    discoveredWebsite,
+    discoveredEmail,
+    discoverAttempts: needsDiscovery.rows.length,
     noEmailCount: noEmail.rows.length,
     apolloAvailable: !!apolloKey,
   };

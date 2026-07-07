@@ -128,15 +128,25 @@ export async function initOutboundTables(): Promise<void> {
     );
   `);
 
-  // One-shot backfill: nuke fake info@ emails injected by the old fallback logic.
+  // One-shot backfill: nuke fake info@ emails and pattern-guessed websites
+  // that the old bestGuessDomain fallback injected. Real websites can only come
+  // from Apollo or an actual scrape — those aren't in play yet, so anything
+  // currently set is fabricated.
   try {
-    const nuked = await pool.query(
+    const emailsNuked = await pool.query(
       `UPDATE outbound_leads SET contact_email = NULL, updated_at = now() WHERE contact_email LIKE 'info@%'`,
     );
-    if (nuked.rowCount && nuked.rowCount > 0) {
-      console.log(`[outbound] nuked ${nuked.rowCount} fake info@ contact emails`);
+    if (emailsNuked.rowCount && emailsNuked.rowCount > 0) {
+      console.log(`[outbound] nuked ${emailsNuked.rowCount} fake info@ contact emails`);
     }
-  } catch (err) { console.warn("[outbound] info@ backfill skipped:", String(err).slice(0, 120)); }
+    const websitesNuked = await pool.query(
+      `UPDATE outbound_leads SET website = NULL, updated_at = now()
+       WHERE website IS NOT NULL AND contact_name IS NULL AND contact_email IS NULL`,
+    );
+    if (websitesNuked.rowCount && websitesNuked.rowCount > 0) {
+      console.log(`[outbound] nuked ${websitesNuked.rowCount} pattern-guessed websites (no verified contact source)`);
+    }
+  } catch (err) { console.warn("[outbound] backfill skipped:", String(err).slice(0, 120)); }
 }
 
 // ── Config ──
