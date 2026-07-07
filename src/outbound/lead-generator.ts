@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import dns from "dns/promises";
 import fs from "fs";
 import path from "path";
 import { pool } from "../config.js";
@@ -9,6 +10,27 @@ import { getOutboundConfig, setOutboundConfig, insertLead } from "./db.js";
 import { qualifyLeadTriggerPair, DESK_SUPPLIER_SIC_PREFIXES } from "./qualification.js";
 import { checkSuppression } from "./suppression.js";
 import type { OutboundLead } from "./types.js";
+
+function guessDomains(companyName: string): string[] {
+  const stripped = companyName
+    .replace(/\b(limited|ltd|plc|llp|inc|group|holdings|uk|services|solutions)\b/gi, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim();
+  const words = stripped.split(/\s+/).filter(Boolean).map(w => w.toLowerCase());
+  if (words.length === 0) return [];
+  const joined = words.join("");
+  const hyphenated = words.join("-");
+  const first = words[0];
+  const candidates = new Set([
+    `${joined}.co.uk`, `${joined}.com`, `${joined}.org.uk`,
+    `${hyphenated}.co.uk`, `${hyphenated}.com`,
+  ]);
+  if (first !== joined) {
+    candidates.add(`${first}.co.uk`);
+    candidates.add(`${first}.com`);
+  }
+  return [...candidates];
+}
 
 const SEGMENT_TO_DESK: Record<string, string> = {
   "Facilities & Cleaning": "facilities",
@@ -338,10 +360,45 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     }
   }
 
+  // Second pass: guess domains from company names for leads still missing email
+  const noEmail = await pool.query<{ id: string; company_name: string }>(
+    `SELECT id, company_name FROM outbound_leads
+     WHERE status IN ('qualified','approved') AND contact_email IS NULL
+     LIMIT 500`,
+  );
+
+  let dnsChecked = 0;
+  let dnsFound = 0;
+  for (const lead of noEmail.rows) {
+    const candidates = guessDomains(lead.company_name);
+    for (const domain of candidates) {
+      try {
+        const mx = await dns.resolveMx(domain).catch(() => []);
+        if (mx.length > 0) {
+          try {
+            await pool.query(
+              `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
+              [`https://${domain}`, `info@${domain}`, lead.id],
+            );
+          } catch { /* skip constraint violations */ }
+          dnsFound++;
+          stats.websiteFound++;
+          stats.emailSet++;
+          break;
+        }
+      } catch { /* DNS lookup failed, try next */ }
+      dnsChecked++;
+      if (dnsChecked > 2000) break;
+    }
+    if (dnsChecked > 2000) break;
+  }
+
   const debug = {
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
+    dnsChecked,
+    dnsFound,
   };
 
   console.log(`[outbound] enrichment complete:`, stats, debug);

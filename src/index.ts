@@ -7540,7 +7540,8 @@ h1 b{color:var(--brand);font-weight:500}
 </html>`;
 }
 
-function reportPage(scan: ScanRecord) {
+function reportPage(scan: ScanRecord, opts?: { gated?: boolean }) {
+  const gated = opts?.gated ?? false;
   if (scan.status === "pending" || scan.status === "running") return waitingPage(scan);
   const data = scan.procurement_json as ProcurementData | null;
   const sectorLens = resolveSectorFromScan(scan).label;
@@ -7572,9 +7573,24 @@ function reportPage(scan: ScanRecord) {
     ? stripEdpFromMarkdown(stripReportTitleFromMarkdown(cleanMarkdown))
     : null;
 
-  const content = bodyMarkdown
+  const fullContent = bodyMarkdown
     ? markdownToHtml(bodyMarkdown)
     : `<p>Status: <strong>${escapeHtml(scan.status)}</strong></p><p>${scan.error_message ? escapeHtml(scan.error_message) : "Still running. Refresh shortly."}</p>`;
+
+  // Split content into free (sections 2-3) and gated (sections 4-10) portions.
+  // Section 4 heading is "Source-Backed" in the markdown → rendered as <h2>4. Source-Backed...
+  // We match the h2 tag that starts section 4 (numbered or unnumbered).
+  let freeContent = fullContent;
+  let gatedContent = "";
+  if (gated && bodyMarkdown) {
+    const gateIdx = fullContent.search(/<h2>[^<]*(?:4\.\s*Source|Source-Backed|Source-labelled)/i);
+    if (gateIdx >= 0) {
+      freeContent = fullContent.slice(0, gateIdx);
+      gatedContent = fullContent.slice(gateIdx);
+    }
+  }
+
+  const totalOpportunities = (data?.contractsFinder?.open?.length || 0) + (data?.contractsFinder?.awarded?.length || 0) + (data?.findTender?.notices?.length || 0);
 
   return `<!doctype html>
 <html lang="en">
@@ -8089,6 +8105,18 @@ function reportPage(scan: ScanRecord) {
     ${oppCardCss()}
     ${winBriefCss()}
     ${reportChaseNowCss()}
+
+    /* Report paywall gate */
+    .rpt-gate{position:relative;min-height:320px}
+    .rpt-gate-blur{filter:blur(6px);opacity:.45;pointer-events:none;user-select:none}
+    .rpt-gate-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;background:linear-gradient(180deg,rgba(5,7,11,.40) 0%,rgba(5,7,11,.92) 50%);padding:48px 24px;z-index:10}
+    .rpt-gate-icon{font-size:28px;line-height:1;color:var(--brand);opacity:.85}
+    .rpt-gate-title{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--text);letter-spacing:-.01em}
+    .rpt-gate-msg{font-size:14px;color:var(--text-mid);line-height:1.65;max-width:36em}
+    .rpt-gate-cta{display:inline-block;background:var(--brand);color:#fff;font-family:var(--sans);font-size:15px;font-weight:600;padding:14px 36px;border:0;text-decoration:none;letter-spacing:.01em;margin-top:4px;transition:.18s}
+    .rpt-gate-cta:hover{background:var(--brand-hot)}
+    .rpt-gate-sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+    @media print{.rpt-gate-overlay{display:none !important}.rpt-gate-blur{filter:none;opacity:1;pointer-events:auto;user-select:auto}}
   </style>
 </head>
 <body>
@@ -8153,12 +8181,23 @@ function reportPage(scan: ScanRecord) {
     ${data && scan.status === "completed" ? renderRegionHeatMap(data, scan) : ""}
 
     <section class="report">
-      ${content}
+      ${freeContent}
+      ${gated && gatedContent ? `
+      <div class="rpt-gate">
+        <div class="rpt-gate-blur">${gatedContent}</div>
+        <div class="rpt-gate-overlay">
+          <div class="rpt-gate-icon">&#x1F512;</div>
+          <div class="rpt-gate-title">Unlock the full report</div>
+          <div class="rpt-gate-msg">Your scan found ${totalOpportunities > 0 ? totalOpportunities : "multiple"} opportunities. Get the full buyer watchlist, outreach pack, and 30-day action plan.</div>
+          <a href="/checkout?plan=payg&amp;scan=${escapeHtml(scan.id)}" class="rpt-gate-cta">Unlock full report &mdash; &pound;29 &rarr;</a>
+          <div class="rpt-gate-sub">One-time purchase &middot; PDF download included</div>
+        </div>
+      </div>` : gated ? "" : gatedContent}
     </section>
 
-    ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
+    ${gated ? "" : (scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : "")}
 
-    ${((scan.input_json as any)?.scanMode ?? "both") === "intelligence" ? "" : `
+    ${gated ? "" : (((scan.input_json as any)?.scanMode ?? "both") === "intelligence" ? "" : `
     ${data ? renderScanSpendTrend(data) : ""}
 
     ${data ? renderBuyerConcentration(data) : ""}
@@ -8183,11 +8222,11 @@ function reportPage(scan: ScanRecord) {
       };
       const scored = scoreAndBucketNotices(allNotices.map(normaliseFromProcurementNotice), scanCtx);
       return renderChaseNowPanel(scored, scanCtx);
-    })()}`}
+    })()}`)}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
 
-    ${scan.status === "completed" ? `
+    ${scan.status === "completed" && !gated ? `
     <div class="no-print" style="margin:40px auto;max-width:680px;padding:24px 28px;background:var(--surface-2);border:1px solid var(--border-2)">
       <h3 style="margin-top:0;font-family:var(--sans);font-weight:800;color:var(--text)">Get weekly opportunity alerts</h3>
       <p style="color:var(--muted);margin-bottom:16px">We'll re-scan Contracts Finder every 7 days and email you when new tenders match your profile.</p>
@@ -8600,12 +8639,12 @@ app.get("/", asyncRoute(async (req, res) => {
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AtlasRevenue">
-<meta property="og:title" content="Know exactly who wants what you sell — before your competitors do.">
+<meta property="og:title" content="Your competitors are winning contracts you don't know about — AtlasRevenue">
 <meta property="og:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
 <meta property="og:url" content="${BASE_URL}/">
 <meta property="og:image" content="${BASE_URL}/og-cover.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Know exactly who wants what you sell — AtlasRevenue">
+<meta name="twitter:title" content="Your competitors are winning contracts you don't know about — AtlasRevenue">
 <meta name="twitter:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
 <meta name="twitter:image" content="${BASE_URL}/og-cover.png">
 <script type="application/ld+json">${JSON.stringify({
@@ -8917,12 +8956,12 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="hero-grad"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Buyer intent &middot; Demand detection &middot; Real UK data</div>
-      <h1>Know exactly who wants <br>what you sell <em>before your <br>competitors do.</em></h1>
-      <p class="lede">AtlasRevenue finds buyers showing evidence-backed demand before they publicly ask for suppliers. We map intent signals, named buyers, spend patterns, and live opportunities across UK markets — so you know who to approach, what to say, and when to move. One sourced scan. No guesses.</p>
+      <div class="eyebrow">Procurement intelligence &middot; Contracts Finder &middot; Find a Tender</div>
+      <h1>Your competitors are winning <br>contracts <em>you don&rsquo;t know about.</em></h1>
+      <p class="lede">AtlasRevenue scans Contracts Finder and Find a Tender daily. We show you which buyers are spending, who holds the work now, and when it comes back around &mdash; so you can chase it before anyone else.</p>
       <div class="hero-actions">
-        <a class="btn-primary" href="/preview">See who's buying &mdash; free &rarr;</a>
-        <a href="/scan" style="display:inline-flex;align-items:center;padding:0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:#ECE6D6;text-decoration:none;border-bottom:1px solid rgba(180,146,78,.5)">Run a full scan</a>
+        <a class="btn-primary" href="/scan">Run a free scan &rarr;</a>
+        <a href="/articles" style="display:inline-flex;align-items:center;padding:0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:#ECE6D6;text-decoration:none;border-bottom:1px solid rgba(180,146,78,.5)">See how it works</a>
         ${sampleLink}
       </div>
       <div class="chips">
@@ -8970,42 +9009,6 @@ ${pageShellHeader(null, homepageAuth)}
       ${homeMktCardsHtml}
       <a href="/atlas" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">Explore Atlas intelligence &rarr;</a>
     </div>
-  </div>
-</section>
-<section style="background:var(--surface);border-bottom:1px solid var(--border)">
-  <div class="wrap" style="padding:72px 40px">
-    <div style="text-align:center;max-width:640px;margin:0 auto 48px">
-      <div class="eyebrow">Two ways to win</div>
-      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:12px 0 14px;color:var(--text)">Whatever you sell, the demand is already in the data.</h2>
-      <p style="color:var(--muted);font-size:16px;line-height:1.6">Pick the scan that fits how you make money. Both are built on the same real UK datasets — and both end with a 30-day plan to act on what they find.</p>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div style="background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--brand);padding:34px 32px;display:flex;flex-direction:column">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:14px">Market demand intelligence</div>
-        <h3 style="font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.15;color:var(--text);margin-bottom:12px">For anyone selling a product or service</h3>
-        <p style="color:var(--text-mid);font-size:15px;line-height:1.6;margin-bottom:20px">Find out who is buying what you sell, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with named segments, real numbers, and a regional demand heat map.</p>
-        <ul style="list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:9px">
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Sourced demand signals (DVLA, ONS, Land Registry, Companies House)</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Buyer watchlist — named segments to approach now</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Money Map: fastest routes to first revenue</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Regional demand heat map + 30-day plan</li>
-        </ul>
-        <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Map my market demand &rarr;</a>
-      </div>
-      <div style="background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--hero-cta);padding:34px 32px;display:flex;flex-direction:column">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:14px">Public-sector contracts</div>
-        <h3 style="font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.15;color:var(--text);margin-bottom:12px">For anyone selling to government</h3>
-        <p style="color:var(--text-mid);font-size:15px;line-height:1.6;margin-bottom:20px">Live tenders and awards from Contracts Finder and Find a Tender, scored against your firm — with a buyer watchlist, incumbent intelligence, bid-readiness grade, and the contracts worth chasing now.</p>
-        <ul style="list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:9px">
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Live open + awarded contracts in your sector</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Buyer watchlist + incumbent contract timeline</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Bid-readiness score &amp; do-not-chase list</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Framework routes + 30-day activation plan</li>
-        </ul>
-        <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Find contracts I can win &rarr;</a>
-      </div>
-    </div>
-    <p style="text-align:center;margin-top:24px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--faint)">Not sure? Run both in one scan — the default mode covers demand and contracts together.</p>
   </div>
 </section>
 ${chaseNowHtml}
@@ -12075,21 +12078,10 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
 
   const authUser = getAuthUser(req);
 
-  if (!authUser) {
-    res.redirect(302, `/login?next=${encodeURIComponent("/scan")}`);
-    return;
-  }
-
-  // Free tier: no scans — must upgrade or pay per scan
-  if (authUser.tier === "free") {
-    const scan = await createScan(parsed.data);
-    if (pool) await pool.query(`UPDATE scans SET user_id=$2, status='pending_payment' WHERE id=$1`, [scan.id, authUser.userId]);
-    res.redirect(302, `/checkout?plan=payg&scan=${encodeURIComponent(scan.id)}`);
-    return;
-  }
-
+  // First scan free: all users (including unauthenticated and free tier)
+  // can submit scans. The paywall gate lives on the report result page.
   const scan = await createScan(parsed.data);
-  if (pool) {
+  if (pool && authUser) {
     await pool.query(`UPDATE scans SET user_id=$2 WHERE id=$1`, [scan.id, authUser.userId]);
   }
   await enqueueScan(scan.id, parsed.data);
@@ -14897,8 +14889,8 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
       </div>
 
       <div class="submit-row">
-        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
-        <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
+        <button type="submit" class="btn-submit">Run free scan &rarr;</button>
+        <span class="submit-note">Takes 2&ndash;4 minutes &middot; preview report free &middot; unlock full report for &pound;29</span>
         <div style="margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Public record only &middot; Intelligence, not certainty</div>
       </div>
     </div>
@@ -14994,7 +14986,12 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
     return;
   }
 
-  res.type("html").send(reportPage(scan));
+  // Gate the report for unauthenticated users or free-tier users.
+  // Paid tiers (payg, pro, agency) see the full ungated report.
+  const auth = getAuthUser(req);
+  const shouldGate = !auth || auth.tier === "free";
+
+  res.type("html").send(reportPage(scan, { gated: shouldGate }));
 }));
 
 app.get("/signals", asyncRoute(async (req, res) => {
@@ -17888,6 +17885,13 @@ ${pageShellHeader(profile, authCtx)}
     </div>
   </div>
 </section>
+
+<div style="max-width:680px;padding:0 28px 32px;font-size:15px;line-height:1.7;color:var(--muted)">
+  <p>${escapeHtml(profile.label)} is one of the most active areas of UK public procurement. AtlasRevenue tracks every notice on Contracts Finder and Find a Tender in this category &mdash; live tenders, awarded contracts, renewal windows, and buyer spending patterns. Use this desk to find your next opportunity.</p>
+</div>
+<div style="max-width:680px;padding:0 28px 24px">
+  <a href="/scan?desk=${escapeHtml(profile.slug)}&services=${encodeURIComponent(profile.pinnedProfile.mainServices)}" style="display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;padding:10px 20px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;font-weight:600">Run a ${escapeHtml(profile.label)} scan &rarr;</a>
+</div>
 
 ${pulseHtml}
 
