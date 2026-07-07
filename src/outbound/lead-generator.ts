@@ -258,77 +258,88 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
 
   const stats = { total: 0, matched: 0, websiteFound: 0, emailSet: 0, addressSet: 0, scoreUpdated: 0 };
 
-  // Build a normalised_name lookup column on outbound_leads, then JOIN in one pass
-  const countResult = await pool.query<{ cnt: string }>(
-    `SELECT count(*) as cnt FROM outbound_leads WHERE status IN ('qualified','approved')`,
+  // Load all leads and all supplier entities, match in JS (reliable normalisation)
+  const leads = await pool.query<{
+    id: string; company_name: string; company_number: string | null;
+    website: string | null; contact_email: string | null; address: string | null;
+    sic_codes: string[]; qualification_score: number;
+  }>(
+    `SELECT id, company_name, company_number, website, contact_email, address, sic_codes, qualification_score
+     FROM outbound_leads WHERE status IN ('qualified','approved')`,
   );
-  stats.total = parseInt(countResult.rows[0].cnt, 10);
+  stats.total = leads.rows.length;
 
-  // Batch: update company_number, address, sic_codes, company_type, website from supplier_entities
-  const mainUpdate = await pool.query(`
-    UPDATE outbound_leads ol SET
-      company_number = COALESCE(ol.company_number, se.company_number),
-      address = COALESCE(ol.address, se.address),
-      sic_codes = CASE WHEN array_length(ol.sic_codes, 1) > 0 THEN ol.sic_codes ELSE se.sic_codes END,
-      company_type = COALESCE(ol.company_type, se.company_type),
-      website = COALESCE(ol.website, se.website),
-      qualification_score = CASE
-        WHEN ol.qualification_score < 70 AND se.total_wins > 0
-        THEN LEAST(100, ol.qualification_score + LEAST(se.total_wins * 3, 30))
-        ELSE ol.qualification_score
-      END,
-      updated_at = now()
-    FROM supplier_entities se
-    WHERE ol.status IN ('qualified','approved')
-      AND trim(lower(regexp_replace(
-        regexp_replace(ol.company_name, '\\m(ltd|limited|plc|llp|uk|group|company|co|inc|corporation|corp)\\M', '', 'gi'),
-        '[^a-z0-9]+', ' ', 'gi'
-      ))) = se.normalised_name
-  `);
-  stats.matched = mainUpdate.rowCount ?? 0;
+  const suppliers = await pool.query<{
+    normalised_name: string; company_number: string | null; address: string | null;
+    sic_codes: string[]; website: string | null; total_wins: number;
+    company_type: string | null;
+  }>(
+    `SELECT normalised_name, company_number, address, sic_codes, website, total_wins, company_type
+     FROM supplier_entities`,
+  );
 
-  // Set contact_email from website domain where missing
-  const emailUpdate = await pool.query(`
-    UPDATE outbound_leads SET
-      contact_email = 'info@' || lower(regexp_replace(regexp_replace(website, '^https?://', ''), '/.*$', '')),
-      updated_at = now()
-    WHERE status IN ('qualified','approved')
-      AND website IS NOT NULL
-      AND contact_email IS NULL
-      AND website !~ 'companieshouse|gov\\.uk'
-      AND regexp_replace(regexp_replace(website, '^https?://', ''), '/.*$', '') <> ''
-  `);
-  stats.emailSet = emailUpdate.rowCount ?? 0;
+  // Build lookup map
+  const supplierMap = new Map<string, typeof suppliers.rows[0]>();
+  for (const s of suppliers.rows) {
+    supplierMap.set(s.normalised_name, s);
+  }
 
-  // Count results
-  const enriched = await pool.query<{ websites: string; addresses: string; scores: string }>(`
-    SELECT
-      count(*) FILTER (WHERE website IS NOT NULL) as websites,
-      count(*) FILTER (WHERE address IS NOT NULL) as addresses,
-      count(*) FILTER (WHERE qualification_score >= 70) as scores
-    FROM outbound_leads
-    WHERE status IN ('qualified','approved')
-  `);
-  stats.websiteFound = parseInt(enriched.rows[0].websites, 10);
-  stats.addressSet = parseInt(enriched.rows[0].addresses, 10);
-  stats.scoreUpdated = parseInt(enriched.rows[0].scores, 10);
+  const sampleLeadNorms: string[] = [];
+  const sampleSupplierNorms = suppliers.rows.slice(0, 10).map(s => s.normalised_name);
 
-  // Debug: show sample normalised names from both sides
-  const supplierCount = await pool.query<{ cnt: string }>(`SELECT count(*) as cnt FROM supplier_entities`);
-  const sampleLeadNorms = await pool.query<{ norm: string }>(`
-    SELECT trim(lower(regexp_replace(
-      regexp_replace(company_name, '\\m(ltd|limited|plc|llp|uk|group|company|co|inc|corporation|corp)\\M', '', 'gi'),
-      '[^a-z0-9]+', ' ', 'gi'
-    ))) as norm FROM outbound_leads LIMIT 10
-  `);
-  const sampleSupplierNorms = await pool.query<{ normalised_name: string }>(`
-    SELECT normalised_name FROM supplier_entities ORDER BY total_wins DESC LIMIT 10
-  `);
+  for (const lead of leads.rows) {
+    const norm = normaliseName(lead.company_name);
+    if (sampleLeadNorms.length < 10) sampleLeadNorms.push(norm);
+
+    const supplier = supplierMap.get(norm);
+    if (!supplier) continue;
+    stats.matched++;
+
+    const sets: string[] = [];
+    const vals: (string | string[] | number)[] = [];
+    let p = 1;
+
+    if (supplier.company_number && !lead.company_number) {
+      sets.push(`company_number = $${p++}`); vals.push(supplier.company_number);
+    }
+    if (supplier.address && !lead.address) {
+      sets.push(`address = $${p++}`); vals.push(supplier.address);
+      stats.addressSet++;
+    }
+    if (supplier.sic_codes?.length > 0 && (!lead.sic_codes || lead.sic_codes.length === 0)) {
+      sets.push(`sic_codes = $${p++}`); vals.push(supplier.sic_codes);
+    }
+    if (supplier.company_type) {
+      sets.push(`company_type = $${p++}`); vals.push(supplier.company_type);
+    }
+    if (supplier.website && !lead.website) {
+      sets.push(`website = $${p++}`); vals.push(supplier.website);
+      stats.websiteFound++;
+      if (!lead.contact_email) {
+        const domain = domainFromWebsite(supplier.website);
+        if (domain) {
+          sets.push(`contact_email = $${p++}`); vals.push(`info@${domain}`);
+          stats.emailSet++;
+        }
+      }
+    }
+    if (supplier.total_wins > 0 && lead.qualification_score < 70) {
+      const newScore = Math.min(100, lead.qualification_score + Math.min(supplier.total_wins * 3, 30));
+      sets.push(`qualification_score = $${p++}`); vals.push(newScore);
+      stats.scoreUpdated++;
+    }
+
+    if (sets.length > 0) {
+      sets.push(`updated_at = now()`);
+      vals.push(lead.id);
+      await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals);
+    }
+  }
 
   const debug = {
-    supplierCount: parseInt(supplierCount.rows[0].cnt, 10),
-    sampleLeadNorms: sampleLeadNorms.rows.map(r => r.norm),
-    sampleSupplierNorms: sampleSupplierNorms.rows.map(r => r.normalised_name),
+    supplierCount: suppliers.rows.length,
+    sampleLeadNorms,
+    sampleSupplierNorms,
   };
 
   console.log(`[outbound] enrichment complete:`, stats, debug);
