@@ -18544,11 +18544,100 @@ type BuyerContact = { contact_name: string; contact_email: string; contact_title
 
 const BUYER_TITLES = /\b(director|managing|founder|owner|ceo|md|chief|head|partner|principal|commissioning|procurement|commercial|contract|programme)\b/i;
 
+function publicSectorDomain(buyerName: string): { domain: string; tld: string } | null {
+  const b = buyerName.toLowerCase().trim();
+
+  const laMatch = b
+    .replace(/\b(metropolitan|metro)\s+/g, "")
+    .replace(/\b(city|borough|district|county|unitary)\s+council\b/g, "")
+    .replace(/\blondon borough of\s+/g, "")
+    .replace(/\broyal borough of\s+/g, "")
+    .replace(/\bcouncil of\s+/g, "")
+    .replace(/\bcouncil\b/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim();
+  if (b.includes("council") || b.includes("borough") || b.includes("unitary authority")) {
+    const slug = laMatch.split(/\s+/).filter(Boolean).join("");
+    return slug ? { domain: `${slug}.gov.uk`, tld: "gov.uk" } : null;
+  }
+
+  if (b.includes("nhs") || b.includes("hospital") || b.includes("clinical commissioning") || b.includes("integrated care")) {
+    const stripped = b
+      .replace(/\bnhs\b/g, "").replace(/\b(foundation\s+)?trust\b/g, "")
+      .replace(/\bintegrated care board\b/g, "").replace(/\bclinical commissioning group\b/g, "")
+      .replace(/\buniversity hospitals?\b/g, "").replace(/\bhospitals?\b/g, "")
+      .replace(/\band\b/g, "").replace(/[^a-z0-9 ]/g, "").trim();
+    const slug = stripped.split(/\s+/).filter(Boolean).join("");
+    return slug ? { domain: `${slug}.nhs.uk`, tld: "nhs.uk" } : null;
+  }
+
+  if (b.includes("university")) {
+    const uniOf = b.match(/university of (.+)/);
+    const nameUni = b.match(/(.+) university/);
+    const raw = uniOf ? uniOf[1] : nameUni ? nameUni[1] : null;
+    if (raw) {
+      const slug = raw.replace(/[^a-z0-9 ]/g, "").trim().split(/\s+/).filter(Boolean).join("");
+      return slug ? { domain: `${slug}.ac.uk`, tld: "ac.uk" } : null;
+    }
+  }
+
+  return null;
+}
+
+const SKIP_EMAILS = /^(info|enquiries|enquiry|contact|reception|general|admin|support|help|feedback|webmaster|customerservice|noreply|no-reply|no\.reply|postmaster|press|media|communications?|data\.protection|foi|freedom|complaints?|planning|parking|council\.?tax|housing|benefits|elections|registrars?|licensing|environmental|waste|recycling|libraries|leisure|hr|recruitment|jobs|careers|subscribe|marketing|sales|payments?|accounts?|finance|it\.?support|ict|web)@/i;
+const PROCUREMENT_KEYWORDS = /\b(procurement|commercial|contracts?|commissioning|tender|buying|purchasing|supply.chain|strategic.sourcing)\b/i;
+
+async function scrapePublicSectorContact(domain: string): Promise<BuyerContact | null> {
+  const paths = ["/", "/contact-us", "/contact", "/procurement", "/about-us"];
+  const allEmails = new Map<string, number>();
+
+  for (const p of paths) {
+    try {
+      const resp = await fetch(`https://www.${domain}${p}`, {
+        headers: { "User-Agent": "AtlasRevenue/1.0 (UK procurement intelligence)" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!resp.ok) continue;
+      const html = await resp.text();
+      const found = html.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [];
+      for (const raw of found) {
+        const e = raw.toLowerCase();
+        if (SKIP_EMAILS.test(e)) continue;
+        allEmails.set(e, (allEmails.get(e) || 0) + 1);
+      }
+    } catch { continue; }
+  }
+
+  if (allEmails.size === 0) return null;
+
+  const candidates = [...allEmails.entries()].sort((a, b) => b[1] - a[1]);
+  const procEmail = candidates.find(([e]) => PROCUREMENT_KEYWORDS.test(e));
+  const personEmail = candidates.find(([e]) => /^[a-z]+\.[a-z]+@/i.test(e));
+  const [bestEmail] = procEmail || personEmail || candidates[0];
+
+  const localPart = bestEmail.split("@")[0];
+  const isPerson = /^[a-z]+\.[a-z]+$/i.test(localPart);
+  const isProcTeam = PROCUREMENT_KEYWORDS.test(localPart);
+
+  return {
+    contact_name: isProcTeam ? "Procurement Team" : isPerson ? localPart.split(".").map(w => w[0].toUpperCase() + w.slice(1)).join(" ") : localPart.replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+    contact_email: bestEmail,
+    contact_title: isProcTeam ? "Procurement Department" : isPerson ? "Senior Officer" : "Contact",
+  };
+}
+
+async function cacheBuyerContact(buyer: string, contact: BuyerContact, source: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO buyer_contacts (id, buyer_name, contact_name, contact_email, contact_title, source) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (buyer_name) DO UPDATE SET contact_name=$3, contact_email=$4, contact_title=$5, source=$6`,
+    [globalThis.crypto.randomUUID(), buyer, contact.contact_name, contact.contact_email, contact.contact_title, source]
+  );
+}
+
 async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, BuyerContact>> {
   const result = new Map<string, BuyerContact>();
-  if (buyerNames.length === 0) return result;
-  const apolloKey = process.env.APOLLO_API_KEY;
-  if (!apolloKey || !pool) return result;
+  if (buyerNames.length === 0 || !pool) return result;
 
   const cached = await pool.query<{ buyer_name: string; contact_name: string; contact_email: string; contact_title: string }>(
     `SELECT buyer_name, contact_name, contact_email, contact_title FROM buyer_contacts WHERE buyer_name = ANY($1)`,
@@ -18559,7 +18648,25 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
   }
 
   const missing = buyerNames.filter(n => !result.has(n));
-  for (const buyer of missing.slice(0, 6)) {
+  if (missing.length === 0) return result;
+
+  for (const buyer of missing.slice(0, 8)) {
+    const orgType = buyerOrgType(buyer);
+    const psDomain = publicSectorDomain(buyer);
+
+    if (psDomain) {
+      try {
+        const contact = await scrapePublicSectorContact(psDomain.domain);
+        if (contact) {
+          result.set(buyer, contact);
+          await cacheBuyerContact(buyer, contact, "transparency");
+          continue;
+        }
+      } catch { /* fall through to Apollo */ }
+    }
+
+    const apolloKey = process.env.APOLLO_API_KEY;
+    if (!apolloKey) continue;
     try {
       const resp = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
         method: "POST",
@@ -18569,8 +18676,7 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
       if (resp.status === 429) break;
       if (!resp.ok) continue;
       const body = await resp.json() as { people?: Array<{ first_name?: string; last_name?: string; email?: string; title?: string }> };
-      const people = body.people || [];
-      const withEmail = people.filter(p => p.email);
+      const withEmail = (body.people || []).filter(p => p.email);
       const best = withEmail.find(p => p.title && BUYER_TITLES.test(p.title)) || withEmail[0];
       if (best?.email) {
         const contact: BuyerContact = {
@@ -18579,12 +18685,9 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
           contact_title: best.title || "",
         };
         result.set(buyer, contact);
-        await pool.query(
-          `INSERT INTO buyer_contacts (id, buyer_name, contact_name, contact_email, contact_title) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (buyer_name) DO UPDATE SET contact_name=$3, contact_email=$4, contact_title=$5`,
-          [globalThis.crypto.randomUUID(), buyer, contact.contact_name, contact.contact_email, contact.contact_title]
-        );
+        await cacheBuyerContact(buyer, contact, "apollo");
       }
-    } catch { /* skip failed lookups */ }
+    } catch { /* skip */ }
   }
   return result;
 }
