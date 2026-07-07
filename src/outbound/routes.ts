@@ -168,13 +168,14 @@ export function registerOutboundRoutes(app: Express): void {
   }));
 
   app.post("/api/outbound/enrich", requireAdmin, asyncRoute(async (_req, res) => {
-    try {
-      const result = await enrichLeadsFromSupplierGraph();
-      res.json(result);
-    } catch (err: any) {
-      console.error("[outbound] enrich error:", err);
-      res.status(500).json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) });
-    }
+    // Fire-and-forget: enrichment can take several minutes with real supplier
+    // discovery. Railway edge cuts requests at ~60s, so respond immediately and
+    // let the work run in the background. Progress lands in the DB — refresh
+    // the leads table to watch rows populate.
+    res.json({ status: "started", note: "Enrichment running in background. Refresh the leads table to see progress." });
+    void enrichLeadsFromSupplierGraph()
+      .then(result => console.log("[outbound] enrichment complete:", result))
+      .catch(err => console.error("[outbound] enrich error:", err));
   }));
 
   console.log("[outbound] routes registered");
