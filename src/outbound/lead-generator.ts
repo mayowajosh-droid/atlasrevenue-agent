@@ -332,7 +332,9 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     if (sets.length > 0) {
       sets.push(`updated_at = now()`);
       vals.push(lead.id);
-      await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals);
+      try {
+        await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals);
+      } catch { /* skip constraint violations from duplicate company+trigger */ }
     }
   }
 
