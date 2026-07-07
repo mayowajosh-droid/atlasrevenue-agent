@@ -168,21 +168,7 @@ export async function renderAdminOutboundPage(token: string): Promise<string> {
   const maxStatus = statusBreakdown.length > 0 ? Math.max(...statusBreakdown.map(s => s.count)) : 1;
   const maxReplyClass = replyBreakdown.length > 0 ? Math.max(...replyBreakdown.map(r => r.count)) : 1;
 
-  const leadRows = leadsResult.leads.map((l, i) => `
-    <tr>
-      <td style="font-family:var(--mono);color:var(--muted)">${i + 1}</td>
-      <td><strong>${escapeHtml(l.company_name)}</strong><br><span style="color:var(--muted);font-size:11px">${escapeHtml(l.address || "")}</span></td>
-      <td style="font-size:11px">${l.contact_email ? escapeHtml(l.contact_email) : `<span style="color:var(--red)">missing</span>`}${l.website ? `<br><span style="color:var(--muted)">${escapeHtml(l.website)}</span>` : ""}</td>
-      <td style="font-size:11px">${escapeHtml(l.trigger_title.slice(0, 60))}${l.trigger_title.length > 60 ? "…" : ""}<br><span style="color:var(--muted)">${escapeHtml(l.trigger_buyer)}</span></td>
-      <td style="font-family:var(--mono)">${fmtMoney(l.trigger_value)}</td>
-      <td style="font-family:var(--mono);font-weight:600">${l.qualification_score}</td>
-      <td>${statusBadge(l.status)}</td>
-      <td style="white-space:nowrap">
-        ${l.status === "qualified" ? `<button class="btn btn-sm btn-brand" onclick="approveLeadFn('${escapeHtml(l.id)}')">Approve</button> ` : ""}
-        ${["qualified", "approved", "ready"].includes(l.status) ? `<button class="btn btn-sm btn-red" onclick="suppressLeadFn('${escapeHtml(l.id)}')">Suppress</button>` : ""}
-      </td>
-    </tr>
-  `).join("");
+  // leads rendered client-side with pagination
 
   const replyRows = unhandledReplies.slice(0, 20).map(r => `
     <tr>
@@ -424,7 +410,7 @@ ${adminCss()}
       <div class="tab-panel" id="panel-leads">
         <div class="section">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-title" style="margin-bottom:0">Lead Pipeline <span class="sb-count">${leadsResult.total}</span></div>
+            <div class="section-title" style="margin-bottom:0">Lead Pipeline <span class="sb-count" id="lead-total">${leadsResult.total}</span></div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm btn-brand" onclick="bulkImportFn()">Bulk import prospects</button>
               <button class="btn btn-sm" onclick="enrichLeadsFn()">Enrich leads</button>
@@ -432,13 +418,25 @@ ${adminCss()}
               <button class="btn btn-sm" onclick="generateLeadsFn()">Generate leads</button>
             </div>
           </div>
-          ${leadsResult.leads.length === 0
-            ? `<p class="empty">No leads yet. Click "Generate leads" to start the engine.</p>`
-            : `<div style="overflow-x:auto"><table class="tbl">
+          <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+            <select id="lead-status-filter" onchange="loadLeadsPage(0)" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);font-size:12px">
+              <option value="">All statuses</option>
+              <option value="qualified">Qualified</option>
+              <option value="approved">Approved</option>
+              <option value="ready">Ready</option>
+              <option value="sent">Sent</option>
+              <option value="suppressed">Suppressed</option>
+            </select>
+            <span id="lead-page-info" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+            <button class="btn btn-sm" id="lead-prev" onclick="loadLeadsPage(leadPage-1)" disabled>Prev</button>
+            <button class="btn btn-sm" id="lead-next" onclick="loadLeadsPage(leadPage+1)">Next</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="tbl" id="leads-table">
               <thead><tr><th>#</th><th>Company</th><th>Contact / Website</th><th>Trigger Contract</th><th>Value</th><th>Score</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody>${leadRows}</tbody>
-            </table></div>`
-          }
+              <tbody id="leads-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -878,15 +876,16 @@ async function addSuppressionFn() {
   location.reload();
 }
 async function enrichLeadsFn() {
-  if (!confirm("Enrich all leads with supplier graph data (website, address, SIC codes, email)?")) return;
+  if (!confirm("Enrich all leads with supplier graph data + domain guessing?")) return;
   var btn = event.target;
   btn.disabled = true; btn.textContent = "Enriching...";
   try {
     var r = await fetch(BASE + "/enrich", { method: "POST", headers: hdr() });
     var data = await r.json();
-    alert("Enriched " + data.matched + "/" + data.total + " leads matched. " + data.websiteFound + " websites, " + data.emailSet + " emails, " + data.addressSet + " addresses filled.");
+    alert("Enriched " + data.matched + "/" + data.total + " supplier matches. " + data.websiteFound + " websites, " + data.emailSet + " emails, " + data.addressSet + " addresses. DNS/HTTP found: " + (data.debug ? data.debug.domainFound : 0));
   } catch(e) { alert("Error: " + e.message); }
-  location.reload();
+  btn.disabled = false; btn.textContent = "Enrich leads";
+  loadLeadsPage(0);
 }
 async function bulkImportFn() {
   if (!confirm("Bulk import all prospect files (JSON pool + CSV)?")) return;
@@ -899,6 +898,49 @@ async function bulkImportFn() {
   } catch(e) { alert("Error: " + e.message); }
   location.reload();
 }
+// ── Leads pagination ──
+var leadPage = 0;
+var LEAD_PAGE_SIZE = 100;
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function fmtVal(v) { if (!v) return "-"; var n = v / 100; return n >= 1e6 ? "\\u00a3" + (n/1e6).toFixed(1) + "m" : n >= 1e3 ? "\\u00a3" + Math.round(n/1e3) + "k" : "\\u00a3" + n; }
+function sBadge(s) { var c = {qualified:"#666",approved:"var(--brand)",ready:"#2e7d32",sent:"var(--brand)",composing:"#555",suppressed:"var(--red)"}; return '<span style="padding:2px 8px;border-radius:3px;font-size:10px;background:'+(c[s]||"#555")+';color:#fff">'+s+'</span>'; }
+async function loadLeadsPage(page) {
+  if (page < 0) page = 0;
+  leadPage = page;
+  var status = document.getElementById("lead-status-filter").value;
+  var q = "?limit=" + LEAD_PAGE_SIZE + "&offset=" + (page * LEAD_PAGE_SIZE);
+  if (status) q += "&status=" + status;
+  try {
+    var r = await fetch(BASE + "/leads" + q, { headers: hdr() });
+    var data = await r.json();
+    document.getElementById("lead-total").textContent = data.total;
+    var start = page * LEAD_PAGE_SIZE;
+    var end = Math.min(start + data.leads.length, data.total);
+    document.getElementById("lead-page-info").textContent = (start+1) + "–" + end + " of " + data.total;
+    document.getElementById("lead-prev").disabled = page === 0;
+    document.getElementById("lead-next").disabled = end >= data.total;
+    var html = "";
+    data.leads.forEach(function(l, i) {
+      var contact = l.contact_email ? esc(l.contact_email) : '<span style="color:var(--red)">missing</span>';
+      var web = l.website ? '<br><span style="color:var(--muted)">' + esc(l.website) + '</span>' : '';
+      var title = l.trigger_title || "";
+      var tShort = title.length > 60 ? esc(title.slice(0,60)) + "\\u2026" : esc(title);
+      var actions = '';
+      if (l.status === 'qualified') actions += '<button class="btn btn-sm btn-brand" onclick="approveLeadFn(\\'' + l.id + '\\')">Approve</button> ';
+      if (['qualified','approved','ready'].indexOf(l.status) >= 0) actions += '<button class="btn btn-sm btn-red" onclick="suppressLeadFn(\\'' + l.id + '\\')">Suppress</button>';
+      html += '<tr><td style="font-family:var(--mono);color:var(--muted)">' + (start+i+1) + '</td>'
+        + '<td><strong>' + esc(l.company_name) + '</strong><br><span style="color:var(--muted);font-size:11px">' + esc(l.address||'') + '</span></td>'
+        + '<td style="font-size:11px">' + contact + web + '</td>'
+        + '<td style="font-size:11px">' + tShort + '<br><span style="color:var(--muted)">' + esc(l.trigger_buyer||'') + '</span></td>'
+        + '<td style="font-family:var(--mono)">' + fmtVal(l.trigger_value) + '</td>'
+        + '<td style="font-family:var(--mono);font-weight:600">' + (l.qualification_score||0) + '</td>'
+        + '<td>' + sBadge(l.status) + '</td>'
+        + '<td style="white-space:nowrap">' + actions + '</td></tr>';
+    });
+    document.getElementById("leads-tbody").innerHTML = html;
+  } catch(e) { console.error("loadLeads", e); }
+}
+loadLeadsPage(0);
 </script>
 </body>
 </html>`;

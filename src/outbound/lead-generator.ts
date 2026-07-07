@@ -364,41 +364,69 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   const noEmail = await pool.query<{ id: string; company_name: string }>(
     `SELECT id, company_name FROM outbound_leads
      WHERE status IN ('qualified','approved') AND contact_email IS NULL
-     LIMIT 500`,
+     LIMIT 300`,
   );
 
-  let dnsChecked = 0;
-  let dnsFound = 0;
+  let domainChecked = 0;
+  let domainFound = 0;
   for (const lead of noEmail.rows) {
     const candidates = guessDomains(lead.company_name);
+    let found = false;
     for (const domain of candidates) {
+      domainChecked++;
       try {
-        const mx = await dns.resolveMx(domain).catch(() => []);
-        if (mx.length > 0) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 3000);
+        const resp = await fetch(`https://${domain}`, {
+          method: "HEAD",
+          signal: ctrl.signal,
+          redirect: "follow",
+        });
+        clearTimeout(timer);
+        if (resp.ok || resp.status === 403 || resp.status === 301 || resp.status === 302) {
           try {
             await pool.query(
               `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
               [`https://${domain}`, `info@${domain}`, lead.id],
             );
           } catch { /* skip constraint violations */ }
-          dnsFound++;
+          domainFound++;
           stats.websiteFound++;
           stats.emailSet++;
+          found = true;
           break;
         }
-      } catch { /* DNS lookup failed, try next */ }
-      dnsChecked++;
-      if (dnsChecked > 2000) break;
+      } catch { /* timeout / network error — try next candidate */ }
     }
-    if (dnsChecked > 2000) break;
+    if (!found) {
+      // try DNS MX as fallback
+      for (const domain of candidates.slice(0, 2)) {
+        try {
+          const mx = await dns.resolveMx(domain).catch(() => []);
+          if (mx.length > 0) {
+            try {
+              await pool.query(
+                `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
+                [`https://${domain}`, `info@${domain}`, lead.id],
+              );
+            } catch { /* skip */ }
+            domainFound++;
+            stats.websiteFound++;
+            stats.emailSet++;
+            break;
+          }
+        } catch { /* skip */ }
+      }
+    }
   }
 
   const debug = {
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
-    dnsChecked,
-    dnsFound,
+    domainChecked,
+    domainFound,
+    noEmailCount: noEmail.rows.length,
   };
 
   console.log(`[outbound] enrichment complete:`, stats, debug);
