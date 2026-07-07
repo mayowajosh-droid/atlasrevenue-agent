@@ -252,6 +252,7 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   emailSet: number;
   addressSet: number;
   scoreUpdated: number;
+  debug: { supplierCount: number; sampleLeadNorms: string[]; sampleSupplierNorms: string[] };
 }> {
   if (!pool) throw new Error("No database connection");
 
@@ -279,10 +280,10 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
       updated_at = now()
     FROM supplier_entities se
     WHERE ol.status IN ('qualified','approved')
-      AND lower(regexp_replace(
+      AND trim(lower(regexp_replace(
         regexp_replace(ol.company_name, '\\m(ltd|limited|plc|llp|uk|group|company|co|inc|corporation|corp)\\M', '', 'gi'),
         '[^a-z0-9]+', ' ', 'gi'
-      )) = se.normalised_name
+      ))) = se.normalised_name
   `);
   stats.matched = mainUpdate.rowCount ?? 0;
 
@@ -312,8 +313,26 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   stats.addressSet = parseInt(enriched.rows[0].addresses, 10);
   stats.scoreUpdated = parseInt(enriched.rows[0].scores, 10);
 
-  console.log(`[outbound] enrichment complete:`, stats);
-  return stats;
+  // Debug: show sample normalised names from both sides
+  const supplierCount = await pool.query<{ cnt: string }>(`SELECT count(*) as cnt FROM supplier_entities`);
+  const sampleLeadNorms = await pool.query<{ norm: string }>(`
+    SELECT trim(lower(regexp_replace(
+      regexp_replace(company_name, '\\m(ltd|limited|plc|llp|uk|group|company|co|inc|corporation|corp)\\M', '', 'gi'),
+      '[^a-z0-9]+', ' ', 'gi'
+    ))) as norm FROM outbound_leads LIMIT 10
+  `);
+  const sampleSupplierNorms = await pool.query<{ normalised_name: string }>(`
+    SELECT normalised_name FROM supplier_entities ORDER BY total_wins DESC LIMIT 10
+  `);
+
+  const debug = {
+    supplierCount: parseInt(supplierCount.rows[0].cnt, 10),
+    sampleLeadNorms: sampleLeadNorms.rows.map(r => r.norm),
+    sampleSupplierNorms: sampleSupplierNorms.rows.map(r => r.normalised_name),
+  };
+
+  console.log(`[outbound] enrichment complete:`, stats, debug);
+  return { ...stats, debug };
 }
 
 type RenewalCandidate = {
