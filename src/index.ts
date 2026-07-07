@@ -68,7 +68,7 @@ import {
   initSupplierGraphTables, listSuppliers, getSupplierProfile, getSupplierEntityById,
   syncSuppliersFromHistory,
 } from "./intelligence/supplier-graph/index.js";
-import { initOutboundTables, startOutboundWorkers, registerOutboundRoutes } from "./outbound/index.js";
+import { initOutboundTables, startOutboundWorkers, registerOutboundRoutes, getLeadsPaginated } from "./outbound/index.js";
 import {
   initGovernanceTables, upsertMetadataCatalog, getMetadataCatalog,
   runQualityChecks, getLatestQualityResults, writeAuditLog, getAuditLog,
@@ -21794,6 +21794,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     pool ? getRegionalIntelligence(pool).catch(() => [] as RegionIntel[]) : Promise.resolve([] as RegionIntel[]),
   ]);
 
+  const outboundLeadsResult = await getLeadsPaginated({ limit: 1 }).catch(() => ({ leads: [], total: 0 }));
+
   const ss   = (scanStatsRes.rows[0]  as any) || {};
   const us   = (userStatsRes.rows[0]  as any) || {};
   const sigs = (signalsStatsRes.rows[0] as any) || {};
@@ -22340,6 +22342,8 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="#source-registry" class="sb-link">${DATA_SOURCES.length} Sources <span class="sb-count" style="color:${failSourcesCount>0?"var(--red)":warnSourcesCount>5?"var(--amber)":"var(--green)"}">${liveSourcesCount}✓ ${failSourcesCount>0?failSourcesCount+"✗":""}</span></a>
     <a href="#governance" class="sb-link">Governance <span class="sb-count" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${(govSummary.qualityPassRate||0)}%</span></a>
     <a href="#webhooks" class="sb-link">Webhooks <span class="sb-count">${webhookList.length}</span></a>
+    <div class="sb-group">Ads &amp; Marketing</div>
+    <a href="/admin/outbound?token=${encodeURIComponent(token)}" class="sb-link">Email Marketing <span class="sb-count">${outboundLeadsResult.total}</span></a>
     <div class="sb-group">Admin</div>
     <a href="#audit" class="sb-link">Audit Log <span class="sb-count">${auditLog.length}</span></a>
     <a href="#deskcache" class="sb-link">Desk Cache <span class="sb-count">${deskCache.length}</span></a>

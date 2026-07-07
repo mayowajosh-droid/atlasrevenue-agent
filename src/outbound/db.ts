@@ -439,3 +439,85 @@ export async function getTodayStats(): Promise<{
     positive_replies: positive.rows[0]?.c ?? 0,
   };
 }
+
+// ── Extended stats for full admin dashboard ──
+
+export async function getAllTimeStats(): Promise<{
+  total_leads: number;
+  total_sent: number;
+  total_replies: number;
+  total_positive: number;
+  total_bounced: number;
+  total_suppressed: number;
+  reply_rate: number;
+  positive_rate: number;
+}> {
+  if (!pool) return { total_leads: 0, total_sent: 0, total_replies: 0, total_positive: 0, total_bounced: 0, total_suppressed: 0, reply_rate: 0, positive_rate: 0 };
+  const [leads, sent, replies, positive, bounced, suppressed] = await Promise.all([
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_leads`),
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_emails WHERE status = 'sent'`),
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_replies`),
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_replies WHERE classification IN ('interested','send_info')`),
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_emails WHERE status = 'bounced'`),
+    pool.query(`SELECT COUNT(*)::int AS c FROM outbound_suppressions`),
+  ]);
+  const s = sent.rows[0]?.c ?? 0;
+  const r = replies.rows[0]?.c ?? 0;
+  const p = positive.rows[0]?.c ?? 0;
+  return {
+    total_leads: leads.rows[0]?.c ?? 0,
+    total_sent: s,
+    total_replies: r,
+    total_positive: p,
+    total_bounced: bounced.rows[0]?.c ?? 0,
+    total_suppressed: suppressed.rows[0]?.c ?? 0,
+    reply_rate: s > 0 ? Math.round((r / s) * 100) : 0,
+    positive_rate: s > 0 ? Math.round((p / s) * 100) : 0,
+  };
+}
+
+export async function getLeadsByDesk(): Promise<Array<{ desk_slug: string; count: number }>> {
+  if (!pool) return [];
+  const r = await pool.query(
+    `SELECT COALESCE(desk_slug, 'unassigned') AS desk_slug, COUNT(*)::int AS count
+     FROM outbound_leads GROUP BY desk_slug ORDER BY count DESC`,
+  );
+  return r.rows;
+}
+
+export async function getLeadStatusBreakdown(): Promise<Array<{ status: string; count: number }>> {
+  if (!pool) return [];
+  const r = await pool.query(
+    `SELECT status, COUNT(*)::int AS count FROM outbound_leads GROUP BY status ORDER BY count DESC`,
+  );
+  return r.rows;
+}
+
+export async function getRecentEmails(limit = 30): Promise<Array<OutboundEmail & { company_name: string; contact_email: string | null }>> {
+  if (!pool) return [];
+  const r = await pool.query(
+    `SELECT e.*, l.company_name, l.contact_email
+     FROM outbound_emails e JOIN outbound_leads l ON e.lead_id = l.id
+     ORDER BY e.created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return r.rows;
+}
+
+export async function getSendQueueCount(): Promise<number> {
+  if (!pool) return 0;
+  const r = await pool.query(
+    `SELECT COUNT(*)::int AS c FROM outbound_emails e
+     JOIN outbound_leads l ON e.lead_id = l.id
+     WHERE e.status = 'approved' AND l.status = 'approved'`,
+  );
+  return r.rows[0]?.c ?? 0;
+}
+
+export async function getReplyClassificationBreakdown(): Promise<Array<{ classification: string; count: number }>> {
+  if (!pool) return [];
+  const r = await pool.query(
+    `SELECT classification, COUNT(*)::int AS count FROM outbound_replies GROUP BY classification ORDER BY count DESC`,
+  );
+  return r.rows;
+}
