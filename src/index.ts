@@ -16578,21 +16578,6 @@ async function nicheMarketWithContacts(cfg: NicheConfig, deskSlug: string, req: 
   res.type("html").send(nicheMarketPage(cfg, cached, getAuthUser(req), contacts));
 }
 
-app.get("/api/debug/buyer-contacts", asyncRoute(async (req, res) => {
-  if (req.query.token !== process.env.ADMIN_TOKEN) { res.status(401).json({ error: "unauthorized" }); return; }
-  try {
-    const cols = pool ? (await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contact_cache' ORDER BY ordinal_position`)).rows.map(r => r.column_name) : [];
-    const cached = await getDeskCache("construction").catch(() => null);
-    const profiles = buildNicheBuyerProfiles(NICHE_RETROFIT, cached?.data ?? undefined);
-    const names = profiles.slice(0, 6).map(bp => bp.buyer);
-    const domains = names.map(n => ({ name: n, orgType: buyerOrgType(n), domain: publicSectorDomain(n) }));
-    const contacts = await lookupBuyerContacts(names);
-    res.json({ tableColumns: cols, profileCount: profiles.length, names, domains, contactCount: contacts.size, contacts: Object.fromEntries(contacts) });
-  } catch (err: any) {
-    res.json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) });
-  }
-}));
-
 app.get("/market/retrofit", asyncRoute(async (req, res) => {
   await nicheMarketWithContacts(NICHE_RETROFIT, "construction", req, res);
 }));
