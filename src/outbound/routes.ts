@@ -7,7 +7,7 @@ import {
   getSuppressions, insertSuppression, getRecentReports, getTodayStats,
   getUnhandledReplies, markReplyHandled, getPendingEmails,
 } from "./db.js";
-import { generateDailyLeads, bulkImportProspects } from "./lead-generator.js";
+import { generateDailyLeads, bulkImportProspects, enrichLeadsFromSupplierGraph } from "./lead-generator.js";
 import { composeEmail } from "./email-composer.js";
 import { getGmailAuthUrl, exchangeCodeForToken, isGmailConfigured } from "./gmail.js";
 import { renderAdminOutboundPage } from "./admin-page.js";
@@ -164,6 +164,11 @@ export function registerOutboundRoutes(app: Express): void {
 
   app.post("/api/outbound/bulk-import", requireAdmin, asyncRoute(async (_req, res) => {
     const result = await bulkImportProspects();
+    res.json(result);
+  }));
+
+  app.post("/api/outbound/enrich", requireAdmin, asyncRoute(async (_req, res) => {
+    const result = await enrichLeadsFromSupplierGraph();
     res.json(result);
   }));
 

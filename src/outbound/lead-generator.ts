@@ -229,6 +229,127 @@ export async function bulkImportProspects(): Promise<{
   return stats;
 }
 
+function normaliseName(name: string): string {
+  return name.toLowerCase()
+    .replace(/\b(ltd|limited|plc|llp|uk|group|company|co|inc|corporation|corp)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function domainFromWebsite(website: string | null): string | null {
+  if (!website) return null;
+  try {
+    const host = website.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
+    if (!host || host.includes("companieshouse") || host.includes("gov.uk")) return null;
+    return host;
+  } catch { return null; }
+}
+
+export async function enrichLeadsFromSupplierGraph(): Promise<{
+  total: number;
+  matched: number;
+  websiteFound: number;
+  emailSet: number;
+  addressSet: number;
+  scoreUpdated: number;
+}> {
+  if (!pool) throw new Error("No database connection");
+
+  const stats = { total: 0, matched: 0, websiteFound: 0, emailSet: 0, addressSet: 0, scoreUpdated: 0 };
+
+  const leads = await pool.query<{
+    id: string; company_name: string; company_number: string | null;
+    website: string | null; contact_email: string | null; address: string | null;
+    sic_codes: string[]; qualification_score: number;
+  }>(
+    `SELECT id, company_name, company_number, website, contact_email, address, sic_codes, qualification_score
+     FROM outbound_leads
+     WHERE status IN ('qualified', 'approved')`,
+  );
+
+  stats.total = leads.rows.length;
+
+  for (const lead of leads.rows) {
+    const normalised = normaliseName(lead.company_name);
+
+    const match = await pool.query<{
+      company_number: string | null; address: string | null;
+      sic_codes: string[]; website: string | null; total_wins: number;
+      company_status: string | null; company_type: string | null;
+    }>(
+      `SELECT company_number, address, sic_codes, website, total_wins, company_status, company_type
+       FROM supplier_entities
+       WHERE normalised_name = $1
+       LIMIT 1`,
+      [normalised],
+    );
+
+    if (match.rows.length === 0) continue;
+    stats.matched++;
+
+    const supplier = match.rows[0];
+    const updates: string[] = [];
+    const values: (string | string[] | number | null)[] = [];
+    let paramIdx = 1;
+
+    if (supplier.company_number && !lead.company_number) {
+      updates.push(`company_number = $${paramIdx++}`);
+      values.push(supplier.company_number);
+    }
+
+    if (supplier.address && !lead.address) {
+      updates.push(`address = $${paramIdx++}`);
+      values.push(supplier.address);
+      stats.addressSet++;
+    }
+
+    if (supplier.sic_codes?.length > 0 && (!lead.sic_codes || lead.sic_codes.length === 0)) {
+      updates.push(`sic_codes = $${paramIdx++}`);
+      values.push(supplier.sic_codes);
+    }
+
+    if (supplier.company_type) {
+      updates.push(`company_type = $${paramIdx++}`);
+      values.push(supplier.company_type);
+    }
+
+    if (supplier.website && !lead.website) {
+      updates.push(`website = $${paramIdx++}`);
+      values.push(supplier.website);
+      stats.websiteFound++;
+
+      if (!lead.contact_email) {
+        const domain = domainFromWebsite(supplier.website);
+        if (domain) {
+          updates.push(`contact_email = $${paramIdx++}`);
+          values.push(`info@${domain}`);
+          stats.emailSet++;
+        }
+      }
+    }
+
+    let newScore = lead.qualification_score;
+    if (supplier.total_wins > 0 && lead.qualification_score < 70) {
+      newScore = Math.min(100, lead.qualification_score + Math.min(supplier.total_wins * 3, 30));
+      updates.push(`qualification_score = $${paramIdx++}`);
+      values.push(newScore);
+      stats.scoreUpdated++;
+    }
+
+    if (updates.length > 0) {
+      updates.push(`updated_at = now()`);
+      values.push(lead.id);
+      await pool.query(
+        `UPDATE outbound_leads SET ${updates.join(", ")} WHERE id = $${paramIdx}`,
+        values,
+      );
+    }
+  }
+
+  console.log(`[outbound] enrichment complete:`, stats);
+  return stats;
+}
+
 type RenewalCandidate = {
   buyer: string;
   title: string;

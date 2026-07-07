@@ -172,12 +172,11 @@ export async function renderAdminOutboundPage(token: string): Promise<string> {
     <tr>
       <td style="font-family:var(--mono);color:var(--muted)">${i + 1}</td>
       <td><strong>${escapeHtml(l.company_name)}</strong><br><span style="color:var(--muted);font-size:11px">${escapeHtml(l.address || "")}</span></td>
+      <td style="font-size:11px">${l.contact_email ? escapeHtml(l.contact_email) : `<span style="color:var(--red)">missing</span>`}${l.website ? `<br><span style="color:var(--muted)">${escapeHtml(l.website)}</span>` : ""}</td>
       <td style="font-size:11px">${escapeHtml(l.trigger_title.slice(0, 60))}${l.trigger_title.length > 60 ? "…" : ""}<br><span style="color:var(--muted)">${escapeHtml(l.trigger_buyer)}</span></td>
       <td style="font-family:var(--mono)">${fmtMoney(l.trigger_value)}</td>
-      <td style="font-family:var(--mono)">${l.trigger_days_left !== null ? `${l.trigger_days_left}d` : "—"}</td>
       <td style="font-family:var(--mono);font-weight:600">${l.qualification_score}</td>
       <td>${statusBadge(l.status)}</td>
-      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${fmtDate(l.created_at)}</td>
       <td style="white-space:nowrap">
         ${l.status === "qualified" ? `<button class="btn btn-sm btn-brand" onclick="approveLeadFn('${escapeHtml(l.id)}')">Approve</button> ` : ""}
         ${["qualified", "approved", "ready"].includes(l.status) ? `<button class="btn btn-sm btn-red" onclick="suppressLeadFn('${escapeHtml(l.id)}')">Suppress</button>` : ""}
@@ -428,6 +427,7 @@ ${adminCss()}
             <div class="section-title" style="margin-bottom:0">Lead Pipeline <span class="sb-count">${leadsResult.total}</span></div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm btn-brand" onclick="bulkImportFn()">Bulk import prospects</button>
+              <button class="btn btn-sm" onclick="enrichLeadsFn()">Enrich leads</button>
               <button class="btn btn-sm btn-brand" onclick="bulkApproveFn()">Bulk approve qualified</button>
               <button class="btn btn-sm" onclick="generateLeadsFn()">Generate leads</button>
             </div>
@@ -435,7 +435,7 @@ ${adminCss()}
           ${leadsResult.leads.length === 0
             ? `<p class="empty">No leads yet. Click "Generate leads" to start the engine.</p>`
             : `<div style="overflow-x:auto"><table class="tbl">
-              <thead><tr><th>#</th><th>Company</th><th>Trigger Contract</th><th>Value</th><th>Expires</th><th>Score</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+              <thead><tr><th>#</th><th>Company</th><th>Contact / Website</th><th>Trigger Contract</th><th>Value</th><th>Score</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>${leadRows}</tbody>
             </table></div>`
           }
@@ -875,6 +875,17 @@ async function addSuppressionFn() {
   if (!email && !domain) return;
   var reason = prompt("Reason (manual/angry_reply/sole_trader):", "manual");
   await fetch(BASE + "/suppressions", { method: "POST", headers: hdr(), body: JSON.stringify({ email: email || null, domain: domain || null, reason: reason || "manual" }) });
+  location.reload();
+}
+async function enrichLeadsFn() {
+  if (!confirm("Enrich all leads with supplier graph data (website, address, SIC codes, email)?")) return;
+  var btn = event.target;
+  btn.disabled = true; btn.textContent = "Enriching...";
+  try {
+    var r = await fetch(BASE + "/enrich", { method: "POST", headers: hdr() });
+    var data = await r.json();
+    alert("Enriched " + data.matched + "/" + data.total + " leads matched. " + data.websiteFound + " websites, " + data.emailSet + " emails, " + data.addressSet + " addresses filled.");
+  } catch(e) { alert("Error: " + e.message); }
   location.reload();
 }
 async function bulkImportFn() {
