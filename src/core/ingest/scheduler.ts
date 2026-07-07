@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import { runFullIngest, runSourceIngest } from "./orchestrator.js";
 import { DATA_SOURCES } from "./source-registry.js";
+import { deriveSignalsFromIngest } from "../../intelligence/early-signals/aggregation-engine.js";
 
 const QUEUE_NAME = "atlasrevenue-ingest";
 
@@ -77,8 +78,14 @@ export function startIngestScheduler(redisConnection: object): void {
     }
   );
 
-  worker.on("completed", (job) => {
+  worker.on("completed", async (job) => {
     console.log(`[ingest] job ${job.name} completed`);
+    try {
+      const processed = await deriveSignalsFromIngest();
+      if (processed > 0) console.log(`[ingest] derived signals from ${processed} pending records`);
+    } catch (err: any) {
+      console.error(`[ingest] signal derivation failed:`, err?.message);
+    }
   });
   worker.on("failed", (job, err) => {
     console.error(`[ingest] job ${job?.name} failed:`, err?.message);

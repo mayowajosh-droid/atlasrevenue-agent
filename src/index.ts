@@ -6463,9 +6463,9 @@ ${faqEntries.length ? `<script type="application/ld+json">${JSON.stringify({
     ${article.dek ? `<p class="art-dek">${escapeHtml(article.dek)}</p>` : ""}
     <div class="art-meta-bar">
       <div class="art-author">
-        <div class="art-author-avatar">GR</div>
+        <div class="art-author-avatar">AR</div>
         <div>
-          <div class="art-author-name">AtlasRevenue Intelligence Desk</div>
+          <div class="art-author-name">AtlasRevenue Intelligence</div>
           <div class="art-author-meta">${pubDate}${pubDate ? " &nbsp;·&nbsp; " : ""}${article.reading_time} min read</div>
         </div>
       </div>
@@ -6756,7 +6756,7 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
       <div class="ai-title">${escapeHtml(a.title)}</div>
       ${a.dek ? `<div class="ai-dek">${escapeHtml(a.dek)}</div>` : ""}
     </div>
-    <div class="ai-meta"><div>${date}</div><div class="ai-read">${a.reading_time} MIN</div></div>
+    <div class="ai-meta"><div>AtlasRevenue Intelligence</div><div>${date} · ${a.reading_time} MIN</div></div>
   </div>
 </a>`;
   }).join("");
@@ -6889,6 +6889,34 @@ ${featuredHtml}
 }
 
 // ── Admin articles pages ──────────────────────────────────────────────────────
+
+function adminSidebarHtml(token: string, active: "articles" | "comments" | "subscriptions"): string {
+  const t = encodeURIComponent(token);
+  const link = (href: string, label: string, key: string) =>
+    `<a href="${href}" class="sb-link${active === key ? " active" : ""}">${label}</a>`;
+  return `<aside class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo-row">
+      <span class="sb-dot"></span>
+      <span class="sb-logo">Atlas<b>Revenue</b></span>
+      <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+    </div>
+    <div class="sb-tag">Command Centre</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-group">Intelligence</div>
+    <a href="/admin/scans?token=${t}" class="sb-link">Dashboard</a>
+    <div class="sb-group">Content</div>
+    ${link(`/admin/articles?token=${t}`, "Articles", "articles")}
+    <a href="/admin/articles/new?token=${t}" class="sb-link">+ New article</a>
+    ${link(`/admin/articles/comments?token=${t}`, "Comment queue", "comments")}
+    <div class="sb-group">Audience</div>
+    ${link(`/admin/subscriptions?token=${t}`, "Subscriptions", "subscriptions")}
+    <div class="sb-group">Outbound</div>
+    <a href="/admin/outbound?token=${t}" class="sb-link">Email Marketing</a>
+  </nav>
+</aside>`;
+}
 
 function adminArticleCss(): string {
   return `
@@ -7082,24 +7110,7 @@ ${adminArticleCss()}
 <body>
 <div id="sb-overlay" class="sb-overlay" onclick="closeSidebar()"></div>
 <div class="shell">
-  <aside class="sidebar" id="sidebar">
-    <div class="sb-brand">
-      <div class="sb-logo-row">
-        <span class="sb-dot"></span>
-        <span class="sb-logo">Atlas<b>Revenue</b></span>
-        <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
-      </div>
-      <div class="sb-tag">Admin Panel</div>
-    </div>
-    <nav class="sb-nav">
-      <div class="sb-group">Intelligence</div>
-      <a href="/admin/scans?token=${encodeURIComponent(token)}" class="sb-link">Overview</a>
-      <div class="sb-group">Content</div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link active">Articles <span class="sb-count">${articles.length}</span></a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="sb-link">+ New article</a>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comment queue</a>
-    </nav>
-  </aside>
+  ${adminSidebarHtml(token, "articles")}
   <div style="min-width:0">
     <div class="topbar">
       <div class="topbar-left">
@@ -7397,24 +7408,7 @@ ${adminArticleCss()}
 <body>
 <div id="sb-overlay" class="sb-overlay" onclick="closeSidebar()"></div>
 <div class="shell">
-  <aside class="sidebar" id="sidebar">
-    <div class="sb-brand">
-      <div class="sb-logo-row">
-        <span class="sb-dot"></span>
-        <span class="sb-logo">Atlas<b>Revenue</b></span>
-        <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
-      </div>
-      <div class="sb-tag">Admin Panel</div>
-    </div>
-    <nav class="sb-nav">
-      <div class="sb-group">Intelligence</div>
-      <a href="/admin/scans?token=${encodeURIComponent(token)}" class="sb-link">Overview</a>
-      <div class="sb-group">Content</div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles</a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="sb-link">+ New article</a>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link active">Comment queue</a>
-    </nav>
-  </aside>
+  ${adminSidebarHtml(token, "comments")}
   <div style="min-width:0">
     <div class="topbar">
       <div class="topbar-left">
@@ -11349,6 +11343,10 @@ ${pageShellHeader(null, authCtx)}
           <div class="atl-spinner"></div>
           <span class="atl-loader-txt">Scanning procurement records…</span>
         </div>
+        <div id="atl-map-empty" style="display:none;position:absolute;inset:0;z-index:400;background:rgba(0,0,0,.55);align-items:center;justify-content:center;flex-direction:column;gap:12px;pointer-events:none">
+          <div style="font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">No demand data found</div>
+          <div style="font-size:14px;color:#C5C9BC;max-width:300px;text-align:center;line-height:1.5">Try a different keyword or broaden your search.</div>
+        </div>
       </div>
       <div class="atl-side">
         <div class="atl-side-top">
@@ -11491,7 +11489,9 @@ function clearMkrs(){mkrs.forEach(function(m){map.removeLayer(m)});mkrs=[];}
 
 function render(data){
   clearMkrs();
-  if(!data||!data.districts||!data.districts.length)return;
+  var ov=document.getElementById('atl-map-empty');
+  if(!data||!data.districts||!data.districts.length){if(ov)ov.style.display='flex';return;}
+  if(ov)ov.style.display='none';
   var max=data.districts[0].total||1;
   data.districts.forEach(function(d){
     var ll=(d.lat!=null&&d.lon!=null)?[d.lat,d.lon]:C[d.name];
@@ -22119,6 +22119,8 @@ a:hover{text-decoration:underline}
 .tb-btn{display:flex;align-items:center;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:7px 13px;border-radius:6px;cursor:pointer;transition:.12s;background:var(--surface);text-decoration:none}
 .tb-btn:hover{border-color:var(--brand-border);color:var(--brand);background:var(--brand-dim);text-decoration:none}
 /* ——— SECTIONS ——— */
+.sec-empty,.gap-empty{display:none}
+body.show-empty .sec-empty,body.show-empty .gap-empty{display:block}
 .section{padding:28px 28px 0}
 .s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .s-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:5px}
@@ -22338,7 +22340,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="s-eyebrow">Dashboard</div>
       <div class="s-title">Overview</div>
     </div>
-    <div class="s-sub">${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="s-sub">${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+      <button class="a-btn" style="font-size:9px;padding:4px 10px" onclick="document.body.classList.toggle('show-empty');this.textContent=document.body.classList.contains('show-empty')?'Hide empty':'Show all sections'">Show all sections</button>
+    </div>
   </div>
 
   <div class="kpi-grid">
@@ -22895,7 +22900,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §I1 BUYER ENTITIES -->
-<section class="section" id="buyers">
+<section class="section${Number(buyerStats.total||0)===0?" sec-empty":""}" id="buyers">
   <div class="s-head">
     <div>
       <div class="s-title">Buyer Entities</div>
@@ -22926,7 +22931,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §I2 CONTACTS -->
-<section class="section" id="contacts">
+<section class="section${Number(contactStats.total||0)===0?" sec-empty":""}" id="contacts">
   <div class="s-head">
     <div>
       <div class="s-title">Buyer Contacts</div>
@@ -22963,7 +22968,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §I3 EARLY SIGNALS -->
-<section class="section" id="early-signals">
+<section class="section${Number(earlySignalStats.total||0)===0?" sec-empty":""}" id="early-signals">
   <div class="s-head">
     <div>
       <div class="s-title">Early Signals</div>
@@ -23003,7 +23008,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §I4 LIFECYCLE -->
-<section class="section" id="lifecycle">
+<section class="section${Number(lifecycleStats.total||0)===0?" sec-empty":""}" id="lifecycle">
   <div class="s-head">
     <div>
       <div class="s-title">Procurement Lifecycle</div>
@@ -23045,7 +23050,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §SG SUPPLIERS -->
-<section class="section" id="suppliers">
+<section class="section${Number(supplierStats.total||0)===0?" sec-empty":""}" id="suppliers">
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Supplier Graph</div>
@@ -23080,7 +23085,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §MARKET INTELLIGENCE SIGNALS -->
-<section class="section" id="market-intel">
+<section class="section${mktIntel.totalSignals===0?" sec-empty":""}" id="market-intel">
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Live Intelligence</div>
@@ -23113,7 +23118,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 </section>
 
 <!-- §INGEST PIPELINE -->
-<section class="section" id="ingest">
+<section class="section${Number(ingestTotals.total||0)===0?" sec-empty":""}" id="ingest">
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Data Platform</div>
@@ -23192,7 +23197,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §GEO GEOSPATIAL -->
-<section class="section" id="geospatial">
+<section class="section${regionIntel.length===0?" sec-empty":""}" id="geospatial">
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Data Platform</div>
@@ -23292,7 +23297,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <div class="gap"></div>
 
 <!-- §GOV DATA GOVERNANCE -->
-<section class="section" id="governance">
+<section class="section${Number(govSummary.totalSources||0)===0?" sec-empty":""}" id="governance">
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Data Governance</div>
@@ -23606,8 +23611,26 @@ app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
 :root{--base:#F4F1E9;--surface:#FFFFFF;--surface-2:#F9F7F2;--brand:#B4924E;--border:#E5DFD4;--text:#1A1208;--muted:#7D6B50;--green:#1d6b4f;
 --serif:"Newsreader",Georgia,serif;--sans:"Libre Franklin",system-ui,sans-serif;--mono:"Spline Sans Mono",ui-monospace,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--base);color:var(--text);font-family:var(--sans);padding:40px 32px;font-size:14px}
-.wrap{max-width:1200px;margin:0 auto}
+body{background:var(--base);color:var(--text);font-family:var(--sans);padding:0;font-size:14px}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-brand{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.sb-logo-row{display:flex;align-items:center;gap:8px}
+.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--brand)}
+.sb-logo{font-family:var(--sans);font-size:15px;font-weight:600;color:var(--text)}
+.sb-logo b{color:var(--brand)}
+.sb-tag{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.sb-nav{padding:12px 0;flex:1}
+.sb-group{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px}
+.sb-link{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-family:var(--sans);font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;border-left:2px solid transparent;margin:1px 0}
+.sb-link:hover{color:var(--text);background:var(--surface-2)}
+.sb-link.active{color:var(--brand);border-left-color:var(--brand);background:rgba(180,146,78,.06)}
+.sb-count{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--border);background:var(--surface)}
+.topbar-crumb{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.topbar-crumb b{color:var(--text)}
+.topbar-title{font-family:var(--serif);font-size:22px;font-weight:500;margin-top:4px}
+.wrap{max-width:1200px;margin:0 auto;padding:28px}
 .crumb{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
 .crumb a{color:var(--muted);text-decoration:none}.crumb a:hover{color:var(--text)}
 h1{font-family:var(--serif);font-weight:500;font-size:30px;letter-spacing:-.01em;margin-bottom:6px}
@@ -23629,10 +23652,15 @@ tr:last-child td{border-bottom:0}
 </style>
 </head>
 <body>
+<div class="shell">
+${adminSidebarHtml(token, "subscriptions")}
+<div style="min-width:0">
+  <div class="topbar">
+    <div><div class="topbar-crumb">Admin <span>›</span> <b>Subscriptions</b></div>
+    <div class="topbar-title">Weekly Alert Subscriptions</div></div>
+  </div>
 <div class="wrap">
-  <div class="crumb"><a href="/admin/scans?token=${encodeURIComponent(token)}">← Admin</a> &middot; Subscriptions</div>
-  <h1>Weekly Alert Subscriptions</h1>
-  <p class="sub">Companies subscribed to weekly opportunity alerts. Fire an alert manually to re-scan and email new matches.</p>
+  <p class="sub" style="margin-top:0">Companies subscribed to weekly opportunity alerts. Fire an alert manually to re-scan and email new matches.</p>
   <div class="kpis">
     <div class="kpi"><div class="kpi-v">${subs.length}</div><div class="kpi-l">Total</div></div>
     <div class="kpi"><div class="kpi-v">${activeCount}</div><div class="kpi-l">Active</div></div>
@@ -23657,6 +23685,8 @@ tr:last-child td{border-bottom:0}
       </tr>`).join("")}
     </tbody>
   </table>`}
+</div>
+</div>
 </div>
 </body></html>`);
 }));
