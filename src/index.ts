@@ -21595,7 +21595,12 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
     }
   }
 
-  const html = reportPage(scan).replace(
+  const pdfBuyerNames = scan.report_markdown ? parseBuyerNamesFromSection6(scan.report_markdown) : [];
+  const pdfBuyerContacts = pdfBuyerNames.length > 0
+    ? await lookupBuyerContacts(pdfBuyerNames.slice(0, 12)).catch(() => new Map<string, BuyerContact>())
+    : new Map<string, BuyerContact>();
+
+  const html = reportPage(scan, { buyerContacts: pdfBuyerContacts }).replace(
     "</head>",
     `<style>
       .actions,
