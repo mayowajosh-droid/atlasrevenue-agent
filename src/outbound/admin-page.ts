@@ -304,6 +304,7 @@ ${adminCss()}
       <a href="#" class="sb-link" onclick="switchTab('queue');return false">Send Queue <span class="sb-count">${sendQueueCount}</span></a>
       <a href="#" class="sb-link" onclick="switchTab('suppressions');return false">Suppressions <span class="sb-count">${suppressions.length}</span></a>
       <a href="#" class="sb-link" onclick="switchTab('analytics');return false">Performance</a>
+      <a href="#" class="sb-link" onclick="switchTab('playbook');return false">Playbook</a>
     </nav>
   </aside>
   <div style="min-width:0">
@@ -346,6 +347,7 @@ ${adminCss()}
         <button class="tab" onclick="switchTab('queue')">Queue</button>
         <button class="tab" onclick="switchTab('suppressions')">Suppressions</button>
         <button class="tab" onclick="switchTab('analytics')">Performance</button>
+        <button class="tab" onclick="switchTab('playbook')">Playbook</button>
       </div>
 
       <!-- ═══════════════════════════════════════════ -->
@@ -551,6 +553,185 @@ ${adminCss()}
       </div>
 
       <!-- ═══════════════════════════════════════════ -->
+      <!-- TAB: PLAYBOOK                               -->
+      <!-- ═══════════════════════════════════════════ -->
+      <div class="tab-panel" id="panel-playbook">
+
+        <div class="section">
+          <div class="section-title">The Unit of Outbound</div>
+          <div style="background:var(--brand-dim);border:1px solid var(--brand-border);border-radius:10px;padding:20px 24px;margin-bottom:24px">
+            <div style="font-family:var(--sg);font-size:15px;font-weight:600;margin-bottom:8px;color:var(--brand)">Company + Matching Money Movement + Decision-Maker + Reason to Talk</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.7">
+              The product is not the platform. The product is the cold email. Every email must be traceable: why did we contact them, what contract triggered it, what source supports the claim.<br>
+              <strong style="color:var(--text)">Sweet spot:</strong> £500k–£20m turnover suppliers who already want bigger contracts but do not have a full BD team.
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Pain Line</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;font-family:var(--sg);font-size:16px;font-weight:600;letter-spacing:-.01em;margin-bottom:24px">
+            "Most suppliers only see these when the tender goes live."
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Lead Groups &amp; Offers (July Priority Order)</div>
+          <div style="overflow-x:auto"><table class="tbl">
+            <thead><tr><th>Rank</th><th>Lead Group</th><th>Offer</th><th>Price</th></tr></thead>
+            <tbody>
+              <tr><td style="font-family:var(--mono);font-weight:700;color:var(--brand)">1</td><td>FM, cleaning, maintenance, waste, grounds suppliers</td><td>Renewal Radar Pack</td><td style="font-family:var(--mono);font-weight:600">£299</td></tr>
+              <tr><td style="font-family:var(--mono);font-weight:700;color:var(--brand)">2</td><td>Retrofit, solar, insulation, EV suppliers</td><td>Demand Signal Pack</td><td style="font-family:var(--mono);font-weight:600">£399</td></tr>
+              <tr><td style="font-family:var(--mono);font-weight:700;color:var(--brand)">3</td><td>Bid writers and tender consultants</td><td>White-label watchlist</td><td style="font-family:var(--mono);font-weight:600">£149/mo</td></tr>
+              <tr><td style="font-family:var(--mono);font-weight:700;color:var(--brand)">4</td><td>Domiciliary care providers</td><td>Care Recommissioning Radar</td><td style="font-family:var(--mono);font-weight:600">£299</td></tr>
+              <tr><td style="font-family:var(--mono);font-weight:700;color:var(--brand)">5</td><td>Construction maintenance contractors</td><td>Housing &amp; Council Works Radar</td><td style="font-family:var(--mono);font-weight:600">£399</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="section">
+            <div class="section-title">Qualification Scorecard</div>
+            <div style="overflow-x:auto"><table class="tbl">
+              <thead><tr><th>Signal</th><th style="text-align:right">Points</th></tr></thead>
+              <tbody>
+                <tr><td>Recently won public contract</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+30</td></tr>
+                <tr><td>Appears on a framework</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+25</td></tr>
+                <tr><td>Has public-sector case studies</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+20</td></tr>
+                <tr><td>Sector matches chosen campaign</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+20</td></tr>
+                <tr><td>Local to named opportunity</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+15</td></tr>
+                <tr><td>Company size looks able to bid</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+15</td></tr>
+                <tr><td>Has a real decision-maker email</td><td style="font-family:var(--mono);text-align:right;color:var(--green);font-weight:600">+15</td></tr>
+                <tr><td>No clear public-sector intent</td><td style="font-family:var(--mono);text-align:right;color:var(--red);font-weight:600">-25</td></tr>
+                <tr><td>Too huge / has internal bid team</td><td style="font-family:var(--mono);text-align:right;color:var(--red);font-weight:600">-15</td></tr>
+                <tr><td>Too tiny / sole trader risk</td><td style="font-family:var(--mono);text-align:right;color:var(--red);font-weight:600">-20</td></tr>
+              </tbody>
+            </table></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">Only leads scoring ~70+ should be emailed.</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Send Volume Ramp</div>
+            <div style="overflow-x:auto"><table class="tbl">
+              <thead><tr><th>Stage</th><th style="text-align:right">Leads/day</th><th style="text-align:right">Emails/day</th><th>Goal</th></tr></thead>
+              <tbody>
+                <tr><td style="font-family:var(--mono)">Week 1</td><td style="font-family:var(--mono);text-align:right">100</td><td style="font-family:var(--mono);text-align:right">20–30</td><td>Test hooks safely</td></tr>
+                <tr><td style="font-family:var(--mono)">Week 2</td><td style="font-family:var(--mono);text-align:right">100</td><td style="font-family:var(--mono);text-align:right">40–60</td><td>Scale winners</td></tr>
+                <tr><td style="font-family:var(--mono)">Week 3+</td><td style="font-family:var(--mono);text-align:right">100–300</td><td style="font-family:var(--mono);text-align:right">75–150</td><td>Repeatable outbound</td></tr>
+              </tbody>
+            </table></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">100 generated leads/day is fine. 100 sent/day too early hurts deliverability.</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="section">
+            <div class="section-title">Sending Rules</div>
+            <div style="overflow-x:auto"><table class="tbl">
+              <thead><tr><th>Rule</th><th>Setting</th></tr></thead>
+              <tbody>
+                <tr><td>Sending days</td><td style="font-family:var(--mono)">Monday – Friday</td></tr>
+                <tr><td>Sending window</td><td style="font-family:var(--mono)">09:15 – 15:45 UK</td></tr>
+                <tr><td>Max per inbox (start)</td><td style="font-family:var(--mono)">20–30/day</td></tr>
+                <tr><td>Max per domain/week</td><td style="font-family:var(--mono)">1–2 contacts</td></tr>
+                <tr><td>Follow-up 1</td><td style="font-family:var(--mono)">3 working days</td></tr>
+                <tr><td>Follow-up 2</td><td style="font-family:var(--mono)">7 working days</td></tr>
+                <tr><td>Stop sequence</td><td style="font-size:11px">Reply, bounce, unsubscribe, meeting booked</td></tr>
+                <tr><td>Tracking pixels</td><td style="font-family:var(--mono)">Avoid at first</td></tr>
+                <tr><td>Links / attachments</td><td style="font-family:var(--mono)">Minimal / none in first email</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Reply Action Map</div>
+            <div style="overflow-x:auto"><table class="tbl">
+              <thead><tr><th>Reply Type</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr><td>${classificationBadge("interested")}</td><td>Create task, suggest meeting slots</td></tr>
+                <tr><td>${classificationBadge("send_info")}</td><td>Send preview pack</td></tr>
+                <tr><td>${classificationBadge("not_now")}</td><td>Follow up in 30–60 days</td></tr>
+                <tr><td>${classificationBadge("wrong_person")}</td><td>Ask for the right contact</td></tr>
+                <tr><td>${classificationBadge("unsubscribe")}</td><td>Suppress immediately</td></tr>
+                <tr><td>${classificationBadge("angry")}</td><td>Suppress company/domain</td></tr>
+                <tr><td>${classificationBadge("ooo")}</td><td>Retry after return date</td></tr>
+                <tr><td>${classificationBadge("bounce")}</td><td>Mark email invalid</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Canonical Cold Email Template</div>
+          <div class="email-preview" style="max-width:640px">
+            <div class="email-preview-subject">Subject: [Buyer Name] contract coming back around</div>
+            <div class="email-preview-body expanded" style="max-height:none">Hi [First Name],
+
+I found something that looks relevant to [Company].
+
+You already work around [sector/service], and [Buyer Name] has a [service type] contract in [region] ending around [date]. The current supplier is listed as [incumbent if available], and I found [number] similar contracts in nearby areas.
+
+Most suppliers only see this when the tender goes live. AtlasRevenue tracks the renewal window earlier, then turns it into a short action pack showing who the buyer is, who holds the work now, when it may come back around, and what to do before competitors start chasing it.
+
+I can send you the small preview I found for [Company] if useful.
+
+Worth a look?
+
+Mayor
+AtlasRevenue
+
+If this isn't relevant, just say so and I won't contact you again.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Preview Pack (on "send it" reply)</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px">
+            <div style="font-size:12px;line-height:1.7;color:var(--muted)">
+              When someone replies "send it" or "send the preview," the system instantly creates a 1-page PDF or webpage:
+            </div>
+            <ul style="font-size:12px;line-height:1.8;color:var(--text);margin:10px 0 10px 18px">
+              <li>3 contracts worth watching</li>
+              <li>Buyer names</li>
+              <li>Incumbents</li>
+              <li>Dates</li>
+              <li>Why this matches them</li>
+              <li>Recommended first move</li>
+            </ul>
+            <div style="font-family:var(--sg);font-size:14px;font-weight:600;color:var(--brand);margin-top:8px">CTA: "Want the full Renewal Radar Pack? £299."</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">This converts better than sending them to a pricing page.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Expected Cold Outreach Outcomes (per 100 emails)</div>
+          <div class="cards">
+            <div class="card"><div class="card-label">Opens</div><div class="card-value">40–70</div></div>
+            <div class="card"><div class="card-label">Replies</div><div class="card-value">2–8</div></div>
+            <div class="card"><div class="card-label">Positive</div><div class="card-value" style="color:var(--green)">1–4</div></div>
+            <div class="card"><div class="card-label">Calls</div><div class="card-value">1–3</div></div>
+            <div class="card"><div class="card-label">Paid Pack</div><div class="card-value" style="color:var(--brand)">0–2</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">100 emails → 2 buyers × £399 = £798. If one converts to £149/mo watchlist, the model begins to work.</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Do Not Send If</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <span class="badge badge-red">Sole trader / partnership</span>
+            <span class="badge badge-red">Personal Gmail / Yahoo / Outlook</span>
+            <span class="badge badge-red">No real business relevance</span>
+            <span class="badge badge-red">Already opted out</span>
+            <span class="badge badge-red">Domain contacted too recently</span>
+            <span class="badge badge-red">Low email confidence</span>
+            <span class="badge badge-red">Weak source evidence</span>
+            <span class="badge badge-red">Unverifiable claims</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ═══════════════════════════════════════════ -->
       <!-- TAB: PERFORMANCE / ANALYTICS                -->
       <!-- ═══════════════════════════════════════════ -->
       <div class="tab-panel" id="panel-analytics">
@@ -626,7 +807,7 @@ function switchTab(name) {
   var panel = document.getElementById('panel-' + name);
   if (panel) panel.classList.add('active');
   var tabs = document.querySelectorAll('.tab');
-  var names = ['overview','leads','emails','replies','campaigns','reports','queue','suppressions','analytics'];
+  var names = ['overview','leads','emails','replies','campaigns','reports','queue','suppressions','analytics','playbook'];
   var idx = names.indexOf(name);
   if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
   document.querySelectorAll('.sb-link').forEach(function(l) { l.classList.remove('active'); });
