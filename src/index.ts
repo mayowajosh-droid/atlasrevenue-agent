@@ -18587,8 +18587,8 @@ function publicSectorDomain(buyerName: string): { domain: string; tld: string } 
 const SKIP_EMAILS = /^(info|enquiries|enquiry|contact|reception|general|admin|support|help|feedback|webmaster|customerservice|noreply|no-reply|no\.reply|postmaster|press|media|communications?|data\.protection|foi|freedom|complaints?|planning|parking|council\.?tax|housing|benefits|elections|registrars?|licensing|environmental|waste|recycling|libraries|leisure|hr|recruitment|jobs|careers|subscribe|marketing|sales|payments?|accounts?|finance|it\.?support|ict|web)@/i;
 const PROCUREMENT_KEYWORDS = /\b(procurement|commercial|contracts?|commissioning|tender|buying|purchasing|supply.chain|strategic.sourcing)\b/i;
 
-async function scrapePublicSectorContact(domain: string): Promise<BuyerContact | null> {
-  const paths = ["/", "/contact-us", "/contact", "/procurement", "/about-us"];
+async function scrapePublicSectorContact(domain: string, tld: string): Promise<BuyerContact | null> {
+  const paths = ["/procurement", "/contact-us", "/about-us/our-people", "/about-us/senior-management", "/"];
   const allEmails = new Map<string, number>();
 
   for (const p of paths) {
@@ -18596,7 +18596,7 @@ async function scrapePublicSectorContact(domain: string): Promise<BuyerContact |
       const resp = await fetch(`https://www.${domain}${p}`, {
         headers: { "User-Agent": "AtlasRevenue/1.0 (UK procurement intelligence)" },
         redirect: "follow",
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(5000),
       });
       if (!resp.ok) continue;
       const html = await resp.text();
@@ -18609,21 +18609,27 @@ async function scrapePublicSectorContact(domain: string): Promise<BuyerContact |
     } catch { continue; }
   }
 
-  if (allEmails.size === 0) return null;
-
   const candidates = [...allEmails.entries()].sort((a, b) => b[1] - a[1]);
   const procEmail = candidates.find(([e]) => PROCUREMENT_KEYWORDS.test(e));
   const personEmail = candidates.find(([e]) => /^[a-z]+\.[a-z]+@/i.test(e));
-  const [bestEmail] = procEmail || personEmail || candidates[0];
 
-  const localPart = bestEmail.split("@")[0];
-  const isPerson = /^[a-z]+\.[a-z]+$/i.test(localPart);
-  const isProcTeam = PROCUREMENT_KEYWORDS.test(localPart);
+  if (procEmail || personEmail) {
+    const [bestEmail] = procEmail || personEmail!;
+    const localPart = bestEmail.split("@")[0];
+    const isPerson = /^[a-z]+\.[a-z]+$/i.test(localPart);
+    const isProcTeam = PROCUREMENT_KEYWORDS.test(localPart);
+    return {
+      contact_name: isProcTeam ? "Procurement Team" : isPerson ? localPart.split(".").map(w => w[0].toUpperCase() + w.slice(1)).join(" ") : localPart.replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+      contact_email: bestEmail,
+      contact_title: isProcTeam ? "Procurement Department" : "Senior Officer",
+    };
+  }
 
+  const procPrefix = tld === "nhs.uk" ? "procurement" : tld === "ac.uk" ? "procurement" : "procurement";
   return {
-    contact_name: isProcTeam ? "Procurement Team" : isPerson ? localPart.split(".").map(w => w[0].toUpperCase() + w.slice(1)).join(" ") : localPart.replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-    contact_email: bestEmail,
-    contact_title: isProcTeam ? "Procurement Department" : isPerson ? "Senior Officer" : "Contact",
+    contact_name: "Procurement Team",
+    contact_email: `${procPrefix}@${domain}`,
+    contact_title: "Procurement Department",
   };
 }
 
@@ -18656,7 +18662,7 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
 
     if (psDomain) {
       try {
-        const contact = await scrapePublicSectorContact(psDomain.domain);
+        const contact = await scrapePublicSectorContact(psDomain.domain, psDomain.tld);
         if (contact) {
           result.set(buyer, contact);
           await cacheBuyerContact(buyer, contact, "transparency");
