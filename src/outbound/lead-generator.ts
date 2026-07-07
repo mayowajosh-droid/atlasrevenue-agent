@@ -267,6 +267,50 @@ function domainFromWebsite(website: string | null): string | null {
   } catch { return null; }
 }
 
+const DECISION_TITLES = /\b(director|managing|founder|owner|ceo|md|chief|head|partner|principal|bid|business development|commercial)\b/i;
+
+async function apolloEnrichLead(
+  apiKey: string,
+  companyName: string,
+): Promise<{ email: string; name: string; title: string; website: string | null } | null> {
+  const resp = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+    body: JSON.stringify({
+      q_organization_name: companyName,
+      person_locations: ["United Kingdom"],
+      page: 1,
+      per_page: 5,
+    }),
+  });
+  if (!resp.ok) {
+    if (resp.status === 429) await new Promise(r => setTimeout(r, 2000));
+    return null;
+  }
+  const data = await resp.json() as {
+    people?: Array<{
+      email?: string;
+      first_name?: string;
+      last_name?: string;
+      title?: string;
+      organization?: { website_url?: string; name?: string };
+    }>;
+  };
+  if (!data.people || data.people.length === 0) return null;
+
+  // prefer decision-makers with emails
+  const withEmail = data.people.filter(p => p.email);
+  if (withEmail.length === 0) return null;
+  const best = withEmail.find(p => p.title && DECISION_TITLES.test(p.title)) || withEmail[0];
+
+  return {
+    email: best.email!,
+    name: [best.first_name, best.last_name].filter(Boolean).join(" "),
+    title: best.title || "",
+    website: best.organization?.website_url || null,
+  };
+}
+
 export async function enrichLeadsFromSupplierGraph(): Promise<{
   total: number;
   matched: number;
@@ -360,14 +404,47 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     }
   }
 
-  // Second pass: assign best-guess domain + info@ email for leads still missing contact
-  const noEmail = await pool.query<{ id: string; company_name: string }>(
+  // Second pass: Apollo enrichment for leads missing contact email
+  const apolloKey = process.env.APOLLO_API_KEY;
+  const noEmail = await pool.query<{ id: string; company_name: string; website: string | null }>(
+    `SELECT id, company_name, website FROM outbound_leads
+     WHERE status IN ('qualified','approved') AND (contact_email IS NULL OR contact_email LIKE 'info@%')
+     LIMIT 100`,
+  );
+
+  let apolloFound = 0;
+  let domainSet = 0;
+
+  if (apolloKey && noEmail.rows.length > 0) {
+    for (const lead of noEmail.rows) {
+      try {
+        const result = await apolloEnrichLead(apolloKey, lead.company_name);
+        if (!result) continue;
+        const sets: string[] = [];
+        const vals: unknown[] = [];
+        let p = 1;
+        if (result.email) { sets.push(`contact_email = $${p++}`); vals.push(result.email); stats.emailSet++; }
+        if (result.name) { sets.push(`contact_name = $${p++}`); vals.push(result.name); }
+        if (result.title) { sets.push(`contact_role = $${p++}`); vals.push(result.title); }
+        if (result.website) { sets.push(`website = $${p++}`); vals.push(result.website); stats.websiteFound++; }
+        if (sets.length > 0) {
+          sets.push(`updated_at = now()`);
+          vals.push(lead.id);
+          await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
+          apolloFound++;
+        }
+      } catch (err) {
+        console.error(`[outbound] apollo enrich failed for ${lead.company_name}:`, err);
+      }
+    }
+  }
+
+  // Fallback: assign best-guess domain for any still missing
+  const stillNoEmail = await pool.query<{ id: string; company_name: string }>(
     `SELECT id, company_name FROM outbound_leads
      WHERE status IN ('qualified','approved') AND contact_email IS NULL`,
   );
-
-  let domainSet = 0;
-  for (const lead of noEmail.rows) {
+  for (const lead of stillNoEmail.rows) {
     const domain = bestGuessDomain(lead.company_name);
     if (!domain) continue;
     await pool.query(
@@ -383,8 +460,10 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
+    apolloFound,
     domainSet,
     noEmailCount: noEmail.rows.length,
+    apolloAvailable: !!apolloKey,
   };
 
   console.log(`[outbound] enrichment complete:`, stats, debug);

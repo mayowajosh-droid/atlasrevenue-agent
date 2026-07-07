@@ -880,7 +880,8 @@ async function enrichLeadsFn() {
   try {
     var r = await fetch(BASE + "/enrich", { method: "POST", headers: hdr() });
     var data = await r.json();
-    alert("Enriched " + data.matched + "/" + data.total + " supplier matches. " + data.websiteFound + " websites, " + data.emailSet + " emails, " + data.addressSet + " addresses. DNS/HTTP found: " + (data.debug ? data.debug.domainFound : 0));
+    var d = data.debug || {};
+    alert("Enriched " + data.total + " leads:\\n" + data.matched + " supplier matches, " + (d.apolloFound || 0) + " Apollo contacts found, " + d.domainSet + " domain guesses.\\n" + data.websiteFound + " websites, " + data.emailSet + " emails total.");
   } catch(e) { alert("Error: " + e.message); }
   btn.disabled = false; btn.textContent = "Enrich leads";
   loadLeadsPage(0);
