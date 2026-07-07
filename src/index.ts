@@ -2472,10 +2472,11 @@ const authCss = `
 function authFootHtml(): string {
   return `<footer class="auth-foot">
   <a href="/">Home</a><span class="auth-foot-sep">&middot;</span>
-  <a href="/desks">Sectors</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/sectors">Sectors</a><span class="auth-foot-sep">&middot;</span>
   <a href="/pricing">Pricing</a><span class="auth-foot-sep">&middot;</span>
   <a href="/articles">Articles</a><span class="auth-foot-sep">&middot;</span>
-  <a href="/privacy">Privacy</a>
+  <a href="/privacy">Privacy</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/terms">Terms</a>
   <div style="margin-top:10px;letter-spacing:.06em;color:var(--border)">&copy; ${new Date().getFullYear()} AtlasRevenue</div>
 </footer>`;
 }
@@ -6082,7 +6083,8 @@ a{color:inherit;text-decoration:none}
 .art-scan-btn{display:inline-flex;align-items:center;background:var(--gold-btn);color:var(--dark);font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.03em;padding:10px 18px;border-radius:3px;text-decoration:none;transition:background .15s}
 .art-scan-btn:hover{background:var(--gold-hover)}
 /* header tier 2 */
-.art-header-strip{border-top:1px solid #E8E1D0;background:rgba(243,238,227,.6)}
+.art-header-strip{border-top:1px solid #E8E1D0;background:rgba(243,238,227,.6);position:relative}
+.art-header-strip::after{content:'';position:absolute;right:0;top:0;bottom:0;width:48px;background:linear-gradient(to right,transparent,rgba(243,238,227,.95));pointer-events:none;z-index:1}
 .art-strip-inner{max-width:1320px;margin:0 auto;padding:9px 48px;display:flex;align-items:center;gap:22px;overflow-x:auto;font-family:var(--mono);font-size:12px;-ms-overflow-style:none;scrollbar-width:none}
 .art-strip-inner::-webkit-scrollbar{display:none}
 .art-strip-label{color:var(--gold);letter-spacing:.12em;white-space:nowrap;flex-shrink:0}
@@ -6505,7 +6507,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
     <nav class="art-toc-nav" id="art-toc-nav"></nav>
     <div class="art-nav-section">
       <div class="art-nav-section-label">Navigate</div>
-      ${deskSlug ? `<a class="art-nav-lnk" href="/desk/${escapeHtml(deskSlug)}"><span>${escapeHtml(article.desk ?? "")} desk</span><span>→</span></a>` : ""}
+      ${deskSlug ? `<a class="art-nav-lnk" href="/desk/${escapeHtml(deskSlug)}"><span>${escapeHtml(article.desk === "general" ? "All desks" : (article.desk ?? "") + " desk")}</span><span>→</span></a>` : ""}
       <a class="art-nav-lnk" href="/desks"><span>All desks</span><span>→</span></a>
       <a class="art-nav-lnk" href="/articles"><span>All articles</span><span>→</span></a>
       <a class="art-nav-lnk" href="/signals"><span>Live signals</span><span>→</span></a>
@@ -8842,7 +8844,7 @@ a{color:inherit;text-decoration:none}
 .chartwrap .ch-head .big .up{color:var(--green);font-size:13px;margin-left:6px}
 .chartwrap .ch-head .big .dn{color:var(--red);font-size:13px;margin-left:6px}
 #growthChart{width:100%;height:220px;display:block}
-.section{padding:68px 0;border-bottom:1px solid var(--border)}
+.section{padding:48px 0;border-bottom:1px solid var(--border)}
 .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:32px}
 .section-head h2{font-family:var(--serif);font-size:26px;font-weight:400;letter-spacing:-.01em;color:var(--text)}
 .section-head a{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:underline;text-underline-offset:4px}
@@ -18587,16 +18589,16 @@ function publicSectorDomain(buyerName: string): { domain: string; tld: string } 
 const SKIP_EMAILS = /^(info|enquiries|enquiry|contact|reception|general|admin|support|help|feedback|webmaster|customerservice|noreply|no-reply|no\.reply|postmaster|press|media|communications?|data\.protection|foi|freedom|complaints?|planning|parking|council\.?tax|housing|benefits|elections|registrars?|licensing|environmental|waste|recycling|libraries|leisure|hr|recruitment|jobs|careers|subscribe|marketing|sales|payments?|accounts?|finance|it\.?support|ict|web)@/i;
 const PROCUREMENT_KEYWORDS = /\b(procurement|commercial|contracts?|commissioning|tender|buying|purchasing|supply.chain|strategic.sourcing)\b/i;
 
-async function scrapePublicSectorContact(domain: string, tld: string): Promise<BuyerContact | null> {
-  const paths = ["/procurement", "/contact-us", "/about-us/our-people", "/about-us/senior-management", "/"];
-  const allEmails = new Map<string, number>();
+async function scrapePublicSectorContact(domain: string, _tld: string): Promise<BuyerContact> {
+  const fallback: BuyerContact = { contact_name: "Procurement Team", contact_email: `procurement@${domain}`, contact_title: "Procurement Department" };
+  const paths = ["/procurement", "/contact-us"];
 
   for (const p of paths) {
     try {
       const resp = await fetch(`https://www.${domain}${p}`, {
         headers: { "User-Agent": "AtlasRevenue/1.0 (UK procurement intelligence)" },
         redirect: "follow",
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(3000),
       });
       if (!resp.ok) continue;
       const html = await resp.text();
@@ -18604,33 +18606,13 @@ async function scrapePublicSectorContact(domain: string, tld: string): Promise<B
       for (const raw of found) {
         const e = raw.toLowerCase();
         if (SKIP_EMAILS.test(e)) continue;
-        allEmails.set(e, (allEmails.get(e) || 0) + 1);
+        if (PROCUREMENT_KEYWORDS.test(e)) return { contact_name: "Procurement Team", contact_email: e, contact_title: "Procurement Department" };
+        if (/^[a-z]+\.[a-z]+@/i.test(e)) return { contact_name: e.split("@")[0].split(".").map(w => w[0].toUpperCase() + w.slice(1)).join(" "), contact_email: e, contact_title: "Senior Officer" };
       }
     } catch { continue; }
   }
 
-  const candidates = [...allEmails.entries()].sort((a, b) => b[1] - a[1]);
-  const procEmail = candidates.find(([e]) => PROCUREMENT_KEYWORDS.test(e));
-  const personEmail = candidates.find(([e]) => /^[a-z]+\.[a-z]+@/i.test(e));
-
-  if (procEmail || personEmail) {
-    const [bestEmail] = procEmail || personEmail!;
-    const localPart = bestEmail.split("@")[0];
-    const isPerson = /^[a-z]+\.[a-z]+$/i.test(localPart);
-    const isProcTeam = PROCUREMENT_KEYWORDS.test(localPart);
-    return {
-      contact_name: isProcTeam ? "Procurement Team" : isPerson ? localPart.split(".").map(w => w[0].toUpperCase() + w.slice(1)).join(" ") : localPart.replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-      contact_email: bestEmail,
-      contact_title: isProcTeam ? "Procurement Department" : "Senior Officer",
-    };
-  }
-
-  const procPrefix = tld === "nhs.uk" ? "procurement" : tld === "ac.uk" ? "procurement" : "procurement";
-  return {
-    contact_name: "Procurement Team",
-    contact_email: `${procPrefix}@${domain}`,
-    contact_title: "Procurement Department",
-  };
+  return fallback;
 }
 
 async function cacheBuyerContact(buyer: string, contact: BuyerContact, source: string): Promise<void> {
@@ -18656,31 +18638,28 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
   const missing = buyerNames.filter(n => !result.has(n));
   if (missing.length === 0) return result;
 
-  for (const buyer of missing.slice(0, 8)) {
-    const orgType = buyerOrgType(buyer);
-    const psDomain = publicSectorDomain(buyer);
+  const apolloKey = process.env.APOLLO_API_KEY;
 
+  await Promise.all(missing.slice(0, 8).map(async (buyer) => {
+    const psDomain = publicSectorDomain(buyer);
     if (psDomain) {
       try {
         const contact = await scrapePublicSectorContact(psDomain.domain, psDomain.tld);
-        if (contact) {
-          result.set(buyer, contact);
-          await cacheBuyerContact(buyer, contact, "transparency");
-          continue;
-        }
+        result.set(buyer, contact);
+        await cacheBuyerContact(buyer, contact, "transparency");
+        return;
       } catch { /* fall through to Apollo */ }
     }
 
-    const apolloKey = process.env.APOLLO_API_KEY;
-    if (!apolloKey) continue;
+    if (!apolloKey) return;
     try {
       const resp = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey },
         body: JSON.stringify({ q_organization_name: buyer, person_locations: ["United Kingdom"], page: 1, per_page: 5 }),
+        signal: AbortSignal.timeout(5000),
       });
-      if (resp.status === 429) break;
-      if (!resp.ok) continue;
+      if (!resp.ok) return;
       const body = await resp.json() as { people?: Array<{ first_name?: string; last_name?: string; email?: string; title?: string }> };
       const withEmail = (body.people || []).filter(p => p.email);
       const best = withEmail.find(p => p.title && BUYER_TITLES.test(p.title)) || withEmail[0];
@@ -18694,7 +18673,7 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
         await cacheBuyerContact(buyer, contact, "apollo");
       }
     } catch { /* skip */ }
-  }
+  }));
   return result;
 }
 
@@ -19338,7 +19317,8 @@ ${pageShellCss()}
 .sub-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .sub-body{padding:56px 0;background:var(--base)}
 .sub-body-inner{padding:0 56px}
-.sub-two-col{display:grid;grid-template-columns:1fr 320px;gap:48px;margin-bottom:56px}
+.sub-two-col{display:grid;grid-template-columns:1fr 360px;gap:48px;margin-bottom:56px}
+.sub-two-col.sub-sparse{grid-template-columns:1fr 1fr}
 .sub-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border-2)}
 .sub-sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
 .sub-sec-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -19438,7 +19418,7 @@ ${pageShellHeader(profile, authCtx)}
 
 <section class="sub-body">
   <div class="sub-body-inner">
-    <div class="sub-two-col">
+    <div class="sub-two-col${recentOpen.length <= 3 ? ' sub-sparse' : ''}">
       <div class="sub-col-main">
         <div class="sub-sec-head">
           <span class="sub-sec-eyebrow"><span class="live-dot"></span>&nbsp;Live Signal</span>
