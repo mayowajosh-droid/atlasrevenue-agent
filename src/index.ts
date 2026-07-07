@@ -6432,15 +6432,17 @@ ${faqEntries.length ? `<script type="application/ld+json">${JSON.stringify({
         <span class="art-logo-text">Atlas<span>Revenue</span></span>
       </a>
       <nav class="art-header-nav">
-        <a href="/desks">Desks</a>
-        <a href="/signals">Signals</a>
+        <a href="/preview" class="gh-nav-atlas" style="color:var(--gold,#B4924E);font-weight:600">Find clients</a>
+        <a href="/sectors">Sectors</a>
+        <a href="/atlas">Atlas</a>
+        <a href="/desks">Contracts</a>
         <a href="/articles" class="cur">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
       </nav>
     </div>
     <div class="art-header-right">
-      <span class="art-header-tag">Signals</span>
+      <a href="/login" style="font-size:14px;color:var(--muted-2);text-decoration:none">Sign in</a>
       <a href="/scan" class="art-scan-btn">Run a scan</a>
     </div>
   </div>
@@ -19123,8 +19125,8 @@ ${pageShellCss()}
 .sub-crumb-sep{color:var(--border-2)}
 .sub-crumb-active{color:var(--text)}
 .sub-mast h1{font-family:var(--serif);font-size:clamp(36px,4.2vw,52px);font-weight:400;line-height:1.02;letter-spacing:-.02em;margin-bottom:16px;color:#ECE6D6}
-.sub-lede{font-size:16px;color:var(--muted);line-height:1.65;margin-bottom:32px}
-.sub-lede strong{color:var(--text)}
+.sub-lede{font-size:16px;color:#B5B0A2;line-height:1.65;margin-bottom:32px}
+.sub-lede strong{color:#ECE6D6}
 .sub-stats{display:grid;grid-template-columns:repeat(3,1fr);max-width:540px;border:1px solid var(--border-2)}
 .sub-stat{padding:20px 24px;background:var(--surface-2)}
 .sub-stat:not(:last-child){border-right:1px solid var(--border)}
@@ -24230,6 +24232,18 @@ app.post("/admin/articles/comments/:id/reply", requireAdmin, asyncRoute(async (r
   }
   res.redirect(`/admin/articles/comments?token=${encodeURIComponent(token)}&msg=Reply+posted`);
 }));
+
+// /admin → redirect to command centre
+app.get("/admin", (req, res) => {
+  const token = req.query.token ? `?token=${encodeURIComponent(String(req.query.token))}` : "";
+  res.redirect(`/admin/scans${token}`);
+});
+
+// Styled 404 catch-all for unmatched HTML routes
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path.startsWith("/api/")) { res.status(404).json({ error: "Not found" }); return; }
+  res.status(404).type("html").send(notFoundHtml("This page doesn’t exist.", getAuthUser(req)));
+});
 
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("[route] failed", err);

@@ -39,7 +39,7 @@ export function registerOutboundRoutes(app: Express): void {
     const code = String(req.query.code || "");
     if (!code) { res.status(400).send("Missing code"); return; }
     await exchangeCodeForToken(code);
-    res.type("html").send(`<html><body><h2>Gmail connected.</h2><p><a href="/admin/outbound?token=${ADMIN_TOKEN}">Back to outbound dashboard</a></p></body></html>`);
+    res.redirect(`/admin/outbound?token=${encodeURIComponent(ADMIN_TOKEN)}`);
   }));
 
   // ── Leads API ──
