@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import { pool } from "../config.js";
 import { DESK_PROFILES } from "../data/desk-profiles.js";
 import { computeRenewalRadar, renewalDaysLeft, anyKeywordMatches, isOverseasNotice } from "../lib/intel.js";
@@ -7,6 +9,225 @@ import { getOutboundConfig, setOutboundConfig, insertLead } from "./db.js";
 import { qualifyLeadTriggerPair, DESK_SUPPLIER_SIC_PREFIXES } from "./qualification.js";
 import { checkSuppression } from "./suppression.js";
 import type { OutboundLead } from "./types.js";
+
+const SEGMENT_TO_DESK: Record<string, string> = {
+  "Facilities & Cleaning": "facilities",
+  "Construction & Retrofit": "construction",
+  "Social Care": "social-care",
+  "Energy & Solar": "energy",
+  "Digital & IT": "digital",
+  "Security": "security",
+  "Waste": "waste",
+  "Transport & Fleet": "transport",
+  "Catering": "catering",
+  "Legal & Professional": "legal",
+  "Recruitment & HR": "recruitment",
+  "Marketing & Creative": "comms",
+  "Grounds & Landscaping": "facilities",
+  "Plumbing & M&E": "construction",
+  "Fire & Compliance": "facilities",
+  "Training": "education",
+  "Consultancy": "consulting",
+  "Scaffolding & Access": "construction",
+};
+
+type ProspectJson = {
+  company: string;
+  segment: string;
+  keyword?: string;
+  awards?: number;
+  bestValue?: number;
+  title: string;
+  buyer: string;
+  value?: number;
+  date?: string;
+  region?: string;
+};
+
+type ProspectCsv = {
+  company: string;
+  segment: string;
+  region: string;
+  last_award_title: string;
+  buyer: string;
+  award_value: string;
+  award_date: string;
+  awards_15mo: string;
+  cold_open_hook: string;
+};
+
+function parseJsonProspects(raw: string): ProspectJson[] {
+  const prospects: ProspectJson[] = [];
+  const objRegex = /\{[^{}]+\}/g;
+  let match;
+  while ((match = objRegex.exec(raw)) !== null) {
+    try {
+      const obj = JSON.parse(match[0]);
+      if (obj.company && obj.title && obj.buyer) {
+        prospects.push(obj);
+      }
+    } catch { /* skip malformed entries */ }
+  }
+  return prospects;
+}
+
+function parseCsvProspects(raw: string): ProspectCsv[] {
+  const lines = raw.split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const prospects: ProspectCsv[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const fields: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (const ch of lines[i]) {
+      if (ch === '"') { inQuotes = !inQuotes; continue; }
+      if (ch === "," && !inQuotes) { fields.push(current); current = ""; continue; }
+      current += ch;
+    }
+    fields.push(current);
+    if (fields.length >= 6) {
+      prospects.push({
+        company: fields[0].trim(),
+        segment: fields[1].trim(),
+        region: fields[2].trim(),
+        last_award_title: fields[3].trim(),
+        buyer: fields[4].trim(),
+        award_value: fields[5].trim(),
+        award_date: fields[6]?.trim() || "",
+        awards_15mo: fields[7]?.trim() || "0",
+        cold_open_hook: fields[8]?.trim() || "",
+      });
+    }
+  }
+  return prospects;
+}
+
+function parsePenceValue(val: string | number | undefined): number | null {
+  if (val === undefined || val === null) return null;
+  if (typeof val === "number") return val;
+  const cleaned = val.replace(/[£,]/g, "").trim();
+  const num = parseFloat(cleaned);
+  if (isNaN(num)) return null;
+  if (cleaned.endsWith("m")) return Math.round(num * 1_000_000 * 100);
+  if (cleaned.endsWith("k")) return Math.round(num * 1_000 * 100);
+  return Math.round(num * 100);
+}
+
+export async function bulkImportProspects(): Promise<{
+  jsonLoaded: number;
+  csvLoaded: number;
+  skippedDuplicates: number;
+  total: number;
+}> {
+  if (!pool) throw new Error("No database connection");
+
+  const existing = await pool.query<{ company_name: string }>(
+    `SELECT DISTINCT company_name FROM outbound_leads`,
+  );
+  const existingNames = new Set(existing.rows.map(r => r.company_name.toLowerCase()));
+
+  const stats = { jsonLoaded: 0, csvLoaded: 0, skippedDuplicates: 0, total: 0 };
+  const seen = new Set<string>();
+
+  const jsonPath = process.env.PROSPECT_POOL_PATH || path.resolve(process.cwd(), "data/prospects-pool.json");
+  if (fs.existsSync(jsonPath)) {
+    const raw = fs.readFileSync(jsonPath, "utf8");
+    const prospects = parseJsonProspects(raw);
+    for (const p of prospects) {
+      const key = p.company.toLowerCase();
+      if (existingNames.has(key) || seen.has(key)) { stats.skippedDuplicates++; continue; }
+      seen.add(key);
+
+      const deskSlug = SEGMENT_TO_DESK[p.segment] || null;
+      const lead: OutboundLead = {
+        id: crypto.randomUUID(),
+        campaign_id: null,
+        company_name: p.company,
+        company_number: null,
+        sic_codes: [],
+        address: null,
+        region: p.region || null,
+        company_type: null,
+        website: null,
+        contact_email: null,
+        contact_name: null,
+        contact_role: null,
+        trigger_title: p.title,
+        trigger_buyer: p.buyer,
+        trigger_incumbent: null,
+        trigger_value: p.value ? Math.round(p.value * 100) : null,
+        trigger_contract_end: null,
+        trigger_url: "",
+        trigger_days_left: null,
+        similar_count: 0,
+        desk_slug: deskSlug,
+        qualification_score: Math.min(100, 40 + (p.awards || 0) * 5),
+        qualification_reasons: [
+          `${p.awards || 0} previous public contract wins`,
+          `Segment: ${p.segment}`,
+          p.region ? `Region: ${p.region}` : null,
+        ].filter(Boolean) as string[],
+        status: "qualified",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await insertLead(lead);
+      stats.jsonLoaded++;
+    }
+  }
+
+  const csvPath = process.env.PROSPECT_CSV_PATH || path.resolve(process.cwd(), "data/prospects-500.csv");
+  if (fs.existsSync(csvPath)) {
+    const raw = fs.readFileSync(csvPath, "utf8");
+    const prospects = parseCsvProspects(raw);
+    for (const p of prospects) {
+      const key = p.company.toLowerCase();
+      if (existingNames.has(key) || seen.has(key)) { stats.skippedDuplicates++; continue; }
+      seen.add(key);
+
+      const deskSlug = SEGMENT_TO_DESK[p.segment] || null;
+      const awards = parseInt(p.awards_15mo, 10) || 0;
+      const lead: OutboundLead = {
+        id: crypto.randomUUID(),
+        campaign_id: null,
+        company_name: p.company,
+        company_number: null,
+        sic_codes: [],
+        address: null,
+        region: p.region || null,
+        company_type: null,
+        website: null,
+        contact_email: null,
+        contact_name: null,
+        contact_role: null,
+        trigger_title: p.last_award_title,
+        trigger_buyer: p.buyer,
+        trigger_incumbent: null,
+        trigger_value: parsePenceValue(p.award_value),
+        trigger_contract_end: null,
+        trigger_url: "",
+        trigger_days_left: null,
+        similar_count: 0,
+        desk_slug: deskSlug,
+        qualification_score: Math.min(100, 40 + awards * 5),
+        qualification_reasons: [
+          `${awards} recent contract wins`,
+          `Segment: ${p.segment}`,
+          p.region ? `Region: ${p.region}` : null,
+        ].filter(Boolean) as string[],
+        status: "qualified",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await insertLead(lead);
+      stats.csvLoaded++;
+    }
+  }
+
+  stats.total = stats.jsonLoaded + stats.csvLoaded;
+  console.log(`[outbound] bulk import complete:`, stats);
+  return stats;
+}
 
 type RenewalCandidate = {
   buyer: string;

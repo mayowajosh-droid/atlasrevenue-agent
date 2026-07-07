@@ -427,6 +427,7 @@ ${adminCss()}
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <div class="section-title" style="margin-bottom:0">Lead Pipeline <span class="sb-count">${leadsResult.total}</span></div>
             <div style="display:flex;gap:8px">
+              <button class="btn btn-sm btn-brand" onclick="bulkImportFn()">Bulk import prospects</button>
               <button class="btn btn-sm btn-brand" onclick="bulkApproveFn()">Bulk approve qualified</button>
               <button class="btn btn-sm" onclick="generateLeadsFn()">Generate leads</button>
             </div>
@@ -874,6 +875,17 @@ async function addSuppressionFn() {
   if (!email && !domain) return;
   var reason = prompt("Reason (manual/angry_reply/sole_trader):", "manual");
   await fetch(BASE + "/suppressions", { method: "POST", headers: hdr(), body: JSON.stringify({ email: email || null, domain: domain || null, reason: reason || "manual" }) });
+  location.reload();
+}
+async function bulkImportFn() {
+  if (!confirm("Bulk import all prospect files (JSON pool + CSV)?")) return;
+  var btn = event.target;
+  btn.disabled = true; btn.textContent = "Importing...";
+  try {
+    var r = await fetch(BASE + "/bulk-import", { method: "POST", headers: hdr() });
+    var data = await r.json();
+    alert("Imported " + data.total + " leads (" + data.jsonLoaded + " from pool, " + data.csvLoaded + " from CSV, " + data.skippedDuplicates + " duplicates skipped)");
+  } catch(e) { alert("Error: " + e.message); }
   location.reload();
 }
 </script>
