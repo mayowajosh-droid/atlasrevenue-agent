@@ -427,9 +427,6 @@ ${adminCss()}
               <option value="sent">Sent</option>
               <option value="suppressed">Suppressed</option>
             </select>
-            <span id="lead-page-info" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
-            <button class="btn btn-sm" id="lead-prev" onclick="loadLeadsPage(leadPage-1)" disabled>Prev</button>
-            <button class="btn btn-sm" id="lead-next" onclick="loadLeadsPage(leadPage+1)">Next</button>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" id="leads-table">
@@ -437,6 +434,7 @@ ${adminCss()}
               <tbody id="leads-tbody"></tbody>
             </table>
           </div>
+          <div id="leads-pagination" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 0;flex-wrap:wrap"></div>
         </div>
       </div>
 
@@ -900,10 +898,41 @@ async function bulkImportFn() {
 }
 // ── Leads pagination ──
 var leadPage = 0;
-var LEAD_PAGE_SIZE = 100;
+var LEAD_PAGE_SIZE = 50;
 function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function fmtVal(v) { if (!v) return "-"; var n = v / 100; return n >= 1e6 ? "\\u00a3" + (n/1e6).toFixed(1) + "m" : n >= 1e3 ? "\\u00a3" + Math.round(n/1e3) + "k" : "\\u00a3" + n; }
 function sBadge(s) { var c = {qualified:"#666",approved:"var(--brand)",ready:"#2e7d32",sent:"var(--brand)",composing:"#555",suppressed:"var(--red)"}; return '<span style="padding:2px 8px;border-radius:3px;font-size:10px;background:'+(c[s]||"#555")+';color:#fff">'+s+'</span>'; }
+
+function renderPagination(currentPage, totalItems) {
+  var totalPages = Math.ceil(totalItems / LEAD_PAGE_SIZE);
+  if (totalPages <= 1) { document.getElementById("leads-pagination").innerHTML = ""; return; }
+  var h = "";
+  // Prev button
+  h += '<button class="btn btn-sm" onclick="loadLeadsPage(' + (currentPage - 1) + ')"' + (currentPage === 0 ? ' disabled style="opacity:0.4;cursor:default"' : '') + '>&laquo; Prev</button>';
+  // Page numbers with ellipsis
+  var pages = [];
+  pages.push(0);
+  for (var i = Math.max(1, currentPage - 2); i <= Math.min(totalPages - 2, currentPage + 2); i++) pages.push(i);
+  if (totalPages > 1) pages.push(totalPages - 1);
+  // deduplicate and sort
+  pages = pages.filter(function(v, idx, a) { return a.indexOf(v) === idx; }).sort(function(a, b) { return a - b; });
+  for (var j = 0; j < pages.length; j++) {
+    if (j > 0 && pages[j] - pages[j-1] > 1) {
+      h += '<span style="color:var(--muted);font-size:12px;padding:0 2px">...</span>';
+    }
+    var pg = pages[j];
+    var isActive = pg === currentPage;
+    h += '<button onclick="loadLeadsPage(' + pg + ')" style="min-width:32px;height:32px;border-radius:6px;border:1px solid ' + (isActive ? 'var(--brand)' : 'var(--border)') + ';background:' + (isActive ? 'var(--brand)' : 'var(--card-bg)') + ';color:' + (isActive ? '#fff' : 'var(--ink)') + ';font-size:13px;font-weight:' + (isActive ? '700' : '400') + ';cursor:pointer">' + (pg + 1) + '</button>';
+  }
+  // Next button
+  h += '<button class="btn btn-sm" onclick="loadLeadsPage(' + (currentPage + 1) + ')"' + (currentPage >= totalPages - 1 ? ' disabled style="opacity:0.4;cursor:default"' : '') + '>Next &raquo;</button>';
+  // Page info
+  var start = currentPage * LEAD_PAGE_SIZE + 1;
+  var end = Math.min(start + LEAD_PAGE_SIZE - 1, totalItems);
+  h += '<span style="color:var(--muted);font-size:12px;margin-left:12px">Showing ' + start + '\\u2013' + end + ' of ' + totalItems + '</span>';
+  document.getElementById("leads-pagination").innerHTML = h;
+}
+
 async function loadLeadsPage(page) {
   if (page < 0) page = 0;
   leadPage = page;
@@ -915,10 +944,7 @@ async function loadLeadsPage(page) {
     var data = await r.json();
     document.getElementById("lead-total").textContent = data.total;
     var start = page * LEAD_PAGE_SIZE;
-    var end = Math.min(start + data.leads.length, data.total);
-    document.getElementById("lead-page-info").textContent = (start+1) + "–" + end + " of " + data.total;
-    document.getElementById("lead-prev").disabled = page === 0;
-    document.getElementById("lead-next").disabled = end >= data.total;
+    renderPagination(page, data.total);
     var html = "";
     data.leads.forEach(function(l, i) {
       var contact = l.contact_email ? esc(l.contact_email) : '<span style="color:var(--red)">missing</span>';
@@ -938,6 +964,8 @@ async function loadLeadsPage(page) {
         + '<td style="white-space:nowrap">' + actions + '</td></tr>';
     });
     document.getElementById("leads-tbody").innerHTML = html;
+    // scroll table into view on page change
+    document.getElementById("leads-table").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch(e) { console.error("loadLeads", e); }
 }
 loadLeadsPage(0);
