@@ -10,6 +10,7 @@ import {
 import { generateDailyLeads, bulkImportProspects, enrichLeadsFromSupplierGraph } from "./lead-generator.js";
 import { composeEmail } from "./email-composer.js";
 import { getGmailAuthUrl, exchangeCodeForToken, isGmailConfigured } from "./gmail.js";
+import { discoverRealSupplierContact } from "./supplier-discovery.js";
 import { renderAdminOutboundPage } from "./admin-page.js";
 import type { LeadStatus, CampaignStatus } from "./types.js";
 
@@ -176,6 +177,17 @@ export function registerOutboundRoutes(app: Express): void {
     void enrichLeadsFromSupplierGraph()
       .then(result => console.log("[outbound] enrichment complete:", result))
       .catch(err => console.error("[outbound] enrich error:", err));
+  }));
+
+  app.get("/api/outbound/discover-test", requireAdmin, asyncRoute(async (req, res) => {
+    const name = String(req.query.name || "Kent Construction Consultants Limited");
+    const started = Date.now();
+    try {
+      const found = await discoverRealSupplierContact(name);
+      res.json({ name, found, elapsedMs: Date.now() - started });
+    } catch (err: any) {
+      res.json({ name, error: err.message, stack: err.stack?.split("\n").slice(0, 5), elapsedMs: Date.now() - started });
+    }
   }));
 
   console.log("[outbound] routes registered");
