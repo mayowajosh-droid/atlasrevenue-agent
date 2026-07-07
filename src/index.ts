@@ -1396,6 +1396,21 @@ async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS buyer_contacts (
+      id TEXT PRIMARY KEY,
+      buyer_name TEXT NOT NULL,
+      contact_name TEXT,
+      contact_email TEXT,
+      contact_title TEXT,
+      contact_phone TEXT,
+      website TEXT,
+      source TEXT NOT NULL DEFAULT 'apollo',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(buyer_name)
+    )
+  `);
+
   console.log("[db] ready");
 }
 
@@ -16516,28 +16531,27 @@ app.get("/desks", asyncRoute(async (req, res) => {
 }));
 
 // ── Niche market pages ──────────────────────────────────────────────────────
-app.get("/market/retrofit", asyncRoute(async (req, res) => {
-  const profile = DESK_PROFILES.find(d => d.slug === "construction")!;
-  const cached = await getDeskCache("construction").catch(() => null);
+async function nicheMarketWithContacts(cfg: NicheConfig, deskSlug: string, req: any, res: any) {
+  const profile = DESK_PROFILES.find(d => d.slug === deskSlug)!;
+  const cached = await getDeskCache(deskSlug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
-  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "construction" } }));
-  res.type("html").send(nicheMarketPage(NICHE_RETROFIT, cached, getAuthUser(req)));
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: deskSlug } }));
+  const profiles = buildNicheBuyerProfiles(cfg, cached?.data ?? undefined);
+  const topBuyerNames = profiles.slice(0, 6).map(bp => bp.buyer);
+  const contacts = await lookupBuyerContacts(topBuyerNames).catch(() => new Map<string, BuyerContact>());
+  res.type("html").send(nicheMarketPage(cfg, cached, getAuthUser(req), contacts));
+}
+
+app.get("/market/retrofit", asyncRoute(async (req, res) => {
+  await nicheMarketWithContacts(NICHE_RETROFIT, "construction", req, res);
 }));
 
 app.get("/market/plumbing", asyncRoute(async (req, res) => {
-  const profile = DESK_PROFILES.find(d => d.slug === "construction")!;
-  const cached = await getDeskCache("construction").catch(() => null);
-  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
-  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "construction" } }));
-  res.type("html").send(nicheMarketPage(NICHE_PLUMBING, cached, getAuthUser(req)));
+  await nicheMarketWithContacts(NICHE_PLUMBING, "construction", req, res);
 }));
 
 app.get("/market/facilities", asyncRoute(async (req, res) => {
-  const profile = DESK_PROFILES.find(d => d.slug === "facilities")!;
-  const cached = await getDeskCache("facilities").catch(() => null);
-  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
-  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "facilities" } }));
-  res.type("html").send(nicheMarketPage(NICHE_FACILITIES, cached, getAuthUser(req)));
+  await nicheMarketWithContacts(NICHE_FACILITIES, "facilities", req, res);
 }));
 
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
@@ -18501,10 +18515,60 @@ function startWatchlistWorker() {
   console.log("[watchlist] worker started");
 }
 
+type BuyerContact = { contact_name: string; contact_email: string; contact_title: string };
+
+const BUYER_TITLES = /\b(director|managing|founder|owner|ceo|md|chief|head|partner|principal|commissioning|procurement|commercial|contract|programme)\b/i;
+
+async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, BuyerContact>> {
+  const result = new Map<string, BuyerContact>();
+  if (buyerNames.length === 0) return result;
+  const apolloKey = process.env.APOLLO_API_KEY;
+  if (!apolloKey || !pool) return result;
+
+  const cached = await pool.query<{ buyer_name: string; contact_name: string; contact_email: string; contact_title: string }>(
+    `SELECT buyer_name, contact_name, contact_email, contact_title FROM buyer_contacts WHERE buyer_name = ANY($1)`,
+    [buyerNames]
+  );
+  for (const row of cached.rows) {
+    if (row.contact_email) result.set(row.buyer_name, { contact_name: row.contact_name, contact_email: row.contact_email, contact_title: row.contact_title });
+  }
+
+  const missing = buyerNames.filter(n => !result.has(n));
+  for (const buyer of missing.slice(0, 6)) {
+    try {
+      const resp = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey },
+        body: JSON.stringify({ q_organization_name: buyer, person_locations: ["United Kingdom"], page: 1, per_page: 5 }),
+      });
+      if (resp.status === 429) break;
+      if (!resp.ok) continue;
+      const body = await resp.json() as { people?: Array<{ first_name?: string; last_name?: string; email?: string; title?: string }> };
+      const people = body.people || [];
+      const withEmail = people.filter(p => p.email);
+      const best = withEmail.find(p => p.title && BUYER_TITLES.test(p.title)) || withEmail[0];
+      if (best?.email) {
+        const contact: BuyerContact = {
+          contact_name: `${best.first_name || ""} ${best.last_name || ""}`.trim(),
+          contact_email: best.email,
+          contact_title: best.title || "",
+        };
+        result.set(buyer, contact);
+        await pool.query(
+          `INSERT INTO buyer_contacts (id, buyer_name, contact_name, contact_email, contact_title) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (buyer_name) DO UPDATE SET contact_name=$3, contact_email=$4, contact_title=$5`,
+          [globalThis.crypto.randomUUID(), buyer, contact.contact_name, contact.contact_email, contact.contact_title]
+        );
+      }
+    } catch { /* skip failed lookups */ }
+  }
+  return result;
+}
+
 function nicheMarketPage(
   cfg: NicheConfig,
   cached: { data: ProcurementData; cached_at: string } | null,
-  authCtx?: { email: string; tier: UserTier } | null
+  authCtx?: { email: string; tier: UserTier } | null,
+  buyerContacts?: Map<string, BuyerContact>
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
@@ -18613,6 +18677,12 @@ function nicheMarketPage(
         <div class="rm-oc-row"><span class="rm-oc-k">Timing</span><span class="rm-oc-v">${escapeHtml(bp.timing)}</span></div>
         <div class="rm-oc-row"><span class="rm-oc-k">Outreach angle</span><span class="rm-oc-v">${isGated ? '<span style="filter:blur(4px);user-select:none">' + escapeHtml(bp.outreachAngle.slice(0, 60)) + '</span>' : escapeHtml(bp.outreachAngle)}</span></div>
         <div class="rm-oc-row"><span class="rm-oc-k">Contractor fit</span><span class="rm-oc-v">${escapeHtml(bp.contractorFit)}</span></div>
+        ${(() => {
+          const c = buyerContacts?.get(bp.buyer);
+          if (!c) return "";
+          if (isGated) return `<div class="rm-oc-row rm-oc-contact"><span class="rm-oc-k">Key contact</span><span class="rm-oc-v" style="filter:blur(4px);user-select:none">${escapeHtml(c.contact_name.slice(0, 20))}</span></div>`;
+          return `<div class="rm-oc-row rm-oc-contact"><span class="rm-oc-k">Key contact</span><span class="rm-oc-v"><strong>${escapeHtml(c.contact_name)}</strong><br><span style="font-size:11.5px;color:var(--muted)">${escapeHtml(c.contact_title.slice(0, 60))}</span><br><a href="mailto:${escapeHtml(c.contact_email)}" style="font-size:12px;color:var(--brand)">${escapeHtml(c.contact_email)}</a></span></div>`;
+        })()}
       </div>
       ${bp.signals.length > 0 ? `<div class="rm-tags" style="padding:0 18px 14px">${bp.signals.map(s => `<span class="rm-tag">${escapeHtml(s)}</span>`).join("")}</div>` : ""}
       ${isGated ? `<div class="rm-oc-gate"><span>Full card + outreach pack in the Buyer Pack</span></div>` : ""}
