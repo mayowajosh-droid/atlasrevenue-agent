@@ -10,28 +10,6 @@ import { qualifyLeadTriggerPair, DESK_SUPPLIER_SIC_PREFIXES } from "./qualificat
 import { checkSuppression } from "./suppression.js";
 import type { OutboundLead } from "./types.js";
 
-function bestGuessDomain(companyName: string): string | null {
-  // handle "t/a" / "trading as" — use trade name
-  const taMatch = companyName.match(/(?:t\/a|trading as)\s+(.+)/i);
-  const name = taMatch ? taMatch[1] : companyName;
-
-  const stripped = name
-    .replace(/\b(limited|ltd|plc|llp|inc|group|holdings|uk|services|solutions|the|company|co|&)\b/gi, "")
-    .replace(/[^a-zA-Z0-9 ]/g, "")
-    .trim();
-  const words = stripped.split(/\s+/).filter(Boolean).map(w => w.toLowerCase());
-  if (words.length === 0) return null;
-
-  // single word → word.co.uk (e.g. "Mitie" → mitie.co.uk)
-  // two words → joined.co.uk (e.g. "Kier Building" → kierbuilding.co.uk)
-  // three+ words → first word.co.uk (e.g. "Kent Construction Consultants" → kent.co.uk is too generic)
-  //   so use joined for 2-3 words, first word for 4+
-  if (words.length <= 3) {
-    return words.join("") + ".co.uk";
-  }
-  return words[0] + ".co.uk";
-}
-
 const SEGMENT_TO_DESK: Record<string, string> = {
   "Facilities & Cleaning": "facilities",
   "Construction & Retrofit": "construction",
@@ -258,15 +236,6 @@ function normaliseName(name: string): string {
     .trim();
 }
 
-function domainFromWebsite(website: string | null): string | null {
-  if (!website) return null;
-  try {
-    const host = website.replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
-    if (!host || host.includes("companieshouse") || host.includes("gov.uk")) return null;
-    return host;
-  } catch { return null; }
-}
-
 const DECISION_TITLES = /\b(director|managing|founder|owner|ceo|md|chief|head|partner|principal|bid|business development|commercial)\b/i;
 
 async function apolloEnrichLead(
@@ -381,13 +350,6 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     if (supplier.website && !lead.website) {
       sets.push(`website = $${p++}`); vals.push(supplier.website);
       stats.websiteFound++;
-      if (!lead.contact_email) {
-        const domain = domainFromWebsite(supplier.website);
-        if (domain) {
-          sets.push(`contact_email = $${p++}`); vals.push(`info@${domain}`);
-          stats.emailSet++;
-        }
-      }
     }
     if (supplier.total_wins > 0 && lead.qualification_score < 70) {
       const newScore = Math.min(100, lead.qualification_score + Math.min(supplier.total_wins * 3, 30));
@@ -439,29 +401,19 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     }
   }
 
-  // Fallback: assign best-guess domain for any still missing
-  const stillNoEmail = await pool.query<{ id: string; company_name: string }>(
-    `SELECT id, company_name FROM outbound_leads
-     WHERE status IN ('qualified','approved') AND contact_email IS NULL`,
-  );
-  for (const lead of stillNoEmail.rows) {
-    const domain = bestGuessDomain(lead.company_name);
-    if (!domain) continue;
-    await pool.query(
-      `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
-      [`https://${domain}`, `info@${domain}`, lead.id],
-    ).catch(() => {});
-    domainSet++;
-    stats.websiteFound++;
-    stats.emailSet++;
-  }
+  // No fake info@ fallback: leads without a real discovered email stay NULL.
+  // Backfill: nuke any previously-injected info@ addresses so they show as missing.
+  const nuked = await pool.query(
+    `UPDATE outbound_leads SET contact_email = NULL, updated_at = now() WHERE contact_email LIKE 'info@%'`,
+  ).catch(() => ({ rowCount: 0 }));
+  const infoNuked = nuked.rowCount || 0;
 
   const debug = {
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
     apolloFound,
-    domainSet,
+    infoNuked,
     noEmailCount: noEmail.rows.length,
     apolloAvailable: !!apolloKey,
   };
@@ -602,10 +554,8 @@ async function generateLeadsForDesk(deskSlug: string, campaignId?: string): Prom
       if (!qualification.qualified) continue;
       stats.suppliersMatched++;
 
-      // Build contact email from pattern (first attempt — will be enriched later)
-      const contactEmail = supplier.website
-        ? `info@${supplier.website.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}`
-        : null;
+      // Contact email is discovered later via enrichment — do NOT fabricate info@ emails.
+      const contactEmail = null;
 
       const suppression = await checkSuppression({
         email: contactEmail,

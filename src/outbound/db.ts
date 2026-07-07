@@ -127,6 +127,16 @@ export async function initOutboundTables(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+
+  // One-shot backfill: nuke fake info@ emails injected by the old fallback logic.
+  try {
+    const nuked = await pool.query(
+      `UPDATE outbound_leads SET contact_email = NULL, updated_at = now() WHERE contact_email LIKE 'info@%'`,
+    );
+    if (nuked.rowCount && nuked.rowCount > 0) {
+      console.log(`[outbound] nuked ${nuked.rowCount} fake info@ contact emails`);
+    }
+  } catch (err) { console.warn("[outbound] info@ backfill skipped:", String(err).slice(0, 120)); }
 }
 
 // ── Config ──

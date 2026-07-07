@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "atlasrevenue-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "atlasrevenue-dev-mem",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["DATABASE_URL=", "REDIS_URL=", "npm", "run", "dev", "--prefix", "/Users/mayowathefirst/Desktop/atlasrevenue-agent"],
+      "port": 3000
+    }
+  ]
+}
