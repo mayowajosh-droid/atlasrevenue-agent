@@ -2448,7 +2448,22 @@ const authCss = `
     .field-row{grid-template-columns:1fr}
     .btn-primary{padding:13px}
   }
+  .auth-foot{text-align:center;padding:32px 20px 24px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .auth-foot a{color:var(--muted);text-decoration:none;transition:color .15s}
+  .auth-foot a:hover{color:var(--brand)}
+  .auth-foot-sep{color:var(--border);margin:0 6px}
 `;
+
+function authFootHtml(): string {
+  return `<footer class="auth-foot">
+  <a href="/">Home</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/desks">Sectors</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/pricing">Pricing</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/articles">Articles</a><span class="auth-foot-sep">&middot;</span>
+  <a href="/privacy">Privacy</a>
+  <div style="margin-top:10px;letter-spacing:.06em;color:var(--border)">&copy; ${new Date().getFullYear()} AtlasRevenue</div>
+</footer>`;
+}
 
 function clientEmailFromInput(input: z.infer<typeof intakeSchema>) {
   return input.clientEmail || input.email || null;
@@ -5481,7 +5496,7 @@ const DESK_SOURCE_PRIORITY: Record<string, string[]> = {
 const DESK_SECTORS: Record<string, MarketSignalSector[]> = {
   "construction":       ["construction", "property"],
   "highways":           ["construction", "transport"],
-  "facilities":         ["construction", "professional_services"],
+  "facilities":         ["professional_services", "property"],
   "education":          ["education"],
   "transport":          ["transport"],
   "fleet-automotive":   ["automotive", "transport", "energy"],
@@ -6734,12 +6749,15 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
     const tags = (a.tags || generateArticleTags(a)).split(",").map(t => t.trim()).filter(Boolean);
     const tagHtml = tags.map(t => `<span class="ai-pill${t.toLowerCase() === "monthly report" ? " ai-pill-report" : ""}">${escapeHtml(t)}</span>`).join("");
     return `<a href="/articles/${escapeHtml(a.slug)}" class="ai-row">
-  <div class="ai-tags">${tagHtml}</div>
-  <div>
-    <div class="ai-title">${escapeHtml(a.title)}</div>
-    ${a.dek ? `<div class="ai-dek">${escapeHtml(a.dek)}</div>` : ""}
+  ${a.hero_image_url ? `<div class="ai-thumb" style="background-image:url('${escapeHtml(a.hero_image_url)}')"></div>` : `<div class="ai-thumb ai-thumb-empty"></div>`}
+  <div class="ai-row-body">
+    <div class="ai-tags">${tagHtml}</div>
+    <div>
+      <div class="ai-title">${escapeHtml(a.title)}</div>
+      ${a.dek ? `<div class="ai-dek">${escapeHtml(a.dek)}</div>` : ""}
+    </div>
+    <div class="ai-meta"><div>${date}</div><div class="ai-read">${a.reading_time} MIN</div></div>
   </div>
-  <div class="ai-meta"><div>${date}</div><div class="ai-read">${a.reading_time} MIN</div></div>
 </a>`;
   }).join("");
 
@@ -6758,9 +6776,12 @@ ${pageShellCss()}
 .ai-fw{max-width:1160px;margin:0 auto;padding:40px 32px 0}
 .ai-featured{display:grid;grid-template-columns:1.15fr 0.85fr}
 .ai-fl{padding:32px 38px}
-.ai-row{display:grid;grid-template-columns:160px 1fr 110px;gap:22px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
+.ai-row{display:grid;grid-template-columns:80px 1fr;gap:18px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
 .ai-row:hover{background:var(--surface)}
 .ai-row:last-child{border-bottom:none}
+.ai-thumb{width:80px;height:80px;border-radius:6px;background-size:cover;background-position:center;background-color:var(--surface-2);flex-shrink:0}
+.ai-thumb-empty{background:linear-gradient(135deg,var(--surface-2) 0%,var(--border) 100%)}
+.ai-row-body{display:grid;grid-template-columns:160px 1fr 110px;gap:22px;align-items:center}
 .ai-tags{display:flex;flex-wrap:wrap;gap:5px}
 .ai-pill{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.18);padding:2px 7px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
 .ai-pill-report{color:#0E2318;background:rgba(14,35,24,.10);border-color:rgba(14,35,24,.28);font-weight:600}
@@ -6773,7 +6794,9 @@ ${pageShellCss()}
   .ai-featured{display:block}
   .ai-fl{padding:22px 20px}
   .ai-fr{display:none}
-  .ai-row{grid-template-columns:1fr;gap:6px}
+  .ai-row{grid-template-columns:1fr;gap:10px}
+  .ai-thumb{display:none}
+  .ai-row-body{grid-template-columns:1fr;gap:6px}
   .ai-meta{text-align:left}
 }
 .ai-pager{display:flex;align-items:center;justify-content:center;gap:6px;padding:40px 0 0;flex-wrap:wrap}
@@ -12246,7 +12269,7 @@ ${err ? `<div class="err">${err}</div>` : ""}
   <div><div style="font-family:monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#A0522D;margin-bottom:4px">&#9679; Sample available</div><div style="font-size:12px;color:#888">Preview a full 10-section intelligence report</div></div>
   <a href="/scan/sample" style="font-family:monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#A0522D;padding:8px 16px;text-decoration:none">View &rarr;</a>
 </div>
-</div></div></body></html>`);
+</div></div>${authFootHtml()}</body></html>`);
 });
 
 app.post("/register", asyncRoute(async (req, res) => {
@@ -12295,7 +12318,7 @@ ${err ? `<div class="err">${err}</div>` : ""}
   <div><div style="font-family:monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#A0522D;margin-bottom:4px">&#9679; Sample available</div><div style="font-size:12px;color:#888">Preview a full 10-section intelligence report</div></div>
   <a href="/scan/sample" style="font-family:monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#A0522D;padding:8px 16px;text-decoration:none">View &rarr;</a>
 </div>
-</div></div></body></html>`);
+</div></div>${authFootHtml()}</body></html>`);
 });
 
 app.post("/login", asyncRoute(async (req, res) => {
@@ -12326,7 +12349,7 @@ function forgotSentPage(): string {
 <h1>Check your email</h1>
 <p class="sub">If that email has an AtlasRevenue account, a reset link is on its way. It expires in 1 hour. Check spam if it hasn't arrived in a couple of minutes.</p>
 <p class="auth-alt"><a href="/login">Back to sign in</a></p>
-</div></div></body></html>`;
+</div></div>${authFootHtml()}</body></html>`;
 }
 
 app.get("/forgot", (req, res) => {
@@ -12343,7 +12366,7 @@ app.get("/forgot", (req, res) => {
 <button class="btn-primary" type="submit">Send reset link</button>
 </form>
 <p class="auth-alt">Remembered it? <a href="/login">Sign in</a></p>
-</div></div></body></html>`);
+</div></div>${authFootHtml()}</body></html>`);
 });
 
 app.post("/forgot", asyncRoute(async (req, res) => {
@@ -16978,9 +17001,9 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
   }).length;
 
-  // Monthly spend trend (last 12 months, from awardedNotices, no future dates)
+  // Monthly spend trend (last 12 months, outlier-filtered, no future dates)
   const monthlySpend = new Map<string, number>();
-  for (const n of awardedNotices) {
+  for (const n of validAwardedNotices) {
     const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
     if (!d || d.getTime() < cutoff365 || d.getTime() > nowMs) continue;
     const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -17393,8 +17416,8 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
           <div class="an-kpi-lbl">Contracts indexed</div>
         </div>
         <div class="an-kpi an-kpi--div">
-          <div class="an-kpi-val">${topBuyers.length}</div>
-          <div class="an-kpi-lbl">Active buyers</div>
+          <div class="an-kpi-val">${escapeHtml(String(uniqueBuyerCount))}</div>
+          <div class="an-kpi-lbl">Unique buyers</div>
         </div>
         <div class="an-kpi an-kpi--div">
           <div class="an-kpi-val">${medianContractVal > 0 ? escapeHtml(fmtShort(medianContractVal)) : "&mdash;"}</div>
@@ -17420,7 +17443,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
             </div>
           </div>
           ${buyersHtml}
-          <p class="an-footnote">${topBuyers.length} active buyer${topBuyers.length === 1 ? "" : "s"} tracked on this desk</p>
+          <p class="an-footnote">Top ${topBuyers.length} buyer${topBuyers.length === 1 ? "" : "s"} by awarded spend on this desk</p>
         </div>
         <div>
           <div class="an-card">
@@ -17460,13 +17483,13 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
             const dt = n.awardedDate || n.publishedDate;
             const dtFmt = dt ? new Date(dt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
             return `<div class="award-card">
-              <div class="award-card-buyer">${escapeHtml(n.buyer.slice(0, 45))}</div>
-              <div class="award-card-title">${escapeHtml(n.title.slice(0, 90))}</div>
+              <div class="award-card-buyer">${escapeHtml(n.buyer.length > 60 ? n.buyer.slice(0, n.buyer.lastIndexOf(' ', 60)) + '...' : n.buyer)}</div>
+              <div class="award-card-title">${escapeHtml(n.title.length > 140 ? n.title.slice(0, n.title.lastIndexOf(' ', 140)) + '...' : n.title)}</div>
               <div class="award-card-meta">
                 <span class="award-card-val">${val && val > 0 ? escapeHtml(fmtMoney(val)) : "&mdash;"}</span>
                 <span class="award-card-date">${escapeHtml(dtFmt)}</span>
               </div>
-              ${n.awardedSupplier ? `<div class="award-card-winner">&#127942; ${escapeHtml(n.awardedSupplier.slice(0, 50))}</div>` : ""}
+              ${n.awardedSupplier ? `<div class="award-card-winner">&#127942; ${escapeHtml(n.awardedSupplier.length > 60 ? n.awardedSupplier.slice(0, n.awardedSupplier.lastIndexOf(' ', 60)) + '...' : n.awardedSupplier)}</div>` : ""}
             </div>`;
           }).join("")}
         </div>
@@ -17499,15 +17522,15 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
                 ? `<span style="font-family:var(--mono);font-size:10px;color:var(--brand);border:1px solid var(--brand);border-radius:3px;padding:1px 6px">ENDS IN ${daysLeft}D</span>`
                 : `<span style="font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--border);border-radius:3px;padding:1px 6px">ENDS IN ${daysLeft}D</span>`;
             return `<div class="award-card">
-              <div class="award-card-buyer">${escapeHtml(n.buyer.slice(0, 45))}</div>
-              <div class="award-card-title">${escapeHtml(n.title.slice(0, 90))}</div>
+              <div class="award-card-buyer">${escapeHtml(n.buyer.length > 60 ? n.buyer.slice(0, n.buyer.lastIndexOf(' ', 60)) + '...' : n.buyer)}</div>
+              <div class="award-card-title">${escapeHtml(n.title.length > 140 ? n.title.slice(0, n.title.lastIndexOf(' ', 140)) + '...' : n.title)}</div>
               <div class="award-card-meta">
                 <span class="award-card-val">${n.awardedValue && n.awardedValue > 0 ? escapeHtml(fmtMoney(n.awardedValue)) : "&mdash;"}</span>
                 <span class="award-card-date">${escapeHtml(endFmt)}</span>
               </div>
               <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
                 ${chip}
-                ${n.awardedSupplier ? `<span class="award-card-winner" style="margin-top:0">Incumbent: ${escapeHtml(n.awardedSupplier.slice(0, 40))}</span>` : ""}
+                ${n.awardedSupplier ? `<span class="award-card-winner" style="margin-top:0">Incumbent: ${escapeHtml(n.awardedSupplier.length > 50 ? n.awardedSupplier.slice(0, n.awardedSupplier.lastIndexOf(' ', 50)) + '...' : n.awardedSupplier)}</span>` : ""}
               </div>
             </div>`;
           }).join("")}
