@@ -7557,7 +7557,26 @@ h1 b{color:var(--brand);font-weight:500}
 </html>`;
 }
 
-function reportPage(scan: ScanRecord, opts?: { gated?: boolean }) {
+function parseBuyerNamesFromSection6(md: string): string[] {
+  const sec = md.match(/##\s*6\..*?(?=\n##\s|\Z)/s)?.[0] || "";
+  const rows = sec.match(/^\|[^|\n]+\|[^|\n]+\|[^\n]*\|/gm) || [];
+  return rows.slice(2).map(line => {
+    const cells = line.split("|").map(s => s.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+    return (cells[0] || "").replace(/\*\*/g, "").trim();
+  }).filter(b => b && !/^[-=]+$/.test(b));
+}
+
+function injectBuyerContactsIntoHtml(html: string, contacts: Map<string, BuyerContact>): string {
+  if (!contacts || contacts.size === 0) return html;
+  for (const [buyer, c] of contacts) {
+    const buyerEsc = escapeHtml(buyer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(<td>(?:<strong>)?)(${buyerEsc})((?:<\\/strong>)?<\\/td>)`, "i");
+    html = html.replace(re, `$1$2$3</tr><tr><td colspan="5" style="padding:4px 8px 10px;border-bottom:1px solid var(--border-2)"><span style="font-size:11.5px;color:var(--muted)">&#128100; ${escapeHtml(c.contact_name)} &middot; ${escapeHtml(c.contact_title.slice(0, 50))}</span><br><a href="mailto:${escapeHtml(c.contact_email)}" style="font-size:11.5px;color:var(--brand)">${escapeHtml(c.contact_email)}</a></td>`);
+  }
+  return html;
+}
+
+function reportPage(scan: ScanRecord, opts?: { gated?: boolean; buyerContacts?: Map<string, BuyerContact> }) {
   const gated = opts?.gated ?? false;
   if (scan.status === "pending" || scan.status === "running") return waitingPage(scan);
   const data = scan.procurement_json as ProcurementData | null;
@@ -7590,9 +7609,10 @@ function reportPage(scan: ScanRecord, opts?: { gated?: boolean }) {
     ? stripEdpFromMarkdown(stripReportTitleFromMarkdown(cleanMarkdown))
     : null;
 
-  const fullContent = bodyMarkdown
+  const rawContent = bodyMarkdown
     ? markdownToHtml(bodyMarkdown)
     : `<p>Status: <strong>${escapeHtml(scan.status)}</strong></p><p>${scan.error_message ? escapeHtml(scan.error_message) : "Still running. Refresh shortly."}</p>`;
+  const fullContent = opts?.buyerContacts ? injectBuyerContactsIntoHtml(rawContent, opts.buyerContacts) : rawContent;
 
   // Split content into free (sections 2-3) and gated (sections 4-10) portions.
   // Section 4 heading is "Source-Backed" in the markdown → rendered as <h2>4. Source-Backed...
@@ -15008,7 +15028,12 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   const auth = getAuthUser(req);
   const shouldGate = !auth || auth.tier === "free";
 
-  res.type("html").send(reportPage(scan, { gated: shouldGate }));
+  const buyerNames = scan.report_markdown ? parseBuyerNamesFromSection6(scan.report_markdown) : [];
+  const buyerContacts = buyerNames.length > 0
+    ? await lookupBuyerContacts(buyerNames.slice(0, 12)).catch(() => new Map<string, BuyerContact>())
+    : new Map<string, BuyerContact>();
+
+  res.type("html").send(reportPage(scan, { gated: shouldGate, buyerContacts }));
 }));
 
 app.get("/signals", asyncRoute(async (req, res) => {
