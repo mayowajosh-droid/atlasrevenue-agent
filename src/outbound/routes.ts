@@ -190,5 +190,43 @@ export function registerOutboundRoutes(app: Express): void {
     }
   }));
 
+  // Discover a small batch inline (sync) and write results directly to DB.
+  // Bounded to N leads and returns actual write outcome — used to prove the
+  // full happy-path works without the background-void indirection.
+  app.post("/api/outbound/discover-batch", requireAdmin, asyncRoute(async (req, res) => {
+    const { pool } = await import("../config.js");
+    if (!pool) { res.status(500).json({ error: "no db" }); return; }
+    const limit = Math.min(Number(req.query.limit || 5), 20);
+    const rows = await pool.query<{ id: string; company_name: string }>(
+      `SELECT id, company_name FROM outbound_leads
+       WHERE status IN ('qualified','approved') AND website IS NULL AND contact_email IS NULL
+       ORDER BY qualification_score DESC LIMIT $1`, [limit]);
+    const started = Date.now();
+    const results: any[] = [];
+    for (const lead of rows.rows) {
+      try {
+        const found = await discoverRealSupplierContact(lead.company_name);
+        const sets: string[] = [];
+        const vals: unknown[] = [];
+        let p = 1;
+        if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); }
+        if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); }
+        if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
+        if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
+        let updated = false;
+        if (sets.length > 0) {
+          sets.push(`updated_at = now()`);
+          vals.push(lead.id);
+          await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals);
+          updated = true;
+        }
+        results.push({ company: lead.company_name, found, updated });
+      } catch (err: any) {
+        results.push({ company: lead.company_name, error: err.message });
+      }
+    }
+    res.json({ count: results.length, elapsedMs: Date.now() - started, results });
+  }));
+
   console.log("[outbound] routes registered");
 }
