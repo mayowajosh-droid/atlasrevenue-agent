@@ -41,19 +41,23 @@ Return ONLY this JSON object, no prose, no markdown fences:
 {"website": "...", "email": "...", "contact_name": "...", "contact_role": "..."}`;
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25_000);
     let response;
     try {
       response = await openai.responses.create({
         model: OPENAI_MODEL,
         tools: [{ type: "web_search" } as any],
         input: prompt,
-      });
+      }, { signal: controller.signal });
     } catch {
       response = await openai.responses.create({
         model: OPENAI_MODEL,
         tools: [{ type: "web_search_preview" } as any],
         input: prompt,
-      });
+      }, { signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
     }
 
     const text = response.output_text || "";

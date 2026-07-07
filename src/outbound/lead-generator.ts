@@ -409,9 +409,10 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   ).catch(() => ({ rowCount: 0 }));
   const infoNuked = nuked.rowCount || 0;
 
-  // Real supplier discovery via OpenAI web_search. Capped to protect the OpenAI bill.
-  // Only runs for leads that still have no verified website and no contact email.
-  const DISCOVER_CAP = Number(process.env.OUTBOUND_DISCOVER_CAP || 50);
+  // Real supplier discovery via OpenAI web_search. Capped + parallelized to keep
+  // the request under HTTP timeout and to protect the OpenAI bill.
+  const DISCOVER_CAP = Number(process.env.OUTBOUND_DISCOVER_CAP || 20);
+  const DISCOVER_CONCURRENCY = Number(process.env.OUTBOUND_DISCOVER_CONCURRENCY || 6);
   const needsDiscovery = await pool.query<{ id: string; company_name: string }>(
     `SELECT id, company_name FROM outbound_leads
      WHERE status IN ('qualified','approved')
@@ -424,26 +425,33 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
   let discovered = 0;
   let discoveredWebsite = 0;
   let discoveredEmail = 0;
-  for (const lead of needsDiscovery.rows) {
-    try {
-      const found = await discoverRealSupplierContact(lead.company_name);
-      if (!found.website && !found.email) continue;
-      const sets: string[] = [];
-      const vals: unknown[] = [];
-      let p = 1;
-      if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); discoveredWebsite++; }
-      if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); discoveredEmail++; }
-      if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
-      if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
-      if (sets.length === 0) continue;
-      sets.push(`updated_at = now()`);
-      vals.push(lead.id);
-      await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
-      discovered++;
-    } catch (err) {
-      console.error(`[outbound] discovery failed for ${lead.company_name}:`, String(err).slice(0, 120));
+
+  const queue = [...needsDiscovery.rows];
+  const workers = Array.from({ length: Math.min(DISCOVER_CONCURRENCY, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const lead = queue.shift();
+      if (!lead) break;
+      try {
+        const found = await discoverRealSupplierContact(lead.company_name);
+        if (!found.website && !found.email) continue;
+        const sets: string[] = [];
+        const vals: unknown[] = [];
+        let p = 1;
+        if (found.website) { sets.push(`website = $${p++}`); vals.push(found.website); discoveredWebsite++; }
+        if (found.email) { sets.push(`contact_email = $${p++}`); vals.push(found.email); discoveredEmail++; }
+        if (found.contact_name) { sets.push(`contact_name = $${p++}`); vals.push(found.contact_name); }
+        if (found.contact_role) { sets.push(`contact_role = $${p++}`); vals.push(found.contact_role); }
+        if (sets.length === 0) continue;
+        sets.push(`updated_at = now()`);
+        vals.push(lead.id);
+        if (pool) await pool.query(`UPDATE outbound_leads SET ${sets.join(", ")} WHERE id = $${p}`, vals).catch(() => {});
+        discovered++;
+      } catch (err) {
+        console.error(`[outbound] discovery failed for ${lead.company_name}:`, String(err).slice(0, 120));
+      }
     }
-  }
+  });
+  await Promise.all(workers);
 
   const debug = {
     supplierCount: suppliers.rows.length,
