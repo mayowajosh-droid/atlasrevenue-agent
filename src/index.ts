@@ -1396,24 +1396,14 @@ async function initDb() {
     )
   `);
 
-  try {
-    const bcSchema = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' AND column_name = 'buyer_name'`);
-    if (bcSchema.rowCount === 0) {
-      await pool.query(`ALTER TABLE IF EXISTS buyer_contacts RENAME TO buyer_contacts_legacy`);
-      console.log("[db] renamed old buyer_contacts → buyer_contacts_legacy");
-    }
-  } catch { /* table may not exist yet */ }
-
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS buyer_contacts (
+    CREATE TABLE IF NOT EXISTS buyer_contact_cache (
       id TEXT PRIMARY KEY,
       buyer_name TEXT NOT NULL,
       contact_name TEXT,
       contact_email TEXT,
       contact_title TEXT,
-      contact_phone TEXT,
-      website TEXT,
-      source TEXT NOT NULL DEFAULT 'apollo',
+      source TEXT NOT NULL DEFAULT 'transparency',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE(buyer_name)
     )
@@ -16580,7 +16570,7 @@ async function nicheMarketWithContacts(cfg: NicheConfig, deskSlug: string, req: 
 app.get("/api/debug/buyer-contacts", asyncRoute(async (req, res) => {
   if (req.query.token !== process.env.ADMIN_TOKEN) { res.status(401).json({ error: "unauthorized" }); return; }
   try {
-    const cols = pool ? (await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contacts' ORDER BY ordinal_position`)).rows.map(r => r.column_name) : [];
+    const cols = pool ? (await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'buyer_contact_cache' ORDER BY ordinal_position`)).rows.map(r => r.column_name) : [];
     const cached = await getDeskCache("construction").catch(() => null);
     const profiles = buildNicheBuyerProfiles(NICHE_RETROFIT, cached?.data ?? undefined);
     const names = profiles.slice(0, 6).map(bp => bp.buyer);
@@ -18641,7 +18631,7 @@ async function scrapePublicSectorContact(domain: string, _tld: string): Promise<
 async function cacheBuyerContact(buyer: string, contact: BuyerContact, source: string): Promise<void> {
   if (!pool) return;
   await pool.query(
-    `INSERT INTO procurement_contact_cache (id, buyer_name, contact_name, contact_email, contact_title, source) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (buyer_name) DO UPDATE SET contact_name=$3, contact_email=$4, contact_title=$5, source=$6`,
+    `INSERT INTO buyer_contact_cache (id, buyer_name, contact_name, contact_email, contact_title, source) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (buyer_name) DO UPDATE SET contact_name=$3, contact_email=$4, contact_title=$5, source=$6`,
     [globalThis.crypto.randomUUID(), buyer, contact.contact_name, contact.contact_email, contact.contact_title, source]
   );
 }
@@ -18651,7 +18641,7 @@ async function lookupBuyerContacts(buyerNames: string[]): Promise<Map<string, Bu
   if (buyerNames.length === 0 || !pool) return result;
 
   const cached = await pool.query<{ buyer_name: string; contact_name: string; contact_email: string; contact_title: string }>(
-    `SELECT buyer_name, contact_name, contact_email, contact_title FROM procurement_contact_cache WHERE buyer_name = ANY($1)`,
+    `SELECT buyer_name, contact_name, contact_email, contact_title FROM buyer_contact_cache WHERE buyer_name = ANY($1)`,
     [buyerNames]
   );
   for (const row of cached.rows) {
