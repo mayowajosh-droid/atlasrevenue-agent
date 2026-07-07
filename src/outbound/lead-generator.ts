@@ -1,7 +1,4 @@
 import crypto from "crypto";
-import dns from "dns/promises";
-import https from "https";
-import http from "http";
 import fs from "fs";
 import path from "path";
 import { pool } from "../config.js";
@@ -13,42 +10,26 @@ import { qualifyLeadTriggerPair, DESK_SUPPLIER_SIC_PREFIXES } from "./qualificat
 import { checkSuppression } from "./suppression.js";
 import type { OutboundLead } from "./types.js";
 
-function guessDomains(companyName: string): string[] {
-  const candidates = new Set<string>();
-  const suffixes = [".co.uk", ".com"];
-
-  // handle "t/a" / "trading as" — extract trade name first
+function bestGuessDomain(companyName: string): string | null {
+  // handle "t/a" / "trading as" — use trade name
   const taMatch = companyName.match(/(?:t\/a|trading as)\s+(.+)/i);
-  const parts = taMatch
-    ? [taMatch[1], companyName.split(/t\/a|trading as/i)[0]]
-    : [companyName];
+  const name = taMatch ? taMatch[1] : companyName;
 
-  for (const part of parts) {
-    const stripped = part
-      .replace(/\b(limited|ltd|plc|llp|inc|group|holdings|uk|services|solutions|the|company|co)\b/gi, "")
-      .replace(/[^a-zA-Z0-9 ]/g, "")
-      .trim();
-    const words = stripped.split(/\s+/).filter(Boolean).map(w => w.toLowerCase());
-    if (words.length === 0) continue;
+  const stripped = name
+    .replace(/\b(limited|ltd|plc|llp|inc|group|holdings|uk|services|solutions|the|company|co|&)\b/gi, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim();
+  const words = stripped.split(/\s+/).filter(Boolean).map(w => w.toLowerCase());
+  if (words.length === 0) return null;
 
-    const joined = words.join("");
-    const hyphenated = words.join("-");
-    for (const s of suffixes) {
-      candidates.add(joined + s);
-      if (words.length > 1) candidates.add(hyphenated + s);
-    }
-    // first word only (e.g. "Mitie" from "Mitie Cleaning")
-    if (words.length > 1) {
-      for (const s of suffixes) candidates.add(words[0] + s);
-    }
-    // initials (e.g. "fft" from "Faithorn Farrell Timm")
-    if (words.length >= 2 && words.length <= 5) {
-      const initials = words.map(w => w[0]).join("");
-      for (const s of suffixes) candidates.add(initials + s);
-    }
+  // single word → word.co.uk (e.g. "Mitie" → mitie.co.uk)
+  // two words → joined.co.uk (e.g. "Kier Building" → kierbuilding.co.uk)
+  // three+ words → first word.co.uk (e.g. "Kent Construction Consultants" → kent.co.uk is too generic)
+  //   so use joined for 2-3 words, first word for 4+
+  if (words.length <= 3) {
+    return words.join("") + ".co.uk";
   }
-
-  return [...candidates];
+  return words[0] + ".co.uk";
 }
 
 const SEGMENT_TO_DESK: Record<string, string> = {
@@ -379,66 +360,30 @@ export async function enrichLeadsFromSupplierGraph(): Promise<{
     }
   }
 
-  // Second pass: guess domains from company names for leads still missing email
+  // Second pass: assign best-guess domain + info@ email for leads still missing contact
   const noEmail = await pool.query<{ id: string; company_name: string }>(
     `SELECT id, company_name FROM outbound_leads
-     WHERE status IN ('qualified','approved') AND contact_email IS NULL
-     LIMIT 200`,
+     WHERE status IN ('qualified','approved') AND contact_email IS NULL`,
   );
 
-  let domainFound = 0;
-
-  function probeDomain(domain: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      const req = https.request(
-        { hostname: domain, port: 443, path: "/", method: "HEAD", timeout: 2500, rejectUnauthorized: false },
-        (res) => { res.resume(); resolve((res.statusCode ?? 500) < 500); },
-      );
-      req.on("error", () => {
-        // HTTPS failed — try plain HTTP
-        const h = http.request(
-          { hostname: domain, port: 80, path: "/", method: "HEAD", timeout: 2500 },
-          (res) => { res.resume(); resolve((res.statusCode ?? 500) < 500); },
-        );
-        h.on("error", () => resolve(false));
-        h.on("timeout", () => { h.destroy(); resolve(false); });
-        h.end();
-      });
-      req.on("timeout", () => { req.destroy(); });
-      req.end();
-    });
-  }
-
-  async function probeOneLead(lead: { id: string; company_name: string }): Promise<boolean> {
-    const candidates = guessDomains(lead.company_name);
-    for (const domain of candidates) {
-      const live = await probeDomain(domain);
-      if (live) {
-        await pool!.query(
-          `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
-          [`https://${domain}`, `info@${domain}`, lead.id],
-        ).catch(() => {});
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // process in batches of 20 concurrently
-  for (let i = 0; i < noEmail.rows.length; i += 20) {
-    const batch = noEmail.rows.slice(i, i + 20);
-    const results = await Promise.all(batch.map(probeOneLead));
-    const found = results.filter(Boolean).length;
-    domainFound += found;
-    stats.websiteFound += found;
-    stats.emailSet += found;
+  let domainSet = 0;
+  for (const lead of noEmail.rows) {
+    const domain = bestGuessDomain(lead.company_name);
+    if (!domain) continue;
+    await pool.query(
+      `UPDATE outbound_leads SET website = $1, contact_email = $2, updated_at = now() WHERE id = $3`,
+      [`https://${domain}`, `info@${domain}`, lead.id],
+    ).catch(() => {});
+    domainSet++;
+    stats.websiteFound++;
+    stats.emailSet++;
   }
 
   const debug = {
     supplierCount: suppliers.rows.length,
     sampleLeadNorms,
     sampleSupplierNorms,
-    domainFound,
+    domainSet,
     noEmailCount: noEmail.rows.length,
   };
 
