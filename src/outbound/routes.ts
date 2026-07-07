@@ -168,8 +168,13 @@ export function registerOutboundRoutes(app: Express): void {
   }));
 
   app.post("/api/outbound/enrich", requireAdmin, asyncRoute(async (_req, res) => {
-    const result = await enrichLeadsFromSupplierGraph();
-    res.json(result);
+    try {
+      const result = await enrichLeadsFromSupplierGraph();
+      res.json(result);
+    } catch (err: any) {
+      console.error("[outbound] enrich error:", err);
+      res.status(500).json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) });
+    }
   }));
 
   console.log("[outbound] routes registered");
