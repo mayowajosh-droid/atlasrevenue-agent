@@ -24443,6 +24443,11 @@ app.get("/admin", (req, res) => {
   res.redirect(`/admin/scans${token}`);
 });
 
+// Outbound routes must register before the 404 catch-all below — Express matches
+// in registration order, so anything registered later (e.g. in the async startup
+// chain) is unreachable behind it.
+registerOutboundRoutes(app);
+
 // Styled 404 catch-all for unmatched HTML routes
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.path.startsWith("/api/")) { res.status(404).json({ error: "Not found" }); return; }
@@ -24670,7 +24675,6 @@ initDb()
     }
 
     if (RUN_WEB) {
-      registerOutboundRoutes(app);
       app.listen(PORT, () => {
         console.log(`[server] AtlasRevenue Agent running on port ${PORT}`);
         // Warm up live desk caches on startup — staggered to avoid hammering Contracts Finder.
